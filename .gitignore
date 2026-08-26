@@ -50,11 +50,12 @@ frontend/dist/
 !.env.example
 
 # ==============================
-# Databases
+# Databases & Data Files
 # ==============================
 *.db
 *.sqlite
 *.sqlite3
+8.xlsx
 
 # ==============================
 # IDE & Editors
