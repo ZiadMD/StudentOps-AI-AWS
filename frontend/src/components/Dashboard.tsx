@@ -64,7 +64,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab, onSendCha
     },
     {
       title: "Scorecard Review",
-      prompt: "Show me Maurine's score based on the 8.xlsx evaluation standards",
+      prompt: "Show me Maurine's evaluation scores and behavior breakdown",
       icon: Award,
       shortcut: "⌘3"
     },

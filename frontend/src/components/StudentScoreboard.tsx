@@ -32,8 +32,8 @@ export const StudentScoreboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">8.xlsx Master Scoreboard</h2>
-          <p className="text-sm text-slate-500 mt-1">Official evaluation metrics (Behavior /23, Tasks /10)</p>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Member Evaluations</h2>
+          <p className="text-sm text-slate-500 mt-1">Behavior score (/23) and task quality average (/10)</p>
         </div>
         
         <div className="flex items-center space-x-3">
@@ -56,7 +56,7 @@ export const StudentScoreboard: React.FC = () => {
 
       <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 text-sm">Syncing with 8.xlsx records...</div>
+          <div className="p-12 text-center text-slate-500 text-sm">Loading evaluations…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">

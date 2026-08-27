@@ -44,7 +44,7 @@ export const api = {
       body: JSON.stringify({ action_id: actionId, confirmed }),
     }),
 
-  // Students & 8.xlsx Scoreboards
+  // Students & Scoreboards
   getStudents: () => fetchJson<Student[]>('/students'),
   getScoreboard: () => fetchJson<StudentScoreSummary[]>('/students/scoreboard/all'),
 

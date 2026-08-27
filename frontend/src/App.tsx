@@ -1,48 +1,90 @@
 import { useState } from 'react';
-import { Sidebar } from './components/Sidebar';
-import { Dashboard } from './components/Dashboard';
-import { AgentChat } from './components/AgentChat';
-import { AttendanceView } from './components/AttendanceView';
-import { StudentScoreboard } from './components/StudentScoreboard';
-import { CalendarView } from './components/CalendarView';
-import { TaskManagement } from './components/TaskManagement';
-import { AuditViewer } from './components/AuditViewer';
+import { Sidebar, Tab, Role } from './components/Sidebar';
+import { LoginPage }          from './components/auth/LoginPage';
+import { RegisterPage }       from './components/auth/RegisterPage';
+import { Dashboard }          from './components/Dashboard';
+import { AgentChat }          from './components/AgentChat';
+import { AttendanceView }     from './components/AttendanceView';
+import { StudentScoreboard }  from './components/StudentScoreboard';
+import { CalendarView }       from './components/CalendarView';
+import { TaskManagement }     from './components/TaskManagement';
+import { TaskReviewsPage }    from './components/TaskReviewsPage';
+import { StudentsPage }       from './components/StudentsPage';
+import { NotificationsPage }  from './components/NotificationsPage';
+import { AuditViewer }        from './components/AuditViewer';
+
+type AuthScreen = 'login' | 'register' | 'app';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [screen, setScreen]             = useState<AuthScreen>('login');
+  const [userRole, setUserRole]         = useState<Role>('hr_admin');
+  const [activeTab, setActiveTab]       = useState<Tab>('dashboard');
   const [chatInitialQuery, setChatInitialQuery] = useState<string | undefined>(undefined);
+
+  const handleLogin = (role: Role) => {
+    setUserRole(role);
+    setScreen('app');
+    setActiveTab('dashboard');
+  };
+
+  const handleRegister = (role: Role) => {
+    setUserRole(role);
+    setScreen('app');
+    setActiveTab('dashboard');
+  };
+
+  const handleLogout = () => {
+    setScreen('login');
+    setActiveTab('dashboard');
+  };
 
   const handleSendChatQuery = (query: string) => {
     setChatInitialQuery(query);
     setActiveTab('chat');
   };
 
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex antialiased selection:bg-blue-600 selection:text-white">
-      {/* Sidebar Navigation */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+  // ── Auth screens ──────────────────────────────────────────────────────────
+  if (screen === 'login') {
+    return (
+      <LoginPage
+        onLogin={handleLogin}
+        onGoToRegister={() => setScreen('register')}
+      />
+    );
+  }
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <div className="flex-1 overflow-y-auto w-full mx-auto px-6 sm:px-8 lg:px-12 py-8 bg-ambient-mesh">
-          <div className="max-w-6xl mx-auto w-full h-full flex flex-col">
-            {activeTab === 'dashboard' && (
-              <Dashboard 
-                onNavigateToTab={setActiveTab} 
-                onSendChatQuery={handleSendChatQuery} 
-              />
-            )}
-            {activeTab === 'chat' && (
-              <AgentChat 
-                initialQuery={chatInitialQuery} 
-                onClearInitialQuery={() => setChatInitialQuery(undefined)} 
-              />
-            )}
-            {activeTab === 'attendance' && <AttendanceView />}
-            {activeTab === 'scoreboard' && <StudentScoreboard />}
-            {activeTab === 'calendar' && <CalendarView />}
-            {activeTab === 'tasks' && <TaskManagement />}
-            {activeTab === 'audit' && <AuditViewer />}
+  if (screen === 'register') {
+    return (
+      <RegisterPage
+        onRegister={handleRegister}
+        onGoToLogin={() => setScreen('login')}
+      />
+    );
+  }
+
+  // ── Main app shell ────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] flex antialiased selection:bg-blue-600 selection:text-white">
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        role={userRole}
+        onLogout={handleLogout}
+      />
+
+      <main className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        <div className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-10 py-8">
+          <div className="max-w-5xl mx-auto w-full">
+            {activeTab === 'dashboard'     && <Dashboard onNavigateToTab={(t) => setActiveTab(t as Tab)} onSendChatQuery={handleSendChatQuery} />}
+            {activeTab === 'chat'          && <AgentChat initialQuery={chatInitialQuery} onClearInitialQuery={() => setChatInitialQuery(undefined)} />}
+            {activeTab === 'students'      && <StudentsPage />}
+            {activeTab === 'attendance'    && <AttendanceView />}
+            {activeTab === 'scoreboard'    && <StudentScoreboard />}
+            {activeTab === 'calendar'      && <CalendarView />}
+            {activeTab === 'tasks'         && <TaskManagement />}
+            {activeTab === 'task-reviews'  && <TaskReviewsPage />}
+            {activeTab === 'notifications' && <NotificationsPage />}
+            {activeTab === 'audit'         && <AuditViewer />}
           </div>
         </div>
       </main>

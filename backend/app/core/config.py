@@ -26,12 +26,10 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5174",
     ]
     
-    # AWS Bedrock
-    AWS_REGION: str = "us-east-1"
-    AWS_ACCESS_KEY_ID: Optional[str] = None
-    AWS_SECRET_ACCESS_KEY: Optional[str] = None
-    AWS_SESSION_TOKEN: Optional[str] = None
-    BEDROCK_MODEL_ID: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    # OpenRouter LLM
+    OPENROUTER_API_KEY: Optional[str] = None
+    OPENROUTER_MODEL: str = "nvidia/nemotron-3-super-120b-a12b:free"
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     
     # Google Workspace / APIs
     GOOGLE_CLIENT_ID: Optional[str] = None
@@ -49,7 +47,7 @@ class Settings(BaseSettings):
     ATTENDANCE_MIN_PRESENT_PERCENT: float = 70.0
     ATTENDANCE_MIN_LATE_PERCENT: float = 50.0
     
-    # Scoring standard (from 8.xlsx)
+    # Scoring thresholds
     BEHAVIOR_MAX_SCORE: int = 23
     TASK_MAX_SCORE: int = 10
 
