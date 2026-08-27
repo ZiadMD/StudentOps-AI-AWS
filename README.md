@@ -8,43 +8,53 @@ It replaces fragmented spreadsheets, manual Google Meet tracking, and uncoordina
 
 ## Architecture Overview
 
-```
-                      +------------------------------------------+
-                      |         User (HR / Lead / Member)        |
-                      +------------------------------------------+
-                                           |
-                                           v
-                      +------------------------------------------+
-                      |   Frontend Shell (React 19 / Vite / TS)  |
-                      |   - Multi-Role Auth State Machine        |
-                      |   - Real-Time SSE Stream Consumer        |
-                      |   - Edge-to-Edge Pro SaaS Data Tables    |
-                      +------------------------------------------+
-                                           |  (HTTP / SSE Stream)
-                                           v
-                      +------------------------------------------+
-                      |       FastAPI Backend (Python 3.11+ / uv)|
-                      |   - POST /api/agent/stream (SSE)         |
-                      |   - POST /api/agent/confirm (Human-in-Loop)
-                      |   - REST API: Members, Attendance, Tasks |
-                      +------------------------------------------+
-                                           |
-                   +-----------------------+-----------------------+
-                   |                                               |
-                   v                                               v
-+------------------------------------+   +------------------------------------+
-|     Autonomous ReAct Engine        |   |   Deterministic Policy Engines     |
-| - Intent Recognition               |   | - Attendance Policy (70%/50% rules)|
-| - OpenRouter LLM (Streaming)       |   | - Scoring Engine (Behavior /23)    |
-| - Sandboxed Typed Tool Registry    |   | - Task Quality Engine (Avg /10)    |
-| - Human Confirmation Barrier       |   | - Bilingual Identity Matcher       |
-+------------------------------------+   | - Immutable Audit Logger           |
-                                         +------------------------------------+
-                                                           |
-                                                           v
-                                         +------------------------------------+
-                                         | Async SQLite Database (aiosqlite)  |
-                                         +------------------------------------+
+```mermaid
+flowchart TD
+    User(["User (HR Admin / Team Lead / Member)"])
+    
+    subgraph FrontendShell["Frontend Shell (React 19 / TypeScript / Vite / Tailwind)"]
+        Auth["Multi-Role Auth State Machine"]
+        StreamReader["Real-Time SSE Stream Consumer"]
+        Tables["Pro SaaS Data Workspaces & Tables"]
+    end
+    
+    subgraph BackendAPI["FastAPI Backend (Python 3.11+ / uv)"]
+        StreamEndpoint["POST /api/agent/stream (SSE)"]
+        ConfirmEndpoint["POST /api/agent/confirm (Human-in-Loop)"]
+        RESTEndpoints["REST Endpoints (Students, Attendance, Tasks, Audit)"]
+    end
+    
+    subgraph AgentLayer["Autonomous ReAct Agent Engine"]
+        IntentRouter{"Intent Classification"}
+        ToolRegistry["Sandboxed Typed Tool Registry"]
+        ConfirmBarrier{"Sensitive Action Barrier"}
+        OpenRouterLLM["OpenRouter LLM Gateway (Streaming)"]
+    end
+    
+    subgraph PolicyLayer["Deterministic Domain & Policy Engines"]
+        AttendanceEngine["Attendance Policy Engine (70%/50% Rules)"]
+        ScoringEngine["Scoring Engine (Behavior /23, Tasks /10)"]
+        IdentityEngine["Bilingual Identity Matcher"]
+        AuditEngine["Immutable Audit Logger"]
+    end
+    
+    subgraph DatabaseLayer["Database Layer"]
+        SQLiteDB[("Async SQLite (aiosqlite) / PostgreSQL Ready")]
+    end
+
+    User --> FrontendShell
+    FrontendShell -- "HTTP / SSE Streaming" --> BackendAPI
+    BackendAPI --> AgentLayer
+    
+    IntentRouter -- "Operational Query" --> ToolRegistry
+    IntentRouter -- "General Query / Chat" --> OpenRouterLLM
+    
+    ToolRegistry --> PolicyLayer
+    ToolRegistry --> ConfirmBarrier
+    ConfirmBarrier -- "Requires Approval" --> FrontendShell
+    
+    PolicyLayer --> DatabaseLayer
+    AuditEngine --> DatabaseLayer
 ```
 
 ---

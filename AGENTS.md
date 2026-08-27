@@ -59,30 +59,41 @@ npm run build
 
 ## Architecture and Layering Rules
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    STUDENTOPS AI STACK                      │
-├─────────────────────────────────────────────────────────────┤
-│ 1. Frontend Shell: App.tsx -> Sidebar + Routed Components   │
-│    • Auth state machine (Login / Register / App)            │
-│    • Real-time SSE streaming reader with ReadableStream     │
-├─────────────────────────────────────────────────────────────┤
-│ 2. API & Routing Layer: FastAPI /app/api/                   │
-│    • POST /api/agent/stream (SSE token & tool traces)       │
-│    • POST /api/agent/confirm (Human-in-the-loop barrier)    │
-│    • REST endpoints for attendance, tasks, students, audit  │
-├─────────────────────────────────────────────────────────────┤
-│ 3. Autonomous ReAct Engine: /app/agent/                     │
-│    • Deterministic tool intents (Instant execution)         │
-│    • OpenRouter LLM fallback with multi-turn memory         │
-│    • Sandboxed tools with typed schemas (tools.py)          │
-├─────────────────────────────────────────────────────────────┤
-│ 4. Domain & Policy Engine: /app/services/                   │
-│    • AttendancePolicyEngine (70% present / 50% late rules)  │
-│    • ScoringEngine (Behavior /23, Tasks /10)                │
-│    • IdentityMatcher (Bilingual Latin + Arabic match)       │
-│    • Immutable Audit Logger (AgentActionAudit)              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Layer1["1. Frontend Shell: App.tsx"]
+        L1A["Sidebar + Routed Component Architecture"]
+        L1B["Auth State Machine (Login / Register / App)"]
+        L1C["Real-Time SSE Streaming Reader (ReadableStream)"]
+    end
+
+    subgraph Layer2["2. API & Routing Layer: FastAPI /app/api/"]
+        L2A["POST /api/agent/stream (SSE Tokens & Tool Traces)"]
+        L2B["POST /api/agent/confirm (Human-in-the-Loop Barrier)"]
+        L2C["REST Endpoints (Attendance, Tasks, Students, Audit)"]
+    end
+
+    subgraph Layer3["3. Autonomous ReAct Engine: /app/agent/"]
+        L3A["Deterministic Tool Intents (Instant Execution)"]
+        L3B["OpenRouter LLM Fallback (Multi-Turn Memory)"]
+        L3C["Sandboxed Tools with Typed Schemas (tools.py)"]
+    end
+
+    subgraph Layer4["4. Domain & Policy Engine: /app/services/"]
+        L4A["AttendancePolicyEngine (70% Present / 50% Late Rules)"]
+        L4B["ScoringEngine (Behavior /23, Tasks /10)"]
+        L4C["IdentityMatcher (Bilingual Latin + Arabic Match)"]
+        L4D["Immutable Audit Logger (AgentActionAudit)"]
+    end
+
+    subgraph Layer5["5. Persistence Layer: /app/core/database.py"]
+        L5A[("Async SQLite Database (aiosqlite)")]
+    end
+
+    Layer1 --> Layer2
+    Layer2 --> Layer3
+    Layer3 --> Layer4
+    Layer4 --> Layer5
 ```
 
 ### Critical Architecture Rules
