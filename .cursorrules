@@ -1,0 +1,26 @@
+# Cursor Rules for StudentOps AI
+
+## Environment & Tooling
+- Always use `uv` for Python backend commands (`uv sync`, `uv run uvicorn ...`, `uv run pytest`).
+- Never use raw `pip install` or direct `python` execution.
+- Use `npm run build` in `frontend/` to verify TypeScript types after modifying frontend files.
+
+## Code Standards
+- **Backend (FastAPI)**:
+  - Async SQLAlchemy (`AsyncSession`) and async endpoints throughout.
+  - Model definitions in `app/models/entities.py` (SQLAlchemy) and `app/models/schemas.py` (Pydantic v2).
+  - All agent interactions go through `app/agent/react_agent.py` and `app/agent/tools.py`.
+  - Sensitive operations (mass messaging/reminders) must trigger human confirmation.
+  - LLM calls use OpenRouter SSE streaming via `httpx.AsyncClient`.
+  - Never hardcode secrets. Read strictly from `app.core.config.settings`.
+
+- **Frontend (React 19 + TypeScript + Tailwind)**:
+  - Strict TypeScript typing matching `src/types/index.ts`.
+  - Modern, award-winning SaaS visual standards (Linear/Stripe/Vercel light-mode aesthetic).
+  - No AI-slop visual tropes (no neon cyberpunk glows or generic dark template cards).
+  - Streaming responses render token-by-token with SSE and cursor animation.
+  - Maintain bilingual support (English + Arabic with `arabic_name` and `Cairo` font).
+
+## Testing & Verification
+- Unit tests: `cd backend && uv run pytest tests -v`
+- Frontend build: `cd frontend && npm run build`
