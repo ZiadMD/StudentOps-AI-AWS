@@ -1,4 +1,4 @@
-## 📌 Pull Request Overview
+## Pull Request Overview
 
 ### Summary of Changes
 <!-- Provide a clear, high-level summary of what this PR introduces or fixes. -->
@@ -8,18 +8,18 @@
 
 ---
 
-## 🏷️ Type of Change
-- [ ] 🐛 **Bug Fix** (non-breaking fix for an existing issue)
-- [ ] ✨ **New Feature** (non-breaking addition to functionality)
-- [ ] 🤖 **Agent / Tooling Update** (new ReAct tool, prompt modification, or policy change)
-- [ ] 🎨 **UI / UX Polish** (visual improvements following 2026 SaaS guidelines)
-- [ ] ⚡ **Performance / Refactor** (code restructuring without functional change)
-- [ ] 🔒 **Security / Auth** (permissions, sensitive barriers, secrets management)
-- [ ] 📝 **Documentation** (updates to README, AGENTS.md, or architecture docs)
+## Type of Change
+- [ ] **Bug Fix** (non-breaking fix for an existing issue)
+- [ ] **New Feature** (non-breaking addition to functionality)
+- [ ] **Agent / Tooling Update** (new ReAct tool, prompt modification, or policy change)
+- [ ] **UI / UX Polish** (visual improvements following 2026 SaaS guidelines)
+- [ ] **Performance / Refactor** (code restructuring without functional change)
+- [ ] **Security / Auth** (permissions, sensitive barriers, secrets management)
+- [ ] **Documentation** (updates to README, AGENTS.md, or architecture docs)
 
 ---
 
-## 🧪 Verification & Testing Checklist
+## Verification & Testing Checklist
 
 ### Backend Checks
 - [ ] Dependencies synced via `uv sync`
@@ -33,11 +33,12 @@
 - [ ] Dual Arabic + English strings render cleanly without layout overflow
 - [ ] AI Agent streaming renders tokens smoothly with blinking cursor
 
-### Security Hygiene
+### Security & Anti-Slop Hygiene
 - [ ] No hardcoded API keys, tokens, or credentials in commit history
+- [ ] Zero emoji slop in UI, prompts, agent responses, or documentation
 - [ ] `.env` is omitted and `.env.example` is updated if new environment variables were introduced
 
 ---
 
-## 📸 Screenshots / Demos (If Applicable)
+## Screenshots / Demos (If Applicable)
 <!-- Add screenshots, screen recordings, or tool trace previews here -->

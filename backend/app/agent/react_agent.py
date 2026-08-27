@@ -135,16 +135,16 @@ class ReActAgent:
                 absent_names = [f"• {s['arabic_name']} ({s['phone']})" for s in absent_list]
                 names_str = "\n".join(absent_names) if absent_names else "لا يوجد غائبون اليوم!"
                 resp_text = (
-                    f"📊 **تقرير الحضور:**\n"
+                    f"**تقرير الحضور:**\n"
                     f"حضر: {result.get('summary', {}).get('present_count', 0)} | "
                     f"غياب: {len(absent_list)}\n\n**الغائبون:**\n{names_str}\n\n"
-                    f"💡 هل ترغب في إرسال تذكير لهم؟"
+                    f"هل ترغب في إرسال تذكير لهم؟"
                 )
             else:
                 absent_names = [f"• {s['name']} ({s['arabic_name']}) — {s['phone']}" for s in absent_list]
                 names_str = "\n".join(absent_names) if absent_names else "Everyone attended!"
                 resp_text = (
-                    f"📊 **Attendance Report:**\n"
+                    f"**Attendance Report:**\n"
                     f"Present: {result.get('summary', {}).get('present_count', 0)} | "
                     f"Late: {result.get('summary', {}).get('late_count', 0)} | "
                     f"Absent: {len(absent_list)}\n\n**Absent Members:**\n{names_str}\n\n"
@@ -191,13 +191,13 @@ class ReActAgent:
             )
             if is_arabic:
                 resp_text = (
-                    f"⚠️ **مطلوب تأكيد:** رسالة لـ {len(target_ids)} عضو.\n\n"
+                    f"**مطلوب تأكيد:** رسالة لـ {len(target_ids)} عضو.\n\n"
                     f"**نص الرسالة:**\n```\n{prep_res.get('message_preview')}\n```\n"
                     f"اضغط **تأكيد وإرسال** للمتابعة."
                 )
             else:
                 resp_text = (
-                    f"⚠️ **Confirmation Required:** Reminder for {len(target_ids)} member(s).\n\n"
+                    f"**Confirmation Required:** Reminder for {len(target_ids)} member(s).\n\n"
                     f"**Message Preview:**\n```\n{prep_res.get('message_preview')}\n```\n"
                     f"Click **Confirm & Send** to dispatch."
                 )
@@ -225,20 +225,20 @@ class ReActAgent:
             sc = result.get("score_summary", {})
             if is_arabic:
                 resp_text = (
-                    f"📋 **تقييم: {sc.get('arabic_name')}**\n\n"
+                    f"**تقييم: {sc.get('arabic_name')}**\n\n"
                     f"• الحضور: {sc.get('on_time_attendance_count')} في الميعاد | {sc.get('late_attendance_count')} متأخر | {sc.get('absence_count')} غياب\n"
                     f"• متوسط التاسكات: {sc.get('average_task_quality')} / 10\n"
                     f"• السلوك: {sc.get('total_behavior_score')} / 23\n"
-                    f"• التقييم العام: ⭐ {sc.get('overall_rating')}"
+                    f"• التقييم العام: {sc.get('overall_rating')}"
                 )
             else:
                 resp_text = (
-                    f"📋 **Evaluation: {sc.get('student_name')} ({sc.get('arabic_name')})**\n\n"
+                    f"**Evaluation: {sc.get('student_name')} ({sc.get('arabic_name')})**\n\n"
                     f"• Attendance: {sc.get('on_time_attendance_count')} On-time | {sc.get('late_attendance_count')} Late | {sc.get('absence_count')} Absent\n"
                     f"• Avg Task Quality: {sc.get('average_task_quality')} / 10\n"
                     f"• Behavior & Discipline: {sc.get('total_behavior_score')} / 23\n"
                     f"  — Group: {sc.get('group_interaction_score')}/5 | Social: {sc.get('social_media_score')}/5 | Rules: {sc.get('hierarchy_rules_score')}/5 | Conduct: {sc.get('polite_conduct_score')}/8\n"
-                    f"• Overall: ⭐ {sc.get('overall_rating')}"
+                    f"• Overall: {sc.get('overall_rating')}"
                 )
             return AgentChatResponse(conversation_id=conversation_id, response=resp_text,
                                      tool_executions=tool_executions, audit_id=audit_entry.id)
@@ -257,10 +257,10 @@ class ReActAgent:
             pending = result.get("pending_submissions", [])
             if is_arabic:
                 items = [f"• {p['arabic_name']} — {p['task_title']}" for p in pending]
-                resp_text = f"📝 **التاسكات المعلقة ({len(pending)}):**\n" + ("\n".join(items) if items else "الكل سلّم!")
+                resp_text = f"**التاسكات المعلقة ({len(pending)}):**\n" + ("\n".join(items) if items else "الكل سلّم!")
             else:
                 items = [f"• {p['student_name']} ({p['arabic_name']}) — {p['task_title']}" for p in pending]
-                resp_text = f"📝 **Pending Submissions ({len(pending)}):**\n" + ("\n".join(items) if items else "All submitted!")
+                resp_text = f"**Pending Submissions ({len(pending)}):**\n" + ("\n".join(items) if items else "All submitted!")
             return AgentChatResponse(conversation_id=conversation_id, response=resp_text,
                                      tool_executions=tool_executions, audit_id=audit_entry.id)
 
@@ -276,11 +276,11 @@ class ReActAgent:
                 parameters={"limit": 5}, result=result, user_id=user_role, status="EXECUTED"
             )
             events = result.get("events", [])
-            items = [f"• **{e['title']}** — 📅 {e['start_time'][:16].replace('T', ' ')}" for e in events]
+            items = [f"• **{e['title']}** — {e['start_time'][:16].replace('T', ' ')}" for e in events]
             if is_arabic:
-                resp_text = "📅 **الأحداث القادمة:**\n" + "\n".join(items)
+                resp_text = "**الأحداث القادمة:**\n" + "\n".join(items)
             else:
-                resp_text = "📅 **Upcoming Events:**\n" + "\n".join(items)
+                resp_text = "**Upcoming Events:**\n" + "\n".join(items)
             return AgentChatResponse(conversation_id=conversation_id, response=resp_text,
                                      tool_executions=tool_executions, audit_id=audit_entry.id)
 

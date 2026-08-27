@@ -11,4 +11,4 @@
 2. **TypeScript**: Strict type checking. Never bypass type errors with `@ts-ignore` or untyped `any` unless strictly necessary for external untyped libraries.
 3. **Database**: Always use async session patterns (`AsyncSession` from SQLAlchemy `asyncio`).
 4. **Security**: Secrets and API keys must be loaded from environment variables through `app.core.config.settings`. Never hardcode keys in code.
-5. **Design System**: Follow clean, modern light-mode SaaS aesthetics (Linear / Vercel style).
+5. **Design System & Anti-Slop**: Follow clean, modern light-mode SaaS aesthetics (Linear / Vercel style). Do NOT use emojis in UI, code, prompts, or agent outputs; use Lucide icons instead.

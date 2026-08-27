@@ -50,11 +50,11 @@ class ReminderService:
     ) -> str:
         """Generates a professional Arabic/English reminder message."""
         time_str = event_time.strftime("%A, %d %b at %I:%M %p")
-        link_str = f"\n🔗 Google Meet: {meet_url}" if meet_url else ""
+        link_str = f"\nGoogle Meet: {meet_url}" if meet_url else ""
         return (
-            f"مرحباً {student_name} 👋\n"
+            f"مرحباً {student_name}\n"
             f"نود تذكيرك بالاجتماع القادم: *{event_title}*\n"
-            f"📅 الموعد: {time_str}{link_str}\n\n"
+            f"الموعد: {time_str}{link_str}\n\n"
             f"يرجى الحضور في الموعد المحدد لأهمية النقاط المطروحة. بالتوفيق!"
         )
 

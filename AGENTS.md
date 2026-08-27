@@ -1,24 +1,24 @@
 # AGENTS.md — StudentOps AI Workspace Guide
 
-Welcome to **StudentOps AI**. This document provides unified instructions, architectural patterns, operational commands, and coding standards for all AI coding agents working within this repository.
+Welcome to StudentOps AI. This document provides unified instructions, architectural patterns, operational commands, and coding standards for all AI coding agents working within this repository.
 
 ---
 
-## 🧭 Project Overview
+## Project Overview
 
-**StudentOps AI** is an AI-driven operations and HR platform for student communities, organizations, and leadership teams. It combines deterministic policy engines (attendance, scoring, scheduling) with an autonomous ReAct AI agent equipped with streaming tool execution and human-in-the-loop confirmation barriers.
+StudentOps AI is an AI-driven operations and HR platform for student communities, organizations, and leadership teams. It combines deterministic policy engines (attendance, scoring, scheduling) with an autonomous ReAct AI agent equipped with streaming tool execution and human-in-the-loop confirmation barriers.
 
 ### Core Stack
-- **Backend**: Python 3.11+ / FastAPI / SQLAlchemy (Async SQLite with `aiosqlite`) / `uv` package manager / OpenRouter API (`httpx` SSE streaming).
-- **Frontend**: React 19 / TypeScript 5.7+ / Vite 6 / Tailwind CSS / Lucide React / CVA (`class-variance-authority`).
-- **Data Engine**: Deterministic policy engines for attendance scoring, multi-tier identity matching, and member performance evaluation.
+- Backend: Python 3.11+ / FastAPI / SQLAlchemy (Async SQLite with aiosqlite) / uv package manager / OpenRouter API (httpx SSE streaming).
+- Frontend: React 19 / TypeScript 5.7+ / Vite 6 / Tailwind CSS / Lucide React / CVA (class-variance-authority).
+- Data Engine: Deterministic policy engines for attendance scoring, multi-tier identity matching, and member performance evaluation.
 
 ---
 
-## 🛠️ Development & Tooling Commands
+## Development and Tooling Commands
 
-### Python Environment (`uv` is mandatory)
-> **Rule**: Always use `uv` for Python dependency management and running commands. Do NOT use raw `pip` or standard `python` without `uv run`.
+### Python Environment (uv is mandatory)
+> Rule: Always use uv for Python dependency management and running commands. Do NOT use raw pip or standard python without uv run.
 
 ```bash
 # Install / sync backend dependencies
@@ -35,7 +35,7 @@ uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 uv run pytest tests -v
 ```
 
-### Frontend Environment (`npm` & Vite)
+### Frontend Environment (npm and Vite)
 ```bash
 cd frontend
 
@@ -57,7 +57,7 @@ npm run build
 
 ---
 
-## 📐 Architecture & Layering Rules
+## Architecture and Layering Rules
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -96,11 +96,12 @@ npm run build
 
 ---
 
-## 🎨 UI/UX Design System Standards
+## UI/UX Design System and Anti-Slop Standards
 
-When creating or modifying frontend components, adhere strictly to the **2026 SaaS/AI standard** (Linear, Vercel, Stripe, Claude UI):
+When creating or modifying frontend components, prompts, responses, or documentation, adhere strictly to the **2026 SaaS/AI standard** (Linear, Vercel, Stripe, Claude UI):
 
-- **No AI Slop**: Avoid tacky neon cyan-on-black glows, meaningless pulsing particles, or generic low-density dashboard templates.
+- **No Emoji Slop**: Strictly avoid emojis in UI components, headings, agent responses, prompts, documentation, and commit messages. Use clean SVG/Lucide icons or typographic hierarchy instead.
+- **No AI Slop Visuals**: Avoid tacky neon cyan-on-black glows, meaningless pulsing particles, or generic low-density dashboard templates.
 - **Light Mode Hierarchy**: Soft canvas background (`#F8FAFC`), crisp white cards (`bg-white border border-slate-200/80 shadow-sm`), muted uppercase headers (`text-[11px] font-semibold text-slate-500 uppercase tracking-wider`).
 - **Typography**:
   - Main text: `Inter` / `system-ui`.
@@ -111,10 +112,11 @@ When creating or modifying frontend components, adhere strictly to the **2026 Sa
 
 ---
 
-## 🔒 Security & Code Hygiene Checklist
+## Security and Code Hygiene Checklist
 
 Before submitting code or committing changes:
 - [ ] Run `npm run build` inside `frontend/` to ensure **0 TypeScript or JSX errors**.
 - [ ] Run `uv run pytest tests -v` inside `backend/` to verify test suite passes.
 - [ ] Ensure no private tokens, API keys, or credentials are hardcoded in source files.
+- [ ] Verify zero emoji slop in new strings, UI components, prompts, and agent responses.
 - [ ] Keep bilingual support intact (Arabic + English strings aligned cleanly).

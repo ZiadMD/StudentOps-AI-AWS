@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 📖 StudentOps AI Documentation
+  - name: StudentOps AI Documentation
     url: https://github.com/ZiadMD/StudentOps-AI-AWS#readme
     about: Read the architectural documentation and quickstart instructions.
-  - name: 💬 Agent & Workspace Guide
+  - name: Agent & Workspace Guide
     url: https://github.com/ZiadMD/StudentOps-AI-AWS/blob/main/AGENTS.md
     about: Review rules and standards for developing on the ReAct Agent and policy engine.

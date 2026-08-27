@@ -18,6 +18,7 @@
   - Strict TypeScript typing matching `src/types/index.ts`.
   - Modern, award-winning SaaS visual standards (Linear/Stripe/Vercel light-mode aesthetic).
   - No AI-slop visual tropes (no neon cyberpunk glows or generic dark template cards).
+  - No emojis in UI components, buttons, agent chat responses, or prompts. Use Lucide icons instead.
   - Streaming responses render token-by-token with SSE and cursor animation.
   - Maintain bilingual support (English + Arabic with `arabic_name` and `Cairo` font).
 

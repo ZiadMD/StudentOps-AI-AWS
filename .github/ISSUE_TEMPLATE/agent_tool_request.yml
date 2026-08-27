@@ -1,4 +1,4 @@
-name: "🤖 Agent Tool / Policy Request"
+name: "Agent Tool / Policy Request"
 description: "Propose a new tool, ReAct intent, or deterministic policy rule for the AI Agent."
 title: "[Agent Tool]: "
 labels: ["agent", "tools", "enhancement"]

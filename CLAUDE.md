@@ -4,7 +4,7 @@ This file provides project-specific context, commands, and rules for Claude Code
 
 ---
 
-## ⚡ Quick Reference Commands
+## Quick Reference Commands
 
 ### Python Backend (`backend/`)
 - **Package Manager**: Always use `uv`.
@@ -22,7 +22,7 @@ This file provides project-specific context, commands, and rules for Claude Code
 
 ---
 
-## 🏛️ Codebase Structure
+## Codebase Structure
 
 ```
 StudentOps AI/
@@ -56,7 +56,7 @@ StudentOps AI/
 
 ---
 
-## 🛡️ Coding Guidelines & Rules
+## Coding Guidelines and Rules
 
 ### 1. Python / Backend Rules
 - **Python Version**: `>= 3.11`.
@@ -71,6 +71,10 @@ StudentOps AI/
 - **Styling**: Tailwind CSS utility classes. Clean light mode palette (`#F8FAFC` background, `slate-900` text, `border-slate-200`).
 - **Streaming**: For chat, use the native `fetch` + `ReadableStream` reader pointing to `/api/agent/stream`.
 
-### 3. Internationalization (Bilingual Arabic / English)
+### 3. Anti-Slop and No Emoji Standard
+- Do not use emojis in UI elements, headers, buttons, toast messages, AI agent chat responses, prompts, documentation, or commit messages.
+- Use clean typography or Lucide icons instead.
+
+### 4. Internationalization (Bilingual Arabic / English)
 - Maintain dual-language support for names (`full_name` and `arabic_name`), chat responses, and notification templates.
 - Preserve Arabic RTL typography using the `Cairo` font where specified.
