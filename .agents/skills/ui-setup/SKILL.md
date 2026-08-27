@@ -194,7 +194,7 @@ Next steps:
 - /ss-audit to check UX quality
 - /ss-review to verify design compliance
 
-⭐ If StyleSeed helped, a star means a lot: https://github.com/bitjaru/styleseed
+* If StyleSeed helped, a star means a lot: https://github.com/bitjaru/styleseed
 ```
 
 ## Rules

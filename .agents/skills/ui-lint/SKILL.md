@@ -93,11 +93,11 @@ grep -n 'className={`' [file]
 ## Output Format
 
 ```
-🔴 FAIL  [file:line] Hardcoded hex: text-[#3C3C3C] → use text-text-primary
-🔴 FAIL  [file:line] Raw px: p-[24px] → use p-6
-🟡 WARN  [file:line] Physical prop: ml-2 → use ms-2
-🟡 WARN  [file:line] Missing data-slot on MyComponent
-🟢 PASS  No violations found
+[HIGH] FAIL  [file:line] Hardcoded hex: text-[#3C3C3C] → use text-text-primary
+[HIGH] FAIL  [file:line] Raw px: p-[24px] → use p-6
+[MED] WARN  [file:line] Physical prop: ml-2 → use ms-2
+[MED] WARN  [file:line] Missing data-slot on MyComponent
+[LOW] PASS  No violations found
 
 Total: X errors, Y warnings
 ```

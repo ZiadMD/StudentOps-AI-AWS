@@ -101,12 +101,12 @@ Current state:
 - .cursorrules: [yes/no]
 
 Recommended updates:
-1. ✅ [safe] Update skills (X → 12)
-2. ✅ [safe] Add .cursorrules
-3. ⚠️ [review] Update DESIGN-LANGUAGE.md ([old line count] → [new line count])
-4. ⚠️ [merge] Add Golden Rules to CLAUDE.md (won't overwrite existing content)
+1. [PASS] [safe] Update skills (X → 12)
+2. [PASS] [safe] Add .cursorrules
+3. [WARN] [review] Update DESIGN-LANGUAGE.md ([old line count] → [new line count])
+4. [WARN] [merge] Add Golden Rules to CLAUDE.md (won't overwrite existing content)
 
-Shall I proceed? (I'll ask before each ⚠️ item)
+Shall I proceed? (I'll ask before each [WARN] item)
 ```
 
 ### Step 4: Execute Updates
@@ -139,10 +139,10 @@ For CLAUDE.md (Golden Rules):
 ```
 Update complete!
 
-✅ Skills: 12 (added X new)
-✅ .cursorrules: added
-✅ DESIGN-LANGUAGE.md: updated to latest
-✅ Golden Rules: added to CLAUDE.md
+[PASS] Skills: 12 (added X new)
+[PASS] .cursorrules: added
+[PASS] DESIGN-LANGUAGE.md: updated to latest
+[PASS] Golden Rules: added to CLAUDE.md
 
 Not touched:
 - theme.css (your skin)

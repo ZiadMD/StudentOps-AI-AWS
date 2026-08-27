@@ -12,7 +12,7 @@ Guide for engineering world-class, award-winning web interfaces (Awwwards Site o
 
 ---
 
-## 🏛️ The 4 Pillars of Award-Winning Craft
+##  The 4 Pillars of Award-Winning Craft
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -32,7 +32,7 @@ Guide for engineering world-class, award-winning web interfaces (Awwwards Site o
 
 ---
 
-## 📐 Pillar 1: Asymmetric Bento Grid Architecture
+##  Pillar 1: Asymmetric Bento Grid Architecture
 
 Bento grids organize complex data into a modular, harmonious screen composition:
 1. **Earned Cell Dimensions**: Every cell's height and width must be strictly earned by its content payload (e.g. 2-column wide live sync monitor vs 1-column ranking list).
@@ -44,7 +44,7 @@ Bento grids organize complex data into a modular, harmonious screen composition:
 
 ---
 
-## ✨ Pillar 2: The Human Layer & Tactile Depth
+##  Pillar 2: The Human Layer & Tactile Depth
 
 Award-winning sites resist the homogenization of generic templates:
 1. **Light Mode Surface Harmony**:
@@ -57,7 +57,7 @@ Award-winning sites resist the homogenization of generic templates:
 
 ---
 
-## ⚡ Pillar 3: Directed Micro-Interactions & Tactile Polish
+##  Pillar 3: Directed Micro-Interactions & Tactile Polish
 
 1. **Tactile Button Press**: Scale down (`active:scale-[0.98]`) with smooth `150ms ease-out`.
 2. **Status Ping with Contrast Rings**: Live status indicator with double-ring animation for real-time telemetry.
@@ -66,7 +66,7 @@ Award-winning sites resist the homogenization of generic templates:
 
 ---
 
-## 🔤 Pillar 4: Typographic Architecture
+##  Pillar 4: Typographic Architecture
 
 1. **Heading Display**: **Plus Jakarta Sans** (weights: 700/800, tracking `-0.02em`) for commanding, modern authority.
 2. **Body & Data**: **Inter** / **DM Sans** (weights: 400/500/600) for comfortable, fatigue-free reading.
@@ -75,7 +75,7 @@ Award-winning sites resist the homogenization of generic templates:
 
 ---
 
-## 📋 Pre-Launch Award Checklist
+##  Pre-Launch Award Checklist
 
 - [x] **No AI-Slop tropes**: No cyan glow on pure black, no meaningless pulsing dots, no generic template cards.
 - [x] **Light Mode Contrast**: Exceeds WCAG AAA standard (text-to-background ratio $> 7:1$).
