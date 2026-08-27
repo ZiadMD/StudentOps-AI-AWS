@@ -1,0 +1,59 @@
+name: "🤖 Agent Tool / Policy Request"
+description: "Propose a new tool, ReAct intent, or deterministic policy rule for the AI Agent."
+title: "[Agent Tool]: "
+labels: ["agent", "tools", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when requesting a new capability for the **Autonomous ReAct Agent**.
+        Remember: All tools must have strict input validation, deterministic data handlers, and human confirmation if sensitive.
+
+  - type: input
+    id: tool-name
+    attributes:
+      label: Tool Name
+      placeholder: "e.g. export_monthly_report, broadcast_event_announcement"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: safety-level
+    attributes:
+      label: Safety & Sensitivity Category
+      description: Does this tool perform sensitive external actions (messaging, deletions, mass changes)?
+      options:
+        - "READ_ONLY (Safe to execute autonomously without confirmation)"
+        - "WRITE_INTERNAL (Safe state modification inside DB)"
+        - "SENSITIVE_EXTERNAL (MUST require human confirmation before execution)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: tool-purpose
+    attributes:
+      label: Purpose & Trigger Triggers
+      description: When should the agent call this tool? What user prompts map to this intent?
+      placeholder: "e.g. Triggered when user asks 'Send announcement to all members about the workshop tomorrow'..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: parameters-schema
+    attributes:
+      label: Expected Input Parameters & Schema
+      description: What parameters does this tool accept?
+      placeholder: |
+        - `channel`: str ("WHATSAPP" | "EMAIL")
+        - `target_cohort`: str
+        - `message_body`: str
+    validations:
+      required: true
+
+  - type: textarea
+    id: output-format
+    attributes:
+      label: Expected Output & User Response
+      description: What structured data should be returned to the agent and rendered to the user?
+    validations:
+      required: true

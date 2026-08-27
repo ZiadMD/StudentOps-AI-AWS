@@ -1,0 +1,73 @@
+name: "🐛 Bug Report"
+description: "File a bug report for backend services, frontend UI, or AI agent behavior."
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve **StudentOps AI**! Please provide as much detail as possible.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Where is the bug occurring?
+      options:
+        - "Backend API / Services"
+        - "Autonomous ReAct Agent / Tools"
+        - "Attendance / Scoring Policy Engine"
+        - "Frontend UI / Dashboard"
+        - "Agent Chat & Streaming"
+        - "Authentication / Role Permissions"
+        - "Database / Migrations"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: "e.g. When asking the agent for attendance via the chat, the tool execution fails with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Navigate to '...'
+        2. Click on '....'
+        3. Enter query '....'
+        4. See error in console / UI
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: "e.g. The agent should return the attendance breakdown for Hanan Ahmed."
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs / Output
+      description: Paste any server error logs, browser console output, or tool execution traces.
+      render: shell
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-Submission Checklist
+      options:
+        - label: "I have verified this is not a duplicate issue."
+          required: true
+        - label: "I have verified `.env` is properly configured."
+          required: false
