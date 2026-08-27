@@ -2,7 +2,7 @@
 
 StudentOps AI is an enterprise-grade, agentic AI platform designed for student communities, university branches, clubs, and youth organizations.
 
-It replaces fragmented spreadsheets, manual attendance tracking, and repetitive messaging by introducing an **Autonomous ReAct AI Agent** that operates strictly through controlled tools, enforces deterministic HR policies based on community evaluation standards (`8.xlsx`), and requires human confirmation before sensitive actions.
+It replaces fragmented spreadsheets, manual attendance tracking, and repetitive messaging by introducing an **Autonomous ReAct AI Agent** that operates strictly through controlled tools, enforces deterministic HR policies based on community evaluation standards, and requires human confirmation before sensitive actions.
 
 ---
 
@@ -22,7 +22,7 @@ Controlled Tool Registry (Read-Only / Write / Sensitive)
 Deterministic Domain Services & Policy Engines
       ├── Attendance Policy Engine (Session aggregation & on-time/late/absent classification)
       ├── Identity Matcher (Exact email & Arabic/Latin name normalization)
-      ├── 8.xlsx Scoring Engine (Task average /10 + Behavior & discipline /23)
+      ├── Scoring Engine (Task average /10 + Behavior & discipline /23)
       ├── Google Meet & Calendar Providers (Real-time sync + Mock fallback)
       ├── Messaging Provider Abstraction (WhatsApp / SMS / Mock)
       └── Immutable Audit Logger
@@ -33,7 +33,7 @@ Database Layer (Async SQLite / DynamoDB & PostgreSQL ready)
 ### 1. Zero Direct Database / API Access for the LLM
 The LLM never directly executes SQL queries or calls external APIs. All interactions flow through typed tools with explicit JSON schemas, parameter validation, and safety categorization.
 
-### 2. Deterministic Policies & Ground Truth from `8.xlsx`
+### 2. Deterministic Policies & Ground Truth from reference
 - **Attendance**:
   - `PRESENT` (حضور في المعاد): Joined within threshold ($\le 10$ mins) and attended $\ge 70\%$ duration.
   - `LATE` (حضور متأخر): Joined $> 10$ mins and attended $\ge 50\%$ duration.
@@ -84,7 +84,7 @@ uv run pytest tests -v
 ### Test Coverage Breakdown:
 - `tests/unit/test_attendance_policy.py`: On-time, late, excused, and unexcused duration calculation.
 - `tests/unit/test_identity_matcher.py`: Multi-tier matching (Exact email, Arabic transliteration, Latin names).
-- `tests/unit/test_scoring.py`: Mathematical verification of `8.xlsx` metrics.
+- `tests/unit/test_scoring.py`: Mathematical verification of refrence metrics.
 - `tests/integration/test_agent_tools.py`: Tool execution and sensitive confirmation interception.
 - `tests/evals/test_demo_workflow.py`: End-to-end multi-turn evaluation of the Primary Demo Scenario.
 
