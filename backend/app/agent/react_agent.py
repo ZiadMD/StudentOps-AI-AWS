@@ -1,7 +1,7 @@
 """
 ReAct AI Agent Loop with OpenRouter LLM (streaming) and Deterministic Grounding.
 """
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Optional
 import json
 import httpx
 from datetime import datetime
@@ -96,7 +96,8 @@ class ReActAgent:
         query: str,
         conversation_id: str,
         db: AsyncSession,
-        user_role: str = "HR_LEAD"
+        user_role: str = "HR_LEAD",
+        team_id: Optional[str] = None
     ) -> AgentChatResponse:
         """
         Runs a deterministic intent check.

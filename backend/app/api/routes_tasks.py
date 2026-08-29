@@ -7,14 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.models.entities import Task, Submission, Student
+from app.core.dependencies import get_current_active_user
+from app.models.entities import Task, Submission, Student, User
 from app.models.schemas import TaskSchema, SubmissionSchema
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
 @router.get("", response_model=list[TaskSchema])
-async def list_tasks(db: AsyncSession = Depends(get_db)):
+async def list_tasks(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user)
+):
     res = await db.execute(select(Task).order_by(Task.task_number.asc()))
     tasks = res.scalars().all()
     results = []
@@ -38,13 +42,30 @@ async def list_tasks(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{task_id}/submissions", response_model=list[SubmissionSchema])
-async def list_submissions_for_task(task_id: str, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(
+async def list_submissions_for_task(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Lists task submissions scoped by role:
+    - hr_admin: sees all submissions for this task.
+    - team_lead: sees submissions only for members of their assigned team.
+    - member: sees only their own submission.
+    """
+    query = (
         select(Submission, Student, Task)
         .join(Student, Submission.student_id == Student.id)
         .join(Task, Submission.task_id == Task.id)
         .where(Submission.task_id == task_id)
     )
+
+    if current_user.role == "team_lead":
+        query = query.where(Student.team_id == current_user.team_id)
+    elif current_user.role == "member":
+        query = query.where(Submission.student_id == current_user.student_id)
+
+    res = await db.execute(query)
     records = res.all()
     return [
         SubmissionSchema(

@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.models.entities import Meeting, AttendanceRecord, Student
+from app.core.dependencies import get_current_active_user, require_roles
+from app.models.entities import Meeting, AttendanceRecord, Student, User
 from app.models.schemas import MeetingDetailResponse, AttendanceRecordSchema
 from app.agent.tools import attendance_service
 
@@ -15,7 +16,10 @@ router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
 
 @router.get("/meetings")
-async def list_meetings(db: AsyncSession = Depends(get_db)):
+async def list_meetings(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user)
+):
     res = await db.execute(select(Meeting).order_by(Meeting.start_time.desc()))
     meetings = res.scalars().all()
     results = []
@@ -42,7 +46,17 @@ async def list_meetings(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingDetailResponse)
-async def get_meeting_attendance(meeting_id: str, db: AsyncSession = Depends(get_db)):
+async def get_meeting_attendance(
+    meeting_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Retrieves meeting detail and attendance records scoped by role:
+    - hr_admin: sees all attendee records.
+    - team_lead: sees attendee records for their team members.
+    - member: sees only their own attendance record for this meeting.
+    """
     res = await db.execute(
         select(Meeting).where((Meeting.id == meeting_id) | (Meeting.meeting_code == meeting_id))
     )
@@ -66,6 +80,12 @@ async def get_meeting_attendance(meeting_id: str, db: AsyncSession = Depends(get
             .where(AttendanceRecord.meeting_id == meeting.id)
         )
         records = att_res.all()
+
+    # Filter records based on role and team scoping
+    if current_user.role == "team_lead":
+        records = [r for r in records if r[1].team_id == current_user.team_id]
+    elif current_user.role == "member":
+        records = [r for r in records if r[1].id == current_user.student_id]
 
     att_schemas = [
         AttendanceRecordSchema(
@@ -103,8 +123,12 @@ async def get_meeting_attendance(meeting_id: str, db: AsyncSession = Depends(get
 
 
 @router.post("/meetings/{meeting_id}/process")
-async def reprocess_meeting(meeting_id: str, db: AsyncSession = Depends(get_db)):
-    """Triggers the deterministic attendance policy processor for a meeting."""
+async def reprocess_meeting(
+    meeting_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles(["hr_admin", "team_lead"]))
+):
+    """Triggers the deterministic attendance policy processor for a meeting (Admin and Lead only)."""
     records = await attendance_service.process_meeting_attendance(meeting_id, db)
     return {
         "success": True,

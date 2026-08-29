@@ -10,10 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.core.dependencies import require_roles
 from app.models.schemas import (
     AgentChatMessage, AgentChatResponse, ActionConfirmationRequest
 )
-from app.models.entities import AgentActionAudit
+from app.models.entities import AgentActionAudit, User
 from app.agent.react_agent import agent_engine, stream_openrouter, CONVERSATION_STATE
 from app.agent.tools import TOOL_DEFINITIONS, tool_send_reminder
 from app.services.audit_service import AuditService
@@ -25,7 +26,8 @@ router = APIRouter(prefix="/agent", tags=["Agent"])
 @router.post("/chat", response_model=AgentChatResponse)
 async def chat_with_agent(
     payload: AgentChatMessage,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["hr_admin", "team_lead"]))
 ):
     """Processes a natural language query through the ReAct Agent (full response)."""
     conversation_id = payload.conversation_id or f"conv_{int(datetime.now().timestamp())}"
@@ -33,14 +35,16 @@ async def chat_with_agent(
         query=payload.query,
         conversation_id=conversation_id,
         db=db,
-        user_role=payload.user_role
+        user_role=current_user.role,
+        team_id=current_user.team_id
     )
 
 
 @router.post("/stream")
 async def stream_chat_with_agent(
     payload: AgentChatMessage,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["hr_admin", "team_lead"]))
 ):
     """
     Streams the agent response as Server-Sent Events (SSE).
@@ -65,7 +69,8 @@ async def stream_chat_with_agent(
                 query=query,
                 conversation_id=conversation_id,
                 db=db,
-                user_role=payload.user_role
+                user_role=current_user.role,
+                team_id=current_user.team_id
             )
 
             # Emit tool traces
@@ -128,7 +133,7 @@ async def stream_chat_with_agent(
             db=db, intent="LLM_STREAM_CHAT", tool_name="openrouter_stream",
             parameters={"query": query, "model": settings.OPENROUTER_MODEL},
             result={"response": llm_reply[:500]},
-            user_id=payload.user_role, status="EXECUTED"
+            user_id=current_user.id, status="EXECUTED"
         )
 
         yield sse({
@@ -152,7 +157,8 @@ async def stream_chat_with_agent(
 @router.post("/confirm")
 async def confirm_action(
     payload: ActionConfirmationRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["hr_admin", "team_lead"]))
 ):
     """Confirms or cancels a pending sensitive agent action."""
     audit_entry = await AuditService.get_pending_action(payload.action_id, db)
