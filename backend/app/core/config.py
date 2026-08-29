@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # Scoring thresholds
     BEHAVIOR_MAX_SCORE: int = 23
     TASK_MAX_SCORE: int = 10
+    
+    # JWT Authentication
+    JWT_SECRET_KEY: str = "studentops-super-secret-jwt-key-for-dev-only-change-in-prod-12345"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",
