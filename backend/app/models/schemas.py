@@ -19,6 +19,7 @@ class StudentBase(BaseModel):
     university: str = "Faculty of Engineering"
     role: str = "Member"
     status: str = "ACTIVE"
+    team_id: Optional[str] = None
 
 
 class StudentCreate(StudentBase):
@@ -225,3 +226,68 @@ class DashboardStats(BaseModel):
     upcoming_meetings_count: int
     pending_submissions_count: int
     recent_actions_count: int
+
+
+# =========================================================
+# Team & Organization Schemas
+# =========================================================
+
+class TeamBase(BaseModel):
+    name: str
+    code: str
+    description: Optional[str] = ""
+
+
+class TeamCreateRequest(TeamBase):
+    pass
+
+
+class TeamResponse(TeamBase):
+    id: str
+    created_at: datetime
+    member_count: int = 0
+    model_config = ConfigDict(from_attributes=True)
+
+
+# =========================================================
+# Authentication & User Schemas
+# =========================================================
+
+class UserRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
+    full_name: str
+    arabic_name: Optional[str] = None
+    role: str = "member"  # "hr_admin", "team_lead", "member"
+    team_id: Optional[str] = None
+
+
+class UserLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: EmailStr
+    full_name: str
+    arabic_name: Optional[str] = None
+    role: str
+    team_id: Optional[str] = None
+    team_name: Optional[str] = None
+    student_id: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+

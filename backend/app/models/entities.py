@@ -22,6 +22,39 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+class Team(Base):
+    __tablename__ = "teams"
+
+    id = Column(String(36), primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False)
+    code = Column(String(50), unique=True, nullable=False, index=True)
+    description = Column(Text, default="")
+    created_at = Column(DateTime, default=utcnow)
+
+    # Relationships
+    members = relationship("User", back_populates="team")
+    students = relationship("Student", back_populates="team")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String(36), primary_key=True, index=True)
+    email = Column(String(100), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(100), nullable=False)
+    arabic_name = Column(String(100), nullable=True)
+    role = Column(String(50), default="member")  # "hr_admin", "team_lead", "member"
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=True, index=True)
+    student_id = Column(String(36), ForeignKey("students.id"), nullable=True, index=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=utcnow)
+
+    # Relationships
+    team = relationship("Team", back_populates="members")
+    student = relationship("Student", foreign_keys=[student_id])
+
+
 class Student(Base):
     __tablename__ = "students"
 
@@ -34,9 +67,11 @@ class Student(Base):
     university = Column(String(100), default="Faculty of Engineering")
     role = Column(String(50), default="Member")  # "Member", "Head", "Vice Head", "Lead"
     status = Column(String(20), default="ACTIVE")  # "ACTIVE", "INACTIVE", "PROBATION"
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=utcnow)
 
     # Relationships
+    team = relationship("Team", back_populates="students")
     attendance_records = relationship("AttendanceRecord", back_populates="student", cascade="all, delete-orphan")
     submissions = relationship("Submission", back_populates="student", cascade="all, delete-orphan")
     scores = relationship("ScoreRecord", back_populates="student", cascade="all, delete-orphan")
