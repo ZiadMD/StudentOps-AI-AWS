@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import init_db, AsyncSessionLocal
 from app.seed.seed_data import seed_all
+from app.api.routes_auth import router as auth_router
 from app.api.routes_agent import router as agent_router
 from app.api.routes_students import router as students_router
 from app.api.routes_attendance import router as attendance_router
@@ -44,6 +45,7 @@ app.add_middleware(
 )
 
 # Include API routers
+app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(dashboard_router, prefix=settings.API_V1_STR)
 app.include_router(agent_router, prefix=settings.API_V1_STR)
 app.include_router(students_router, prefix=settings.API_V1_STR)
