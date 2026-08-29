@@ -8,8 +8,10 @@ from sqlalchemy import select
 from app.core.database import AsyncSessionLocal, init_db
 from app.models.entities import (
     Student, Meeting, ParticipantSession, AttendanceRecord,
-    Event, Task, Submission, ScoreRecord, AgentActionAudit
+    Event, Task, Submission, ScoreRecord, AgentActionAudit,
+    Team, User
 )
+from app.core.security import get_password_hash
 
 
 async def seed_all(db: AsyncSession):
@@ -21,7 +23,92 @@ async def seed_all(db: AsyncSession):
 
     now = datetime.now(timezone.utc)
 
-    # 1. Students from 8.xlsx + cohort members
+    # 0. Teams
+    teams_data = [
+        {
+            "id": "team_tech",
+            "name": "Technical & Engineering",
+            "code": "TECH",
+            "description": "Software engineering, AI systems, and infrastructure operations."
+        },
+        {
+            "id": "team_ops",
+            "name": "Operations & Logistics",
+            "code": "OPS",
+            "description": "Google Meet scheduling, event coordination, and logistics."
+        },
+        {
+            "id": "team_media",
+            "name": "Media & Public Relations",
+            "code": "MEDIA",
+            "description": "Social media, community engagement, and design."
+        }
+    ]
+    for t_data in teams_data:
+        db.add(Team(**t_data))
+
+    # 1. User Accounts (Pre-hashed passwords for dev)
+    users_data = [
+        {
+            "id": "usr_admin",
+            "email": "admin@studentops.org",
+            "hashed_password": get_password_hash("admin123"),
+            "full_name": "HR Administrator",
+            "arabic_name": "مسؤول الموارد البشرية",
+            "role": "hr_admin",
+            "team_id": None,
+            "student_id": None,
+            "is_active": True
+        },
+        {
+            "id": "usr_lead_tech",
+            "email": "lead@studentops.org",
+            "hashed_password": get_password_hash("lead123"),
+            "full_name": "Alaa Mohamed",
+            "arabic_name": "الاء محمد حسن",
+            "role": "team_lead",
+            "team_id": "team_tech",
+            "student_id": "std_alaa",
+            "is_active": True
+        },
+        {
+            "id": "usr_maurine",
+            "email": "maurine.magdy@studentops.org",
+            "hashed_password": get_password_hash("member123"),
+            "full_name": "Maurine Magdy Adly",
+            "arabic_name": "مورين مجدي عدلي",
+            "role": "member",
+            "team_id": "team_tech",
+            "student_id": "std_maurine",
+            "is_active": True
+        },
+        {
+            "id": "usr_hanan",
+            "email": "hanan.ahmed@studentops.org",
+            "hashed_password": get_password_hash("member123"),
+            "full_name": "Hanan Ahmed Ramadan",
+            "arabic_name": "حنان احمد رمضان",
+            "role": "member",
+            "team_id": "team_ops",
+            "student_id": "std_hanan",
+            "is_active": True
+        },
+        {
+            "id": "usr_sara",
+            "email": "sara.omar@studentops.org",
+            "hashed_password": get_password_hash("member123"),
+            "full_name": "Sara Omar Mostafa",
+            "arabic_name": "سارة عمر مصطفى",
+            "role": "member",
+            "team_id": "team_media",
+            "student_id": "std_sara",
+            "is_active": True
+        }
+    ]
+    for u_data in users_data:
+        db.add(User(**u_data))
+
+    # 2. Students from 8.xlsx + cohort members
     students_data = [
         {
             "id": "std_maurine",
@@ -32,7 +119,8 @@ async def seed_all(db: AsyncSession):
             "phone": "+201012345678",
             "university": "Faculty of Engineering",
             "role": "Vice Head",
-            "status": "ACTIVE"
+            "status": "ACTIVE",
+            "team_id": "team_tech"
         },
         {
             "id": "std_alaa",
@@ -43,7 +131,8 @@ async def seed_all(db: AsyncSession):
             "phone": "+201098765432",
             "university": "Faculty of Engineering",
             "role": "Technical Lead",
-            "status": "ACTIVE"
+            "status": "ACTIVE",
+            "team_id": "team_tech"
         },
         {
             "id": "std_hanan",
@@ -54,7 +143,8 @@ async def seed_all(db: AsyncSession):
             "phone": "+201055551234",
             "university": "Faculty of Engineering",
             "role": "Member",
-            "status": "ACTIVE"
+            "status": "ACTIVE",
+            "team_id": "team_ops"
         },
         {
             "id": "std_ahmed",
@@ -65,7 +155,8 @@ async def seed_all(db: AsyncSession):
             "phone": "+201033334444",
             "university": "Faculty of Engineering",
             "role": "Member",
-            "status": "ACTIVE"
+            "status": "ACTIVE",
+            "team_id": "team_ops"
         },
         {
             "id": "std_sara",
@@ -76,7 +167,8 @@ async def seed_all(db: AsyncSession):
             "phone": "+201077778888",
             "university": "Faculty of Computer & AI",
             "role": "Member",
-            "status": "ACTIVE"
+            "status": "ACTIVE",
+            "team_id": "team_media"
         }
     ]
 
