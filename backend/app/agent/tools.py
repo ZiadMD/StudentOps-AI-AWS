@@ -162,10 +162,14 @@ async def tool_get_meeting(db: AsyncSession, meeting_id: str) -> dict:
     }
 
 
-async def tool_get_meeting_attendance(db: AsyncSession, meeting_id: Optional[str] = "today_sync") -> dict:
+async def tool_get_meeting_attendance(
+    db: AsyncSession,
+    meeting_id: Optional[str] = "today_sync",
+    team_id: Optional[str] = None
+) -> dict:
     """
     Retrieve or compute deterministic attendance for a meeting.
-    Defaults to today's sync meeting.
+    Defaults to today's sync meeting. Scoped by team_id if provided.
     """
     if not meeting_id or meeting_id == "today" or meeting_id == "latest":
         meeting_id = "today_sync"
@@ -198,6 +202,10 @@ async def tool_get_meeting_attendance(db: AsyncSession, meeting_id: Optional[str
             records = att_res.all()
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    # Apply team scoping if requested
+    if team_id:
+        records = [r for r in records if r[1].team_id == team_id]
 
     present = []
     late = []
@@ -302,11 +310,17 @@ async def tool_get_tasks(db: AsyncSession) -> dict:
     }
 
 
-async def tool_get_pending_submissions(db: AsyncSession, task_id: Optional[str] = None) -> dict:
-    """List students who have pending/unsubmitted tasks."""
+async def tool_get_pending_submissions(
+    db: AsyncSession,
+    task_id: Optional[str] = None,
+    team_id: Optional[str] = None
+) -> dict:
+    """List students who have pending/unsubmitted tasks. Scoped by team_id if provided."""
     query = select(Submission, Student, Task).join(Student, Submission.student_id == Student.id).join(Task, Submission.task_id == Task.id)
     if task_id:
         query = query.where(Submission.task_id == task_id)
+    if team_id:
+        query = query.where(Student.team_id == team_id)
     query = query.where(Submission.status.in_(["PENDING", "MISSED"]))
     res = await db.execute(query)
     records = res.all()
@@ -345,9 +359,13 @@ async def tool_get_student_score(db: AsyncSession, student_id_or_name: str) -> d
     }
 
 
-async def tool_get_scores(db: AsyncSession) -> dict:
-    """Retrieve evaluation scoreboard for all members."""
+async def tool_get_scores(db: AsyncSession, team_id: Optional[str] = None) -> dict:
+    """Retrieve evaluation scoreboard for all members, optionally scoped by team."""
     summaries = await ScoringService.get_all_summaries(db)
+    if team_id:
+        team_std_res = await db.execute(select(Student.id).where(Student.team_id == team_id))
+        team_ids = set(team_std_res.scalars().all())
+        summaries = [s for s in summaries if s.student_id in team_ids]
     return {
         "total_members": len(summaries),
         "scoreboard": [s.model_dump() for s in summaries]
@@ -358,14 +376,17 @@ async def tool_prepare_reminder(
     db: AsyncSession,
     student_ids: list[str],
     event_id: Optional[str] = None,
-    custom_message: Optional[str] = None
+    custom_message: Optional[str] = None,
+    team_id: Optional[str] = None
 ) -> dict:
     """
     Drafts a reminder message for specified students without sending.
-    Safe read-only operation.
+    Safe read-only operation. Scoped by team_id if provided.
     """
-    # Fetch students
-    res = await db.execute(select(Student).where(Student.id.in_(student_ids)))
+    query = select(Student).where(Student.id.in_(student_ids))
+    if team_id:
+        query = query.where(Student.team_id == team_id)
+    res = await db.execute(query)
     students = res.scalars().all()
     if not students:
         return {"success": False, "message": "No valid students found for reminder."}
