@@ -16,11 +16,15 @@ from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
-    decode_token
+    decode_token,
+    validate_password_strength
 )
 from app.core.dependencies import (
     get_current_active_user,
-    require_roles
+    require_roles,
+    rate_limit_login,
+    rate_limit_register,
+    rate_limit_refresh
 )
 from app.models.entities import User, Team, Student
 from app.models.schemas import (
@@ -30,7 +34,8 @@ from app.models.schemas import (
     TokenResponse,
     RefreshTokenRequest,
     TeamResponse,
-    TeamCreateRequest
+    TeamCreateRequest,
+    UserRoleUpdateRequest
 )
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -52,7 +57,7 @@ def _build_user_response(user: User) -> UserResponse:
     )
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(rate_limit_register)])
 async def register_user(
     payload: UserRegisterRequest,
     db: AsyncSession = Depends(get_db)
@@ -60,10 +65,23 @@ async def register_user(
     """
     Registers a new user account, creates credentials, links existing Student entity if present,
     and returns initial JWT access & refresh tokens.
+    
+    SECURITY ENFORCEMENT:
+    - All self-registrations are strictly created as 'member'.
+    - Elevated roles (hr_admin, team_lead) can only be assigned by existing HR Admins.
+    - Password complexity is validated server-side.
     """
+    # 1. Validate password strength
+    is_valid, err_msg = validate_password_strength(payload.password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err_msg
+        )
+
     email_clean = payload.email.strip().lower()
 
-    # Check for existing user email
+    # 2. Check for existing user email
     existing_user_res = await db.execute(
         select(User).where(func.lower(User.email) == email_clean)
     )
@@ -73,7 +91,7 @@ async def register_user(
             detail=f"An account with email '{payload.email}' already exists."
         )
 
-    # Validate team_id if provided
+    # 3. Validate team_id if provided
     if payload.team_id:
         team_res = await db.execute(select(Team).where(Team.id == payload.team_id))
         if not team_res.scalar_one_or_none():
@@ -82,7 +100,7 @@ async def register_user(
                 detail=f"Team with ID '{payload.team_id}' not found."
             )
 
-    # Check if a matching student profile already exists in the system
+    # 4. Check if a matching student profile already exists in the system
     student_res = await db.execute(
         select(Student).where(func.lower(Student.email) == email_clean)
     )
@@ -93,14 +111,14 @@ async def register_user(
     if matched_student and payload.team_id and not matched_student.team_id:
         matched_student.team_id = payload.team_id
 
-    # Create new User entity
+    # 5. Create new User entity with strictly non-privileged 'member' role
     new_user = User(
         id=f"usr_{uuid.uuid4().hex[:12]}",
         email=email_clean,
         hashed_password=get_password_hash(payload.password),
         full_name=payload.full_name.strip(),
         arabic_name=payload.arabic_name.strip() if payload.arabic_name else None,
-        role=payload.role.lower(),
+        role="member",  # Non-negotiable server-side enforcement: normal users cannot self-assign roles
         team_id=payload.team_id,
         student_id=student_id,
         is_active=True
@@ -134,7 +152,7 @@ async def register_user(
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(rate_limit_login)])
 async def login_user(
     payload: UserLoginRequest,
     db: AsyncSession = Depends(get_db)
@@ -142,6 +160,7 @@ async def login_user(
     """
     Authenticates a user via email and password (JSON body),
     returning access and refresh JWT tokens.
+    Protected by server-side brute-force rate limiting.
     """
     email_clean = payload.email.strip().lower()
 
@@ -183,7 +202,7 @@ async def login_user(
     )
 
 
-@router.post("/token", response_model=TokenResponse, include_in_schema=False)
+@router.post("/token", response_model=TokenResponse, include_in_schema=False, dependencies=[Depends(rate_limit_login)])
 async def login_for_swagger_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
@@ -195,7 +214,7 @@ async def login_for_swagger_token(
     )
 
 
-@router.post("/refresh")
+@router.post("/refresh", dependencies=[Depends(rate_limit_refresh)])
 async def refresh_access_token(
     payload: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db)
@@ -312,3 +331,46 @@ async def create_team(
         created_at=new_team.created_at,
         member_count=0
     )
+
+
+@router.patch("/users/{user_id}/role", response_model=UserResponse)
+async def update_user_role(
+    user_id: str,
+    payload: UserRoleUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(require_roles(["hr_admin"]))
+):
+    """
+    Updates a user's role (HR Admin only).
+    Prevents unauthorized privilege escalation by requiring admin authorization.
+    """
+    res = await db.execute(
+        select(User)
+        .options(selectinload(User.team))
+        .where(User.id == user_id)
+    )
+    target_user = res.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID '{user_id}' not found."
+        )
+
+    # Prevent admin from de-admining themselves if they are the only admin
+    if target_user.id == admin_user.id and payload.role != "hr_admin":
+        admin_count_res = await db.execute(
+            select(func.count(User.id)).where(User.role == "hr_admin", User.is_active == True)
+        )
+        admin_count = admin_count_res.scalar() or 0
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot demote the last remaining active HR administrator."
+            )
+
+    target_user.role = payload.role
+    await db.commit()
+    await db.refresh(target_user)
+
+    return _build_user_response(target_user)
+

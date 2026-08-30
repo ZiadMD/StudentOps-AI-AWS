@@ -11,7 +11,34 @@ import jwt
 
 from app.core.database import get_db
 from app.core.security import decode_token
+from app.core.config import settings
+from app.core.rate_limiter import create_rate_limit_dependency
 from app.models.entities import User, Student
+
+# Rate Limit Dependencies
+rate_limit_login = create_rate_limit_dependency(
+    max_requests=settings.RATE_LIMIT_LOGIN_PER_MINUTE,
+    window_seconds=60,
+    key_prefix="auth_login"
+)
+
+rate_limit_register = create_rate_limit_dependency(
+    max_requests=settings.RATE_LIMIT_REGISTER_PER_MINUTE,
+    window_seconds=60,
+    key_prefix="auth_register"
+)
+
+rate_limit_refresh = create_rate_limit_dependency(
+    max_requests=settings.RATE_LIMIT_REFRESH_PER_MINUTE,
+    window_seconds=60,
+    key_prefix="auth_refresh"
+)
+
+rate_limit_agent = create_rate_limit_dependency(
+    max_requests=settings.RATE_LIMIT_AGENT_PER_MINUTE,
+    window_seconds=60,
+    key_prefix="agent_chat"
+)
 
 # OAuth2 scheme configured for Swagger UI Bearer authorization
 oauth2_scheme = OAuth2PasswordBearer(

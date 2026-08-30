@@ -10,6 +10,22 @@ import jwt
 from app.core.config import settings
 
 
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Validate password complexity:
+    - Minimum length: 8 characters
+    - Maximum length: 128 characters (prevents bcrypt 72-byte truncation issues and DoS)
+    - Must not consist purely of whitespace
+    """
+    if not password or len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if len(password) > 128:
+        return False, "Password must not exceed 128 characters."
+    if password.strip() == "":
+        return False, "Password must not be only whitespace."
+    return True, ""
+
+
 def get_password_hash(password: str) -> str:
     """Hash a plain password using Bcrypt with a random salt."""
     salt = bcrypt.gensalt(rounds=12)

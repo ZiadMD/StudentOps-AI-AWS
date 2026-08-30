@@ -177,9 +177,9 @@ class ReminderResult(BaseModel):
 # =========================================================
 
 class AgentChatMessage(BaseModel):
-    query: str
-    conversation_id: Optional[str] = None
-    user_role: str = "HR_LEAD"
+    query: str = Field(..., min_length=1, max_length=2000, description="Chat query for the AI agent")
+    conversation_id: Optional[str] = Field(None, max_length=100)
+    user_role: Optional[str] = "HR_LEAD"
 
 
 class ToolCallExecution(BaseModel):
@@ -255,16 +255,29 @@ class TeamResponse(TeamBase):
 
 class UserRegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
-    full_name: str
-    arabic_name: Optional[str] = None
-    role: str = "member"  # "hr_admin", "team_lead", "member"
-    team_id: Optional[str] = None
+    password: str = Field(..., min_length=8, max_length=128, description="Password must be between 8 and 128 characters")
+    full_name: str = Field(..., min_length=1, max_length=100)
+    arabic_name: Optional[str] = Field(None, max_length=100)
+    role: Optional[str] = Field("member", description="Ignored on public registration; always creates member accounts")
+    team_id: Optional[str] = Field(None, max_length=50)
 
 
 class UserLoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class UserRoleUpdateRequest(BaseModel):
+    role: str = Field(..., pattern="^(hr_admin|team_lead|member)$", description="Role: hr_admin, team_lead, or member")
+
+
+class UserAdminCreateRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    full_name: str = Field(..., min_length=1, max_length=100)
+    arabic_name: Optional[str] = Field(None, max_length=100)
+    role: str = Field("member", pattern="^(hr_admin|team_lead|member)$")
+    team_id: Optional[str] = Field(None, max_length=50)
 
 
 class UserResponse(BaseModel):
@@ -289,5 +302,5 @@ class TokenResponse(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str = Field(..., min_length=10, max_length=1000)
 
