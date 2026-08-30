@@ -4,6 +4,7 @@ import { ToolCallExecution, PendingConfirmation } from '../types';
 import { api } from '../api/client';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { MarkdownRenderer } from './ui/MarkdownRenderer';
 
 export interface AgentMessage {
   role: 'user' | 'assistant';
@@ -60,17 +61,27 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
     });
 
     abortRef.current = new AbortController();
+    const token = api.getToken();
+    const authHeaders: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
 
     try {
       const res = await fetch(`${API_BASE}/agent/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
         body: JSON.stringify({ query: q, conversation_id: conversationId.current }),
         signal: abortRef.current.signal,
       });
 
       if (!res.ok || !res.body) {
-        throw new Error(`HTTP ${res.status}`);
+        if (res.status === 401) {
+          throw new Error('Authentication required or session expired. Please sign in again.');
+        }
+        throw new Error(`Server returned HTTP ${res.status}`);
       }
 
       const reader = res.body.getReader();
@@ -148,7 +159,9 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
         const next = [...prev];
         next[assistantIdx] = {
           ...next[assistantIdx],
-          content: '**Connection error.** Please check the backend is running and try again.',
+          content: err?.message
+            ? `**Error:** ${err.message}`
+            : '**Connection error.** Please check the backend is running and try again.',
           streaming: false,
         };
         return next;
@@ -207,13 +220,11 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
                       </div>
                     )}
 
-                    {/* Response text with streaming cursor */}
-                    <div className="text-[15px] leading-relaxed text-slate-800 whitespace-pre-wrap font-normal break-words">
-                      {msg.content}
-                      {msg.streaming && (
-                        <span className="inline-block w-[2px] h-4 bg-blue-500 ml-0.5 animate-[blink_0.8s_ease-in-out_infinite] align-middle" />
-                      )}
-                    </div>
+                    {/* Response Markdown preview with streaming cursor */}
+                    <MarkdownRenderer
+                      content={msg.content}
+                      streaming={msg.streaming}
+                    />
 
                     {/* Confirmation card */}
                     {msg.needs_confirmation && msg.pending_action && !msg.streaming && (
@@ -287,8 +298,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
           <div className="text-center mt-3">
             <span className="text-[10px] text-slate-400">
               Powered by{' '}
-              <span className="font-mono">nvidia/nemotron-3-super-120b · free tier</span>
-              {' '} via OpenRouter
+              <span className="font-mono">Groq LPU (openai/gpt-oss-120b) + OpenRouter Cascade</span>
             </span>
           </div>
         </div>

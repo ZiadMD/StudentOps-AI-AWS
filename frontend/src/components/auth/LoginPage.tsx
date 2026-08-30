@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { Layers, Eye, EyeOff, ChevronRight } from 'lucide-react';
+import { api } from '../../api/client';
+import { UserProfile } from '../../types';
 
 type Role = 'hr_admin' | 'team_lead' | 'member';
+
+const DEMO_CREDENTIALS: Record<Role, { email: string; password: string }> = {
+  hr_admin:  { email: 'admin@studentops.org', password: 'admin123' },
+  team_lead: { email: 'lead@studentops.org',  password: 'lead123' },
+  member:    { email: 'maurine.magdy@studentops.org', password: 'member123' },
+};
 
 const ROLES: { value: Role; label: string; description: string; badge: string }[] = [
   { value: 'hr_admin',  label: 'HR Admin',   description: 'Full access to all operations, agent tools, and audit logs', badge: 'Admin' },
@@ -10,19 +18,26 @@ const ROLES: { value: Role; label: string; description: string; badge: string }[
 ];
 
 interface LoginPageProps {
-  onLogin: (role: Role) => void;
+  onLogin: (user: UserProfile) => void;
   onGoToRegister: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister }) => {
-  const [email, setEmail]         = useState('');
-  const [password, setPassword]   = useState('');
-  const [showPass, setShowPass]   = useState(false);
   const [role, setRole]           = useState<Role>('hr_admin');
+  const [email, setEmail]         = useState(DEMO_CREDENTIALS.hr_admin.email);
+  const [password, setPassword]   = useState(DEMO_CREDENTIALS.hr_admin.password);
+  const [showPass, setShowPass]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleRoleChange = (newRole: Role) => {
+    setRole(newRole);
+    setEmail(DEMO_CREDENTIALS[newRole].email);
+    setPassword(DEMO_CREDENTIALS[newRole].password);
+    setError('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError('Please enter your email and password.');
@@ -30,11 +45,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
     }
     setError('');
     setLoading(true);
-    // Simulate auth delay — not a real auth call
-    setTimeout(() => {
+    try {
+      const res = await api.login({
+        email: email.trim(),
+        password: password.trim()
+      });
+      onLogin(res.user);
+    } catch (err: any) {
+      setError(err?.message || 'Login failed. Please check your credentials.');
+    } finally {
       setLoading(false);
-      onLogin(role);
-    }, 800);
+    }
   };
 
   return (
@@ -117,7 +138,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
                   <button
                     key={r.value}
                     type="button"
-                    onClick={() => setRole(r.value)}
+                    onClick={() => handleRoleChange(r.value)}
                     className={`p-2.5 rounded-lg border text-left transition-all ${
                       role === r.value
                         ? 'bg-blue-50 border-blue-400 shadow-sm'

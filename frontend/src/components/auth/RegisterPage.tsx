@@ -1,29 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layers, Eye, EyeOff, ChevronRight, Check } from 'lucide-react';
-
-type Role = 'hr_admin' | 'team_lead' | 'member';
-
-const ROLES: { value: Role; label: string; description: string }[] = [
-  { value: 'hr_admin',  label: 'HR Admin',   description: 'Full access — manage all members, tasks, and AI agent actions' },
-  { value: 'team_lead', label: 'Team Lead',  description: 'Manage your team tasks, reviews, and meeting attendance'         },
-  { value: 'member',    label: 'Member',     description: 'View your personal attendance, scores, and task history'           },
-];
+import { api } from '../../api/client';
+import { UserProfile, TeamItem } from '../../types';
 
 interface RegisterPageProps {
-  onRegister: (role: Role) => void;
+  onRegister: (user: UserProfile) => void;
   onGoToLogin: () => void;
 }
 
 export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLogin }) => {
   const [step, setStep]           = useState<1 | 2>(1);
-  const [role, setRole]           = useState<Role>('member');
+  const role                      = 'member';
   const [name, setName]           = useState('');
   const [arabicName, setArabicName] = useState('');
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
+  const [teamId, setTeamId]       = useState<string>('');
+  const [teams, setTeams]         = useState<TeamItem[]>([]);
   const [showPass, setShowPass]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
+
+  useEffect(() => {
+    async function loadTeams() {
+      try {
+        const t = await api.getTeams();
+        setTeams(t);
+        if (t.length > 0) setTeamId(t[0].id);
+      } catch (e) {
+        // Teams not loaded
+      }
+    }
+    loadTeams();
+  }, []);
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +41,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLo
     setStep(2);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !password.trim()) {
       setError('All fields are required.');
@@ -44,10 +53,21 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLo
     }
     setError('');
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await api.register({
+        email: email.trim(),
+        password: password.trim(),
+        full_name: name.trim(),
+        arabic_name: arabicName.trim() || undefined,
+        role: role,
+        team_id: teamId || undefined,
+      });
+      onRegister(res.user);
+    } catch (err: any) {
+      setError(err?.message || 'Registration failed. Please check your details.');
+    } finally {
       setLoading(false);
-      onRegister(role);
-    }, 900);
+    }
   };
 
   return (
@@ -77,7 +97,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLo
           ))}
         </div>
 
-        {/* Step 1 — Role selection */}
+        {/* Step 1 — Role & Community Notice */}
         {step === 1 && (
           <form onSubmit={handleStep1} className="space-y-6">
             <div>
@@ -90,33 +110,16 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLo
               </p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Your Role</label>
-              <div className="space-y-2">
-                {ROLES.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => setRole(r.value)}
-                    className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-start space-x-3 ${
-                      role === r.value
-                        ? 'bg-blue-50 border-blue-400 shadow-sm'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      role === r.value ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
-                    }`}>
-                      {role === r.value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                    </div>
-                    <div>
-                      <div className={`text-sm font-semibold ${role === r.value ? 'text-blue-700' : 'text-slate-800'}`}>
-                        {r.label}
-                      </div>
-                      <div className="text-[12px] text-slate-500 mt-0.5">{r.description}</div>
-                    </div>
-                  </button>
-                ))}
+            <div className="space-y-3">
+              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Account Type</label>
+              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/70 text-left">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-2 h-2 rounded-full bg-blue-600" />
+                  <span className="text-sm font-bold text-blue-900">Community Member Account</span>
+                </div>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                  Self-registration creates a verified student member account. Elevated access (Team Lead & HR Admin) is granted by platform administrators.
+                </p>
               </div>
             </div>
 
@@ -128,7 +131,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLo
               type="submit"
               className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-semibold rounded-lg text-sm transition-all shadow-sm flex items-center justify-center space-x-2"
             >
-              <span>Continue</span>
+              <span>Continue to Profile</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </form>
@@ -140,11 +143,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLo
             <div>
               <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Your profile</h1>
               <p className="text-sm text-slate-500 mt-1.5">
-                Registering as <span className="font-semibold text-slate-800">{ROLES.find(r => r.value === role)?.label}</span>
-                {' '}&mdash;{' '}
-                <button type="button" onClick={() => setStep(1)} className="text-blue-600 font-semibold hover:underline">
-                  Change
-                </button>
+                Registering as a verified <span className="font-semibold text-slate-800">Community Member</span>
               </p>
             </div>
 
@@ -216,6 +215,23 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLo
                 </div>
               )}
             </div>
+
+            {teams.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Select Team</label>
+                <select
+                  value={teamId}
+                  onChange={(e) => setTeamId(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs"
+                >
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {error && (
               <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>

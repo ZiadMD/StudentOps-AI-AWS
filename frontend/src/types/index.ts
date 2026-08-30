@@ -1,3 +1,32 @@
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  arabic_name?: string | null;
+  role: 'hr_admin' | 'team_lead' | 'member';
+  team_id?: string | null;
+  team_name?: string | null;
+  student_id?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  user: UserProfile;
+}
+
+export interface TeamItem {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  created_at: string;
+  member_count: number;
+}
+
 export interface Student {
   id: string;
   student_code: string;

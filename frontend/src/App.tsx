@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar, Tab, Role } from './components/Sidebar';
 import { LoginPage }          from './components/auth/LoginPage';
 import { RegisterPage }       from './components/auth/RegisterPage';
@@ -12,28 +12,55 @@ import { TaskReviewsPage }    from './components/TaskReviewsPage';
 import { StudentsPage }       from './components/StudentsPage';
 import { NotificationsPage }  from './components/NotificationsPage';
 import { AuditViewer }        from './components/AuditViewer';
+import { api }                from './api/client';
+import { UserProfile }        from './types';
 
 type AuthScreen = 'login' | 'register' | 'app';
 
 export function App() {
-  const [screen, setScreen]             = useState<AuthScreen>('login');
-  const [userRole, setUserRole]         = useState<Role>('hr_admin');
+  const initialUser = api.getUser();
+  const [screen, setScreen]             = useState<AuthScreen>(initialUser && api.getToken() ? 'app' : 'login');
+  const [currentUser, setCurrentUser]   = useState<UserProfile | null>(initialUser);
+  const [userRole, setUserRole]         = useState<Role>(initialUser?.role || 'hr_admin');
   const [activeTab, setActiveTab]       = useState<Tab>('dashboard');
   const [chatInitialQuery, setChatInitialQuery] = useState<string | undefined>(undefined);
 
-  const handleLogin = (role: Role) => {
-    setUserRole(role);
+  useEffect(() => {
+    const token = api.getToken();
+    if (token) {
+      api.getMe()
+        .then((user) => {
+          setCurrentUser(user);
+          setUserRole(user.role);
+          setScreen('app');
+        })
+        .catch(() => {
+          api.logout();
+          setCurrentUser(null);
+          setScreen('login');
+        });
+    } else {
+      setScreen('login');
+    }
+  }, []);
+
+  const handleLogin = (user: UserProfile) => {
+    setCurrentUser(user);
+    setUserRole(user.role);
     setScreen('app');
     setActiveTab('dashboard');
   };
 
-  const handleRegister = (role: Role) => {
-    setUserRole(role);
+  const handleRegister = (user: UserProfile) => {
+    setCurrentUser(user);
+    setUserRole(user.role);
     setScreen('app');
     setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
+    api.logout();
+    setCurrentUser(null);
     setScreen('login');
     setActiveTab('dashboard');
   };
@@ -69,6 +96,7 @@ export function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         role={userRole}
+        currentUser={currentUser}
         onLogout={handleLogout}
       />
 

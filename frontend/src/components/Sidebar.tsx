@@ -57,14 +57,17 @@ const NAV_ITEMS: {
   { id: 'audit',          label: 'Audit Log',       icon: ShieldCheck,     roles: ['hr_admin'] },
 ];
 
+import { UserProfile } from '../types';
+
 interface SidebarProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   role: Role;
+  currentUser?: UserProfile | null;
   onLogout: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role, currentUser, onLogout }) => {
   const visibleItems = NAV_ITEMS.filter(item => item.roles.includes(role));
 
   return (
@@ -148,11 +151,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role,
         </button>
         <div className="flex items-center space-x-2.5 px-2.5 py-2 rounded-md mt-1 border border-slate-200 bg-slate-50/60">
           <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
-            {ROLE_LABELS[role].charAt(0)}
+            {currentUser?.full_name?.charAt(0) || ROLE_LABELS[role].charAt(0)}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-[12px] font-semibold text-slate-900 truncate">Admin User</span>
-            <span className="text-[10px] text-slate-500 truncate">{ROLE_LABELS[role]}</span>
+            <span className="text-[12px] font-semibold text-slate-900 truncate">
+              {currentUser?.full_name || 'Admin User'}
+            </span>
+            <span className="text-[10px] text-slate-500 truncate">
+              {ROLE_LABELS[role]}{currentUser?.team_name ? ` · ${currentUser.team_name}` : ''}
+            </span>
           </div>
         </div>
       </div>
