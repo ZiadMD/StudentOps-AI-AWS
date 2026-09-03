@@ -3,39 +3,17 @@ import { Layers, Eye, EyeOff, ChevronRight } from 'lucide-react';
 import { api } from '../../api/client';
 import { UserProfile } from '../../types';
 
-type Role = 'hr_admin' | 'team_lead' | 'member';
-
-const DEMO_CREDENTIALS: Record<Role, { email: string; password: string }> = {
-  hr_admin:  { email: 'admin@studentops.org', password: 'admin123' },
-  team_lead: { email: 'lead@studentops.org',  password: 'lead123' },
-  member:    { email: 'maurine.magdy@studentops.org', password: 'member123' },
-};
-
-const ROLES: { value: Role; label: string; description: string; badge: string }[] = [
-  { value: 'hr_admin',  label: 'HR Admin',   description: 'Full access to all operations, agent tools, and audit logs', badge: 'Admin' },
-  { value: 'team_lead', label: 'Team Lead',  description: 'Manage team members, tasks, and meeting reviews',           badge: 'Lead'  },
-  { value: 'member',    label: 'Member',     description: 'View personal scores, attendance, and task submissions',     badge: 'Member'},
-];
-
 interface LoginPageProps {
   onLogin: (user: UserProfile) => void;
   onGoToRegister: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister }) => {
-  const [role, setRole]           = useState<Role>('hr_admin');
-  const [email, setEmail]         = useState(DEMO_CREDENTIALS.hr_admin.email);
-  const [password, setPassword]   = useState(DEMO_CREDENTIALS.hr_admin.password);
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
   const [showPass, setShowPass]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
-
-  const handleRoleChange = (newRole: Role) => {
-    setRole(newRole);
-    setEmail(DEMO_CREDENTIALS[newRole].email);
-    setPassword(DEMO_CREDENTIALS[newRole].password);
-    setError('');
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,32 +108,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Role Selector */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Sign in as</label>
-              <div className="grid grid-cols-3 gap-2">
-                {ROLES.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => handleRoleChange(r.value)}
-                    className={`p-2.5 rounded-lg border text-left transition-all ${
-                      role === r.value
-                        ? 'bg-blue-50 border-blue-400 shadow-sm'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className={`text-[11px] font-bold ${role === r.value ? 'text-blue-700' : 'text-slate-700'}`}>
-                      {r.label}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11px] text-slate-400">
-                {ROLES.find(r => r.value === role)?.description}
-              </p>
-            </div>
-
             {/* Email */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700" htmlFor="email">
@@ -167,7 +119,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@engineering.org"
+                placeholder="name@organization.org"
                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs"
               />
             </div>
