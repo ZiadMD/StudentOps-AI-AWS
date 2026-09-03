@@ -14,8 +14,61 @@ from app.models.entities import (
 from app.core.security import get_password_hash
 
 
-async def seed_all(db: AsyncSession):
-    """Populates database with complete realistic operational data seeded from 8.xlsx."""
+CORE_TEAM = [
+    {"name": "Ziad", "arabic": "زياد محمد", "team_id": "team_tech"},
+    {"name": "Ali", "arabic": "علي حسن", "team_id": "team_tech"},
+    {"name": "Salma", "arabic": "سلمى أحمد", "team_id": "team_ops"},
+    {"name": "Rana", "arabic": "رنا محمود", "team_id": "team_ops"},
+    {"name": "Mohamed", "arabic": "محمد إبراهيم", "team_id": "team_media"},
+    {"name": "Khaled", "arabic": "خالد يوسف", "team_id": "team_media"},
+]
+
+SYNTHETIC_PEOPLE = [
+    ("Karim", "Tarek", "كريم طارق", "team_tech"),
+    ("Layla", "Nabil", "ليلى نبيل", "team_tech"),
+    ("Omar", "Farouk", "عمر فاروق", "team_tech"),
+    ("Nour", "El-Din", "نور الدين سامي", "team_tech"),
+    ("Yasmine", "Adel", "ياسمين عادل", "team_tech"),
+    ("Hany", "Samir", "هاني سمير", "team_tech"),
+    ("Dina", "Gamal", "دينا جمال", "team_tech"),
+    ("Sherif", "Mostafa", "شريف مصطفى", "team_tech"),
+    ("Reem", "Hesham", "ريم هشام", "team_tech"),
+    ("Tarek", "Hamdi", "طارق حمدي", "team_tech"),
+    ("Menna", "Essam", "منة عصام", "team_tech"),
+    ("Mostafa", "Kamel", "مصطفى كامل", "team_tech"),
+    ("Aya", "Ashraf", "آية أشرف", "team_tech"),
+    ("Hazem", "Badr", "حازم بدر", "team_tech"),
+    ("Farida", "Yasser", "فريدة ياسر", "team_ops"),
+    ("Seif", "Eldin", "سيف الدين عمرو", "team_ops"),
+    ("Malak", "Wael", "ملك وائل", "team_ops"),
+    ("Mahmoud", "Reda", "محمود رضا", "team_ops"),
+    ("Nada", "Hatem", "ندى حاتم", "team_ops"),
+    ("Youssef", "Emad", "يوسف عماد", "team_ops"),
+    ("Habiba", "Sameh", "حبيبة سامح", "team_ops"),
+    ("Marwan", "Fathy", "مروان فتحي", "team_ops"),
+    ("Basma", "Ezzat", "بسمة عزت", "team_ops"),
+    ("Amr", "Magdy", "عمرو مجدي", "team_ops"),
+    ("Lojain", "Khaled", "لوجين خالد", "team_ops"),
+    ("Ziad", "Fayed", "زياد فايد", "team_ops"),
+    ("Farah", "Saber", "فرح صابر", "team_ops"),
+    ("Ahmed", "Qassem", "أحمد قاسم", "team_media"),
+    ("Shahd", "Anwar", "شهد أنور", "team_media"),
+    ("Hesham", "Raafat", "هشام رأفت", "team_media"),
+    ("Mariam", "Shaker", "مريم شاكر", "team_media"),
+    ("Ramy", "Nader", "رامي نادر", "team_media"),
+    ("Salma", "Badawy", "سلمى بدوي", "team_media"),
+    ("Tamer", "Hosny", "تامر حسني", "team_media"),
+    ("Noha", "Fawzy", "نهى فوزي", "team_media"),
+    ("Karim", "Mounir", "كريم منير", "team_media"),
+    ("Yasmin", "Sabry", "ياسمين صبري", "team_media"),
+    ("Ehab", "Galal", "إيهاب جلال", "team_media"),
+    ("Radwa", "Sherif", "رضوى شريف", "team_media"),
+    ("Waleed", "Mansour", "وليد منصور", "team_media"),
+]
+
+
+async def seed_all(db: AsyncSession, include_synthetic: bool = False):
+    """Populates database with complete realistic operational data seeded from 8.xlsx, plus optional synthetic cohorts."""
     # Check if data already exists
     existing = await db.execute(select(Student))
     if existing.scalars().first():
@@ -105,6 +158,59 @@ async def seed_all(db: AsyncSession):
             "is_active": True
         }
     ]
+    if include_synthetic:
+        core_pwd = get_password_hash("SuperSecret#1234#")
+        for i, p in enumerate(CORE_TEAM, 1):
+            name_lower = p["name"].lower()
+            users_data.extend([
+                {
+                    "id": f"usr_{name_lower}_member",
+                    "email": f"{name_lower}.member@studentops.org",
+                    "hashed_password": core_pwd,
+                    "full_name": f"{p['name']} (Member)",
+                    "arabic_name": p["arabic"],
+                    "role": "member",
+                    "team_id": p["team_id"],
+                    "student_id": f"std_{name_lower}",
+                    "is_active": True
+                },
+                {
+                    "id": f"usr_{name_lower}_lead",
+                    "email": f"{name_lower}.lead@studentops.org",
+                    "hashed_password": core_pwd,
+                    "full_name": f"{p['name']} (Team Lead)",
+                    "arabic_name": f"{p['arabic']} (قائد الفريق)",
+                    "role": "team_lead",
+                    "team_id": p["team_id"],
+                    "student_id": None,
+                    "is_active": True
+                },
+                {
+                    "id": f"usr_{name_lower}_hr",
+                    "email": f"{name_lower}.hr@studentops.org",
+                    "hashed_password": core_pwd,
+                    "full_name": f"{p['name']} (HR Admin)",
+                    "arabic_name": f"{p['arabic']} (مسؤول الموارد البشرية)",
+                    "role": "hr_admin",
+                    "team_id": None,
+                    "student_id": None,
+                    "is_active": True
+                }
+            ])
+
+        for i, (first, last, ar_name, team_id) in enumerate(SYNTHETIC_PEOPLE, 1):
+            users_data.append({
+                "id": f"usr_syn_{i:03d}",
+                "email": f"{first.lower()}.{last.lower()}{i}@studentops.org",
+                "hashed_password": core_pwd,
+                "full_name": f"{first} {last}",
+                "arabic_name": ar_name,
+                "role": "member",
+                "team_id": team_id,
+                "student_id": f"std_syn_{i:03d}",
+                "is_active": True
+            })
+
     for u_data in users_data:
         db.add(User(**u_data))
 
@@ -171,6 +277,36 @@ async def seed_all(db: AsyncSession):
             "team_id": "team_media"
         }
     ]
+
+    if include_synthetic:
+        for i, p in enumerate(CORE_TEAM, 1):
+            name_lower = p["name"].lower()
+            students_data.append({
+                "id": f"std_{name_lower}",
+                "student_code": f"CORE-2026-{i:03d}",
+                "full_name": f"{p['name']} Operations",
+                "arabic_name": p["arabic"],
+                "email": f"{name_lower}.member@studentops.org",
+                "phone": f"+20100000{i:04d}",
+                "university": "Faculty of Engineering",
+                "role": "Member",
+                "status": "ACTIVE",
+                "team_id": p["team_id"]
+            })
+
+        for i, (first, last, ar_name, team_id) in enumerate(SYNTHETIC_PEOPLE, 1):
+            students_data.append({
+                "id": f"std_syn_{i:03d}",
+                "student_code": f"ST-2026-{100+i:03d}",
+                "full_name": f"{first} {last}",
+                "arabic_name": ar_name,
+                "email": f"{first.lower()}.{last.lower()}{i}@studentops.org",
+                "phone": f"+201055{i:06d}",
+                "university": "Faculty of Engineering",
+                "role": "Member",
+                "status": "ACTIVE",
+                "team_id": team_id
+            })
 
     for s_data in students_data:
         db.add(Student(**s_data))
@@ -423,6 +559,6 @@ if __name__ == "__main__":
     async def main():
         await init_db()
         async with AsyncSessionLocal() as session:
-            await seed_all(session)
+            await seed_all(session, include_synthetic=True)
 
     asyncio.run(main())
