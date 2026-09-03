@@ -13,7 +13,7 @@ import {
   TeamItem
 } from '../types';
 
-const API_BASE = '/api';
+export const API_BASE = ((import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, '')) || '/api';
 const TOKEN_KEY = 'studentops_access_token';
 const USER_KEY = 'studentops_user';
 

@@ -25,10 +25,14 @@ logger = logging.getLogger("studentops.security")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize database schema and seed data
-    await init_db()
-    async with AsyncSessionLocal() as session:
-        await seed_all(session)
+    # Startup: initialize database schema
+    try:
+        await init_db()
+        if settings.ENVIRONMENT == "development" and "sqlite" in settings.DATABASE_URL:
+            async with AsyncSessionLocal() as session:
+                await seed_all(session)
+    except Exception as e:
+        logger.warning(f"Database startup notice: {e}")
     yield
     # Shutdown
 
@@ -55,7 +59,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "script-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com data:; "
-            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://openrouter.ai https://api.groq.com; "
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://openrouter.ai https://api.groq.com https://*.supabase.co https://*.vercel.app; "
             "frame-ancestors 'none';"
         )
         if settings.ENVIRONMENT == "production":
@@ -65,10 +69,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CORS middleware with explicit trusted origins
+# CORS middleware with explicit trusted origins and Vercel preview support
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],

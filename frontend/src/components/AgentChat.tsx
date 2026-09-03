@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, ChevronDown, ChevronRight, Code, Paperclip, CheckCircle2 } from 'lucide-react';
 import { ToolCallExecution, PendingConfirmation } from '../types';
-import { api } from '../api/client';
+import { api, API_BASE } from '../api/client';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { MarkdownRenderer } from './ui/MarkdownRenderer';
@@ -21,8 +21,6 @@ interface AgentChatProps {
   initialQuery?: string;
   onClearInitialQuery?: () => void;
 }
-
-const API_BASE = '/api';
 
 export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearInitialQuery }) => {
   const [messages, setMessages]     = useState<AgentMessage[]>([]);

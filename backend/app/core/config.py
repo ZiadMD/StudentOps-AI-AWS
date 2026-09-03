@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./studentops.db"
     
+    # Supabase PostgreSQL & Cloud Configuration
+    SUPABASE_URL: Optional[str] = "https://xziwgwtavxzmeuzoxwqp.supabase.co"
+    SUPABASE_PUBLISHABLE_KEY: Optional[str] = "sb_publishable_2Ha1ris_9Z5SPkIQRGFwCQ_2DofYfqx"
+    SUPABASE_SECRET_KEY: Optional[str] = None
+    SUPABASE_JWKS_URL: Optional[str] = "https://xziwgwtavxzmeuzoxwqp.supabase.co/auth/v1/.well-known/jwks.json"
+
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
@@ -33,6 +39,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "https://studentops-ai.vercel.app",
     ]
     
     # OpenRouter LLM
