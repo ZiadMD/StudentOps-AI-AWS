@@ -17,6 +17,30 @@ const API_BASE = '/api';
 const TOKEN_KEY = 'studentops_access_token';
 const USER_KEY = 'studentops_user';
 
+export interface TaskReminderStatus {
+  enabled: boolean;
+  delay_hours: number;
+  check_interval_minutes: number;
+  last_check: string | null;
+  last_reminder: string | null;
+  eligible: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  test_mode: boolean;
+  test_recipient: string | null;
+  test_delay_minutes: number;
+  test: {
+    id: string;
+    status: string;
+    recipient: string;
+    message?: string;
+    available_at?: string;
+    sent_at?: string | null;
+    error?: string | null;
+  } | null;
+}
+
 export function getStoredToken(): string | null {
   try {
     return localStorage.getItem(TOKEN_KEY);
@@ -114,6 +138,24 @@ export const api = {
 
   getMe: () => fetchJson<UserProfile>('/auth/me'),
   getTeams: () => fetchJson<TeamItem[]>('/auth/teams'),
+
+  // WhatsApp Agent test mode
+  sendWhatsAppMessage: (payload: { phone_number: string; message: string }) =>
+    fetchJson<{ success: boolean; recipient: string; status: string; error?: string }>('/whatsapp/send', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getTaskReminderStatus: () => fetchJson<TaskReminderStatus>('/task-reminders/status'),
+  setTaskReminderStatus: (enabled: boolean) =>
+    fetchJson<TaskReminderStatus>('/task-reminders/status', {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
+  startTaskReminderTest: (message: string) =>
+    fetchJson<TaskReminderStatus['test']>('/task-reminders/test', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
 
   // Dashboard
   getStats: () => fetchJson<DashboardStats>('/dashboard/stats'),

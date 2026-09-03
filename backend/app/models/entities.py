@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Enum as SQLEnum,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -178,6 +179,43 @@ class Submission(Base):
 
     task = relationship("Task", back_populates="submissions")
     student = relationship("Student", back_populates="submissions")
+
+
+class TaskReminder(Base):
+    """One automatic follow-up attempt for a task/member/stage combination."""
+    __tablename__ = "task_reminders"
+    __table_args__ = (
+        UniqueConstraint("task_id", "member_id", "reminder_stage", name="uq_task_member_reminder_stage"),
+    )
+
+    id = Column(String(36), primary_key=True, index=True)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
+    member_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
+    reminder_stage = Column(Integer, nullable=False, default=1)
+    recipient_phone = Column(String(30), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="PENDING")
+    sent_at = Column(DateTime, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+    task = relationship("Task")
+    member = relationship("Student")
+
+
+class TaskReminderTest(Base):
+    """Isolated synthetic reminder used only by the WhatsApp manual E2E test."""
+    __tablename__ = "task_reminder_tests"
+
+    id = Column(String(36), primary_key=True, index=True)
+    reminder_key = Column(String(80), unique=True, nullable=False, index=True)
+    recipient_phone = Column(String(30), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="PENDING")
+    available_at = Column(DateTime, nullable=False, index=True)
+    sent_at = Column(DateTime, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
 
 
 class ScoreRecord(Base):

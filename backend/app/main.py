@@ -2,6 +2,7 @@
 Main FastAPI Application Entry Point for StudentOps AI.
 """
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
@@ -19,8 +20,19 @@ from app.api.routes_calendar import router as calendar_router
 from app.api.routes_tasks import router as tasks_router
 from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_audit import router as audit_router
+from app.api.routes_whatsapp import router as whatsapp_router
+from app.api.routes_task_reminders import router as task_reminders_router
+from app.services.task_reminder_scheduler import task_reminder_scheduler
 
 logger = logging.getLogger("studentops.security")
+logging.getLogger("studentops").setLevel(logging.INFO)
+
+
+def _log_scheduler_exit(task: asyncio.Task) -> None:
+    if task.cancelled():
+        logger.info("[TaskReminderScheduler] task cancelled")
+    elif task.exception() is not None:
+        logger.error("[TaskReminderScheduler] task exited unexpectedly", exc_info=task.exception())
 
 
 @asynccontextmanager
@@ -29,8 +41,14 @@ async def lifespan(app: FastAPI):
     await init_db()
     async with AsyncSessionLocal() as session:
         await seed_all(session)
+    stop_event = asyncio.Event()
+    scheduler_task = asyncio.create_task(task_reminder_scheduler(stop_event))
+    scheduler_task.add_done_callback(_log_scheduler_exit)
+    logger.info("[TaskReminderScheduler] task created; alive=%s", not scheduler_task.done())
     yield
-    # Shutdown
+    stop_event.set()
+    scheduler_task.cancel()
+    await asyncio.gather(scheduler_task, return_exceptions=True)
 
 
 app = FastAPI(
@@ -99,6 +117,8 @@ app.include_router(attendance_router, prefix=settings.API_V1_STR)
 app.include_router(calendar_router, prefix=settings.API_V1_STR)
 app.include_router(tasks_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
+app.include_router(whatsapp_router, prefix=settings.API_V1_STR)
+app.include_router(task_reminders_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

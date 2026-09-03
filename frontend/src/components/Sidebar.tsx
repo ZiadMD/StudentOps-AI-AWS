@@ -15,6 +15,7 @@ import {
   Bell,
   ClipboardList,
   LogOut,
+  MessageCircle,
 } from 'lucide-react';
 
 export type Tab =
@@ -27,7 +28,8 @@ export type Tab =
   | 'task-reviews'
   | 'students'
   | 'notifications'
-  | 'audit';
+  | 'audit'
+  | 'whatsapp-agent';
 
 export type Role = 'hr_admin' | 'team_lead' | 'member';
 
@@ -55,6 +57,7 @@ const NAV_ITEMS: {
   { id: 'task-reviews',   label: 'Task Reviews',    icon: ClipboardList,   roles: ['hr_admin', 'team_lead'] },
   { id: 'notifications',  label: 'Reminders',       icon: Bell,            roles: ['hr_admin', 'team_lead'] },
   { id: 'audit',          label: 'Audit Log',       icon: ShieldCheck,     roles: ['hr_admin'] },
+  { id: 'whatsapp-agent', label: 'WhatsApp Agent',  icon: MessageCircle,  roles: ['hr_admin'], isAgent: true },
 ];
 
 import { UserProfile } from '../types';

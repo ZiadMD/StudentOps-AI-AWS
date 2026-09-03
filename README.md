@@ -190,6 +190,57 @@ StudentOps AI uses [OpenRouter](https://openrouter.ai/) as its primary LLM gatew
 
 > The Vite dev server is pre-configured to proxy all `/api` calls directly to the FastAPI server at `http://127.0.0.1:8000`.
 
+### WhatsApp Agent Test Mode
+
+The HR Admin-only `/whatsapp-agent` workspace sends one manually entered message through pywhatkit and WhatsApp Web.
+
+1. Install the backend dependency with `cd backend && uv add pywhatkit` (or run `uv sync` after the dependency is present in `pyproject.toml`).
+2. Copy `.env.example` to `.env` and configure `WHATSAPP_SENDER_PHONE`, `WHATSAPP_WAIT_TIME`, and `WHATSAPP_TAB_CLOSE`.
+3. Start the backend and frontend using the commands above.
+4. Log the intended sender account into WhatsApp Web in the browser session pywhatkit will use.
+5. Open `/whatsapp-agent`, enter an international recipient number and test message, then click **Send WhatsApp Message**.
+6. Verify the message arrives and review the success or failure status in the page.
+
+`WHATSAPP_SENDER_PHONE` is metadata only. pywhatkit does not accept a sender phone parameter; the sender is whichever account is currently logged into WhatsApp Web. Messages are not stored by this test endpoint.
+
+### Automated Task Reminders
+
+The backend starts a cancellable background scheduler with the FastAPI lifespan. It checks overdue tasks at the configured interval and calls `check_task_followups()` in the task follow-up service. The initial stage runs once after `TASK_REMINDER_DELAY_HOURS` (24 hours by default) and only considers active members who have not submitted the task and have a valid phone number.
+
+Configure the workflow in `backend/.env`:
+
+```env
+TASK_REMINDER_ENABLED=true
+TASK_REMINDER_DELAY_HOURS=24
+TASK_REMINDER_CHECK_INTERVAL_MINUTES=60
+```
+
+The HR Admin can view the current status, timestamps, and eligible/sent/failed/skipped counts in the WhatsApp Agent workspace and can temporarily enable or disable the scheduler there. Each task/member/stage claim is stored in `task_reminders` with a unique constraint, so repeated or concurrent scheduler runs cannot send the same stage twice. Failed deliveries remain recorded as `FAILED` and do not crash later reminders.
+
+Automatic messages are generated from backend-provided member name, task title, deadline, overdue hours, and stage context, then sent through the existing `send_whatsapp_message` tool. Automated tests mock that tool and never open WhatsApp Web. For real testing, the intended sender account must already be authenticated in the WhatsApp Web browser session used by pywhatkit; the scheduler cannot bypass that authentication.
+
+#### Safe Autonomous E2E Test
+
+For a real browser-automation test, set these values in `backend/.env`:
+
+```env
+TASK_REMINDER_ENABLED=true
+WHATSAPP_TEST_MODE=true
+WHATSAPP_TEST_RECIPIENT=+20XXXXXXXXXXX
+WHATSAPP_TEST_DELAY_MINUTES=1
+```
+
+Start the backend with `cd backend; uv run uvicorn app.main:app --reload --port 8000`, log the intended sender account into WhatsApp Web, then start the frontend and open **StudentOps → WhatsApp Agent**. Confirm the warning says `TEST MODE`, verify the displayed recipient, enter a test message, and click **Start Automated Test**. The endpoint only creates an isolated synthetic test record; the background scheduler waits for the configured delay and then runs the same agent and `send_whatsapp_message` tool used by production follow-ups. Keep the browser/session available and wait for the scheduler interval.
+
+After verification, disable it and remove the recipient:
+
+```env
+WHATSAPP_TEST_MODE=false
+WHATSAPP_TEST_RECIPIENT=
+```
+
+The result appears in the page status panel. HR Admins can also open **Audit Log** and look for `AUTOMATIC_TASK_REMINDER_TEST`, `send_whatsapp_message`, and `automatic_task_reminder_test`; the audit result contains `SENT` or `FAILED` and any safe failure reason. Synthetic test records live in `task_reminder_tests` and cannot create production member reminders or duplicates.
+
 ---
 
 ### Alternative: One-Click Startup (PowerShell)

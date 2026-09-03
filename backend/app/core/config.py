@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_PHONE_NUMBER: Optional[str] = None
+    WHATSAPP_SENDER_PHONE: Optional[str] = None
+    WHATSAPP_WAIT_TIME: int = 10
+    WHATSAPP_TAB_CLOSE: bool = True
+
+    # Automated task follow-ups
+    TASK_REMINDER_ENABLED: bool = True
+    TASK_REMINDER_DELAY_HOURS: int = 24
+    TASK_REMINDER_CHECK_INTERVAL_MINUTES: int = 60
+    WHATSAPP_TEST_MODE: bool = False
+    WHATSAPP_TEST_RECIPIENT: Optional[str] = None
+    WHATSAPP_TEST_DELAY_MINUTES: int = 1
     
     # Policy Thresholds
     ATTENDANCE_LATE_THRESHOLD_MINUTES: int = 10

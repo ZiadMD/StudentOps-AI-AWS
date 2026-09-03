@@ -12,6 +12,7 @@ import { TaskReviewsPage }    from './components/TaskReviewsPage';
 import { StudentsPage }       from './components/StudentsPage';
 import { NotificationsPage }  from './components/NotificationsPage';
 import { AuditViewer }        from './components/AuditViewer';
+import { WhatsAppAgentPage }  from './components/WhatsAppAgentPage';
 import { api }                from './api/client';
 import { UserProfile }        from './types';
 
@@ -22,7 +23,7 @@ export function App() {
   const [screen, setScreen]             = useState<AuthScreen>(initialUser && api.getToken() ? 'app' : 'login');
   const [currentUser, setCurrentUser]   = useState<UserProfile | null>(initialUser);
   const [userRole, setUserRole]         = useState<Role>(initialUser?.role || 'hr_admin');
-  const [activeTab, setActiveTab]       = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab]       = useState<Tab>(window.location.pathname === '/whatsapp-agent' ? 'whatsapp-agent' : 'dashboard');
   const [chatInitialQuery, setChatInitialQuery] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -43,6 +44,13 @@ export function App() {
       setScreen('login');
     }
   }, []);
+
+  useEffect(() => {
+    const targetPath = activeTab === 'whatsapp-agent' ? '/whatsapp-agent' : '/';
+    if (window.location.pathname !== targetPath) {
+      window.history.replaceState({}, '', targetPath);
+    }
+  }, [activeTab]);
 
   const handleLogin = (user: UserProfile) => {
     setCurrentUser(user);
@@ -113,6 +121,7 @@ export function App() {
             {activeTab === 'task-reviews'  && <TaskReviewsPage />}
             {activeTab === 'notifications' && <NotificationsPage />}
             {activeTab === 'audit'         && <AuditViewer />}
+            {activeTab === 'whatsapp-agent' && <WhatsAppAgentPage />}
           </div>
         </div>
       </main>
