@@ -29,7 +29,7 @@ class Team(Base):
     name = Column(String(100), unique=True, nullable=False)
     code = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(Text, default="")
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     # Relationships
     members = relationship("User", back_populates="team")
@@ -48,7 +48,7 @@ class User(Base):
     team_id = Column(String(36), ForeignKey("teams.id"), nullable=True, index=True)
     student_id = Column(String(36), ForeignKey("students.id"), nullable=True, index=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     # Relationships
     team = relationship("Team", back_populates="members")
@@ -68,7 +68,7 @@ class Student(Base):
     role = Column(String(50), default="Member")  # "Member", "Head", "Vice Head", "Lead"
     status = Column(String(20), default="ACTIVE")  # "ACTIVE", "INACTIVE", "PROBATION"
     team_id = Column(String(36), ForeignKey("teams.id"), nullable=True, index=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     # Relationships
     team = relationship("Team", back_populates="students")
@@ -84,12 +84,12 @@ class Meeting(Base):
     meeting_code = Column(String(50), unique=True, index=True)
     title = Column(String(150), nullable=False)
     topic = Column(String(200), default="")
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
     duration_minutes = Column(Integer, default=60)
     meet_url = Column(String(255), default="https://meet.google.com/abc-defg-hij")
     status = Column(String(20), default="COMPLETED")  # "SCHEDULED", "LIVE", "COMPLETED"
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     # Relationships
     sessions = relationship("ParticipantSession", back_populates="meeting", cascade="all, delete-orphan")
@@ -104,8 +104,8 @@ class ParticipantSession(Base):
     meeting_id = Column(String(36), ForeignKey("meetings.id"), nullable=False, index=True)
     raw_display_name = Column(String(100), nullable=False)
     raw_email = Column(String(100), default="")
-    join_time = Column(DateTime, nullable=False)
-    leave_time = Column(DateTime, nullable=False)
+    join_time = Column(DateTime(timezone=True), nullable=False)
+    leave_time = Column(DateTime(timezone=True), nullable=False)
     duration_seconds = Column(Integer, default=0)
     matched_student_id = Column(String(36), ForeignKey("students.id"), nullable=True)
 
@@ -121,13 +121,13 @@ class AttendanceRecord(Base):
     student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
     status = Column(String(30), nullable=False)  # "PRESENT", "LATE", "EXCUSED_ACCEPTED", "EXCUSED_MODERATE", "EXCUSED_REJECTED", "UNEXCUSED_ABSENT"
     match_confidence = Column(Float, default=1.0)
-    first_join = Column(DateTime, nullable=True)
-    last_leave = Column(DateTime, nullable=True)
+    first_join = Column(DateTime(timezone=True), nullable=True)
+    last_leave = Column(DateTime(timezone=True), nullable=True)
     total_duration_minutes = Column(Float, default=0.0)
     excuse_reason = Column(Text, nullable=True)
     excuse_status = Column(String(30), nullable=True)
     policy_version = Column(String(20), default="v1.0")
-    recorded_at = Column(DateTime, default=utcnow)
+    recorded_at = Column(DateTime(timezone=True), default=utcnow)
 
     meeting = relationship("Meeting", back_populates="attendance_records")
     student = relationship("Student", back_populates="attendance_records")
@@ -140,12 +140,12 @@ class Event(Base):
     title = Column(String(150), nullable=False)
     description = Column(Text, default="")
     event_type = Column(String(30), default="MEETING")  # "MEETING", "DEADLINE", "CAMP", "WORKSHOP"
-    start_time = Column(DateTime, nullable=False, index=True)
-    end_time = Column(DateTime, nullable=False)
+    start_time = Column(DateTime(timezone=True), nullable=False, index=True)
+    end_time = Column(DateTime(timezone=True), nullable=False)
     location = Column(String(100), default="Google Meet")
     meet_url = Column(String(255), default="")
     is_mandatory = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
 
 class Task(Base):
@@ -155,10 +155,10 @@ class Task(Base):
     task_number = Column(Integer, unique=True, index=True)
     title = Column(String(150), nullable=False)
     description = Column(Text, default="")
-    deadline = Column(DateTime, nullable=False, index=True)
+    deadline = Column(DateTime(timezone=True), nullable=False, index=True)
     max_score = Column(Float, default=10.0)
     score_rule = Column(String(100), default="Out of 10 points based on quality and punctuality")
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     submissions = relationship("Submission", back_populates="task", cascade="all, delete-orphan")
 
@@ -169,12 +169,12 @@ class Submission(Base):
     id = Column(String(36), primary_key=True, index=True)
     task_id = Column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
     student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
-    submitted_at = Column(DateTime, nullable=True)
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String(20), default="PENDING")  # "ON_TIME", "LATE", "PENDING", "MISSED"
     score = Column(Float, nullable=True)  # 0.0 - 10.0
     file_url = Column(String(255), default="")
     reviewer_notes = Column(Text, default="")
-    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     task = relationship("Task", back_populates="submissions")
     student = relationship("Student", back_populates="submissions")
@@ -191,7 +191,7 @@ class ScoreRecord(Base):
     max_points = Column(Float, nullable=False)
     notes = Column(String(255), default="")
     updated_by = Column(String(50), default="SYSTEM")
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     student = relationship("Student", back_populates="scores")
 
@@ -206,7 +206,7 @@ class ReminderLog(Base):
     channel = Column(String(20), default="WHATSAPP")  # "WHATSAPP", "SMS", "EMAIL"
     message_content = Column(Text, nullable=False)
     status = Column(String(20), default="SENT")  # "PENDING", "SENT", "FAILED"
-    sent_at = Column(DateTime, default=utcnow)
+    sent_at = Column(DateTime(timezone=True), default=utcnow)
     trigger_source = Column(String(50), default="AI_AGENT")  # "AI_AGENT", "EVENTBRIDGE", "MANUAL"
 
 
@@ -224,4 +224,4 @@ class AgentActionAudit(Base):
     requires_confirmation = Column(Boolean, default=False)
     confirmed = Column(Boolean, default=True)
     status = Column(String(30), default="EXECUTED")  # "PENDING_CONFIRMATION", "EXECUTED", "REJECTED", "FAILED"
-    timestamp = Column(DateTime, default=utcnow)
+    timestamp = Column(DateTime(timezone=True), default=utcnow)
