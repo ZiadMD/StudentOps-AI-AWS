@@ -29,11 +29,10 @@ export type Tab =
   | 'notifications'
   | 'audit';
 
-export type Role = 'hr_admin' | 'team_lead' | 'member';
+export type Role = 'admin' | 'member';
 
 const ROLE_LABELS: Record<Role, string> = {
-  hr_admin: 'HR Admin',
-  team_lead: 'Team Lead',
+  admin: 'Administrator',
   member: 'Member',
 };
 
@@ -45,16 +44,16 @@ const NAV_ITEMS: {
   isAgent?: boolean;
   roles: Role[];
 }[] = [
-  { id: 'dashboard',      label: 'Overview',        icon: LayoutDashboard, roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'chat',           label: 'Agent Console',   icon: Bot,             roles: ['hr_admin', 'team_lead'], isAgent: true },
-  { id: 'students',       label: 'Member Registry', icon: Users,           roles: ['hr_admin', 'team_lead'] },
-  { id: 'attendance',     label: 'Meet Attendance', icon: Video,           roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'scoreboard',     label: 'Evaluations',     icon: ClipboardList,   roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'calendar',       label: 'Schedule',        icon: Calendar,        roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'tasks',          label: 'Tasks & Sprints', icon: CheckSquare,     roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'task-reviews',   label: 'Task Reviews',    icon: ClipboardList,   roles: ['hr_admin', 'team_lead'] },
-  { id: 'notifications',  label: 'Reminders',       icon: Bell,            roles: ['hr_admin', 'team_lead'] },
-  { id: 'audit',          label: 'Audit Log',       icon: ShieldCheck,     roles: ['hr_admin'] },
+  { id: 'dashboard',      label: 'Overview',        icon: LayoutDashboard, roles: ['admin', 'member'] },
+  { id: 'chat',           label: 'Agent Console',   icon: Bot,             roles: ['admin'], isAgent: true },
+  { id: 'students',       label: 'Member Registry', icon: Users,           roles: ['admin'] },
+  { id: 'attendance',     label: 'Meet Attendance', icon: Video,           roles: ['member', 'admin'] },
+  { id: 'scoreboard',     label: 'Evaluations',     icon: ClipboardList,   roles: ['member', 'admin'] },
+  { id: 'calendar',       label: 'Schedule',        icon: Calendar,        roles: ['member', 'admin'] },
+  { id: 'tasks',          label: 'Tasks & Sprints', icon: CheckSquare,     roles: ['member', 'admin'] },
+  { id: 'task-reviews',   label: 'Task Reviews',    icon: ClipboardList,   roles: ['admin'] },
+  { id: 'notifications',  label: 'Reminders',       icon: Bell,            roles: ['admin'] },
+  { id: 'audit',          label: 'Audit Log',       icon: ShieldCheck,     roles: ['admin'] },
 ];
 
 import { UserProfile } from '../types';

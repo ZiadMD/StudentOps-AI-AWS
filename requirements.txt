@@ -138,3 +138,11 @@ watchfiles==1.2.0
     # via uvicorn
 websockets==17.1
     # via uvicorn
+
+# Active Zero-Trust backend runtime dependencies
+cryptography
+passlib[bcrypt]
+python-jose[cryptography]
+sentry-sdk
+slowapi
+supabase

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sidebar, Tab, Role } from './components/Sidebar';
 import { LoginPage }          from './components/auth/LoginPage';
-import { RegisterPage }       from './components/auth/RegisterPage';
+import { ProtectedRoute }     from './components/ProtectedRoute';
 import { Dashboard }          from './components/Dashboard';
 import { AgentChat }          from './components/AgentChat';
 import { AttendanceView }     from './components/AttendanceView';
@@ -15,13 +15,13 @@ import { AuditViewer }        from './components/AuditViewer';
 import { api }                from './api/client';
 import { UserProfile }        from './types';
 
-type AuthScreen = 'login' | 'register' | 'app';
+type AuthScreen = 'login' | 'app';
 
 export function App() {
-  const initialUser = api.getUser();
-  const [screen, setScreen]             = useState<AuthScreen>(initialUser && api.getToken() ? 'app' : 'login');
-  const [currentUser, setCurrentUser]   = useState<UserProfile | null>(initialUser);
-  const [userRole, setUserRole]         = useState<Role>(initialUser?.role || 'hr_admin');
+  const [screen, setScreen]             = useState<AuthScreen>('login');
+  const [authReady, setAuthReady]       = useState(false);
+  const [currentUser, setCurrentUser]   = useState<UserProfile | null>(null);
+  const [userRole, setUserRole]         = useState<Role>('member');
   const [activeTab, setActiveTab]       = useState<Tab>('dashboard');
   const [chatInitialQuery, setChatInitialQuery] = useState<string | undefined>(undefined);
 
@@ -33,25 +33,21 @@ export function App() {
           setCurrentUser(user);
           setUserRole(user.role);
           setScreen('app');
+          setAuthReady(true);
         })
         .catch(() => {
           api.logout();
           setCurrentUser(null);
           setScreen('login');
+          setAuthReady(true);
         });
     } else {
       setScreen('login');
+      setAuthReady(true);
     }
   }, []);
 
   const handleLogin = (user: UserProfile) => {
-    setCurrentUser(user);
-    setUserRole(user.role);
-    setScreen('app');
-    setActiveTab('dashboard');
-  };
-
-  const handleRegister = (user: UserProfile) => {
     setCurrentUser(user);
     setUserRole(user.role);
     setScreen('app');
@@ -71,23 +67,17 @@ export function App() {
   };
 
   // ── Auth screens ──────────────────────────────────────────────────────────
+  if (!authReady) return null;
+
   if (screen === 'login') {
     return (
       <LoginPage
         onLogin={handleLogin}
-        onGoToRegister={() => setScreen('register')}
       />
     );
   }
 
-  if (screen === 'register') {
-    return (
-      <RegisterPage
-        onRegister={handleRegister}
-        onGoToLogin={() => setScreen('login')}
-      />
-    );
-  }
+  if (!currentUser) return null;
 
   // ── Main app shell ────────────────────────────────────────────────────────
   return (
@@ -103,16 +93,16 @@ export function App() {
       <main className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <div className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-10 py-8">
           <div className="max-w-5xl mx-auto w-full">
-            {activeTab === 'dashboard'     && <Dashboard onNavigateToTab={(t) => setActiveTab(t as Tab)} onSendChatQuery={handleSendChatQuery} />}
-            {activeTab === 'chat'          && <AgentChat initialQuery={chatInitialQuery} onClearInitialQuery={() => setChatInitialQuery(undefined)} />}
-            {activeTab === 'students'      && <StudentsPage />}
+            {activeTab === 'dashboard'     && <Dashboard role={userRole} onNavigateToTab={(t) => setActiveTab(t as Tab)} onSendChatQuery={handleSendChatQuery} />}
+            {activeTab === 'chat' && <ProtectedRoute user={currentUser} isInitializing={!authReady} allowedRoles={['admin']}><AgentChat initialQuery={chatInitialQuery} onClearInitialQuery={() => setChatInitialQuery(undefined)} /></ProtectedRoute>}
+            {activeTab === 'students' && <ProtectedRoute user={currentUser} isInitializing={!authReady} allowedRoles={['admin']}><StudentsPage /></ProtectedRoute>}
             {activeTab === 'attendance'    && <AttendanceView />}
             {activeTab === 'scoreboard'    && <StudentScoreboard />}
             {activeTab === 'calendar'      && <CalendarView />}
             {activeTab === 'tasks'         && <TaskManagement />}
-            {activeTab === 'task-reviews'  && <TaskReviewsPage />}
-            {activeTab === 'notifications' && <NotificationsPage />}
-            {activeTab === 'audit'         && <AuditViewer />}
+            {activeTab === 'task-reviews' && <ProtectedRoute user={currentUser} isInitializing={!authReady} allowedRoles={['admin']}><TaskReviewsPage /></ProtectedRoute>}
+            {activeTab === 'notifications' && <ProtectedRoute user={currentUser} isInitializing={!authReady} allowedRoles={['admin']}><NotificationsPage /></ProtectedRoute>}
+            {activeTab === 'audit' && <ProtectedRoute user={currentUser} isInitializing={!authReady} allowedRoles={['admin']}><AuditViewer /></ProtectedRoute>}
           </div>
         </div>
       </main>

@@ -14,15 +14,16 @@ import {
   Activity
 } from 'lucide-react';
 import { api } from '../api/client';
-import { DashboardStats, MeetingDetail, StudentScoreSummary } from '../types';
+import { DashboardStats, MeetingDetail, StudentScoreSummary, UserProfile } from '../types';
 import { ProgressBar } from './ui/ProgressBar';
 
 interface DashboardProps {
+  role: UserProfile['role'];
   onNavigateToTab: (tab: string) => void;
   onSendChatQuery: (query: string) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab, onSendChatQuery }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ role, onNavigateToTab, onSendChatQuery }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [meetings, setMeetings] = useState<MeetingDetail[]>([]);
   const [scoreboard, setScoreboard] = useState<StudentScoreSummary[]>([]);
@@ -32,7 +33,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab, onSendCha
     async function loadData() {
       try {
         const [statsData, meetingsData, , scoreData] = await Promise.all([
-          api.getStats(),
+          api.getStats(role),
           api.getMeetings(),
           api.getEvents(),
           api.getScoreboard()
@@ -111,15 +112,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab, onSendCha
           </p>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <button 
-            onClick={() => onNavigateToTab('chat')}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center space-x-2"
-          >
-            <Bot className="w-4 h-4" />
-            <span>Launch AI Agent</span>
-          </button>
-        </div>
+        {role === 'admin' && (
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => onNavigateToTab('chat')}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center space-x-2"
+            >
+              <Bot className="w-4 h-4" />
+              <span>Launch AI Agent</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Dense Vercel/Linear Style Telemetry Grid */}
@@ -144,7 +147,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab, onSendCha
       </div>
 
       {/* Vercel Style Command Strip (Calmer than previous Bento) */}
-      <div>
+      {role === 'admin' && <div>
         <h3 className="text-[13px] font-semibold text-slate-900 mb-3 flex items-center">
           <Zap className="w-4 h-4 mr-1.5 text-amber-500" />
           Quick Agent Actions
@@ -170,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab, onSendCha
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Split Views (Meet / Leaderboard) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
