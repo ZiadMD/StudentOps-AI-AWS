@@ -1,21 +1,23 @@
 export interface UserProfile {
   id: string;
   email: string;
-  full_name: string;
+  full_name?: string;
   arabic_name?: string | null;
-  role: 'hr_admin' | 'team_lead' | 'member';
+  role: 'admin' | 'member';
   team_id?: string | null;
   team_name?: string | null;
   student_id?: string | null;
-  is_active: boolean;
-  created_at: string;
+  organization_id: string;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export interface TokenResponse {
+  status: string;
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string;
   token_type: string;
-  user: UserProfile;
+  user?: UserProfile;
 }
 
 export interface TeamItem {
@@ -162,12 +164,10 @@ export interface PendingConfirmation {
 }
 
 export interface AgentChatResponse {
-  conversation_id: string;
-  response: string;
-  tool_executions: ToolCallExecution[];
-  requires_confirmation: boolean;
-  pending_confirmation?: PendingConfirmation;
-  audit_id?: string;
+  status: 'success' | 'pending';
+  result?: unknown;
+  message?: string;
+  approval_id?: string;
 }
 
 export interface AuditLogItem {

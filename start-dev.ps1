@@ -1,14 +1,16 @@
 # StudentOps AI — Start Dev (Backend + Frontend)
-# Run this from the project root: z:\Coding\StudentOps AI\
+$repoRoot = $PSScriptRoot
+$backendPath = Join-Path $repoRoot "backend"
+$frontendPath = Join-Path $repoRoot "frontend"
 
 # Start backend in background
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location 'z:\Coding\StudentOps AI\backend'; uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000" -WindowStyle Normal
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$backendPath'; uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000" -WindowStyle Normal
 
 # Give backend 2 seconds to bind
 Start-Sleep -Seconds 2
 
 # Start frontend in background
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location 'z:\Coding\StudentOps AI\frontend'; npm run dev" -WindowStyle Normal
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$frontendPath'; npm run dev" -WindowStyle Normal
 
 Write-Host ""
 Write-Host "StudentOps AI starting..." -ForegroundColor Cyan

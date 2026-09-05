@@ -1,19 +1,44 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Layers, Eye, EyeOff, ChevronRight } from 'lucide-react';
 import { api } from '../../api/client';
 import { UserProfile } from '../../types';
 
 interface LoginPageProps {
   onLogin: (user: UserProfile) => void;
-  onGoToRegister: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
   const [showPass, setShowPass]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+    if (!siteKey || !turnstileRef.current) return;
+
+    const renderWidget = () => {
+      const turnstile = (window as Window & { turnstile?: { render: (element: HTMLElement, options: { sitekey: string; callback: (token: string) => void; 'expired-callback': () => void; 'error-callback': () => void }) => void } }).turnstile;
+      if (turnstile && turnstileRef.current) {
+        turnstile.render(turnstileRef.current, {
+          sitekey: siteKey,
+          callback: setTurnstileToken,
+          'expired-callback': () => setTurnstileToken(''),
+          'error-callback': () => setTurnstileToken(''),
+        });
+      }
+    };
+
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async = true;
+    script.defer = true;
+    script.onload = renderWidget;
+    document.head.appendChild(script);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,12 +46,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
       setError('Please enter your email and password.');
       return;
     }
+    if (import.meta.env.PROD && import.meta.env.VITE_TURNSTILE_SITE_KEY && !turnstileToken) {
+      setError('Complete the human verification challenge.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
       const res = await api.login({
         email: email.trim(),
-        password: password.trim()
+        password: password.trim(),
+        turnstile_token: turnstileToken,
       });
       onLogin(res.user);
     } catch (err: any) {
@@ -99,12 +129,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
         <div className="w-full max-w-sm">
           <div className="mb-8">
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Sign in</h1>
-            <p className="text-sm text-slate-500 mt-1.5">
-              Don't have an account?{' '}
-              <button onClick={onGoToRegister} className="text-blue-600 font-semibold hover:underline">
-                Create one
-              </button>
-            </p>
+            <p className="text-sm text-slate-500 mt-1.5">Use your organization-issued StudentOps account.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -159,6 +184,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
                 {error}
               </p>
             )}
+
+            <div ref={turnstileRef} aria-label="Human verification" />
 
             <button
               type="submit"
