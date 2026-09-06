@@ -71,6 +71,11 @@ async def send_official_message(
         channel="WHATSAPP_OFFICIAL",
     )
     result = await openwa.send_message(msg)
+    if not result.success:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=result.error_message or "Could not deliver message via OpenWA",
+        )
     return {
         "success": result.success,
         "message_id": result.message_id,
