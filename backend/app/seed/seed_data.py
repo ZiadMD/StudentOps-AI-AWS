@@ -9,7 +9,7 @@ from app.core.database import AsyncSessionLocal, init_db
 from app.models.entities import (
     Student, Meeting, ParticipantSession, AttendanceRecord,
     Event, Task, Submission, ScoreRecord, AgentActionAudit,
-    Team, User
+    Team, User, MemberFollowupStatus, TaskReminder
 )
 from app.core.security import get_password_hash
 
@@ -67,12 +67,13 @@ SYNTHETIC_PEOPLE = [
 ]
 
 
-async def seed_all(db: AsyncSession, include_synthetic: bool = False):
+async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: bool = False):
     """Populates database with complete realistic operational data seeded from 8.xlsx, plus optional synthetic cohorts."""
     # Check if data already exists
-    existing = await db.execute(select(Student))
-    if existing.scalars().first():
-        return
+    if not force:
+        existing = await db.execute(select(Student))
+        if existing.scalars().first():
+            return
 
     now = datetime.now(timezone.utc)
 
@@ -156,6 +157,39 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False):
             "team_id": "team_media",
             "student_id": "std_sara",
             "is_active": True
+        },
+        {
+            "id": "usr_region_head",
+            "email": "region.head@studentops.org",
+            "hashed_password": get_password_hash("head123"),
+            "full_name": "Regional HR Head",
+            "arabic_name": "رئيس الموارد البشرية للإقليم",
+            "role": "region_hr_head",
+            "team_id": None,
+            "student_id": None,
+            "is_active": True
+        },
+        {
+            "id": "usr_hr_leader",
+            "email": "hr.leader@studentops.org",
+            "hashed_password": get_password_hash("leader123"),
+            "full_name": "Nour El-Din (HR Leader)",
+            "arabic_name": "نور الدين سامي",
+            "role": "committee_hr_leader",
+            "team_id": "team_tech",
+            "student_id": None,
+            "is_active": True
+        },
+        {
+            "id": "usr_hr_member",
+            "email": "hr.member@studentops.org",
+            "hashed_password": get_password_hash("hrmember123"),
+            "full_name": "Yasmine Adel (HR Member)",
+            "arabic_name": "ياسمين عادل",
+            "role": "committee_hr_member",
+            "team_id": "team_tech",
+            "student_id": None,
+            "is_active": True
         }
     ]
     if include_synthetic:
@@ -226,7 +260,8 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False):
             "university": "Faculty of Engineering",
             "role": "Vice Head",
             "status": "ACTIVE",
-            "team_id": "team_tech"
+            "team_id": "team_tech",
+            "assigned_hr_id": "usr_hr_member"
         },
         {
             "id": "std_alaa",
@@ -238,7 +273,8 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False):
             "university": "Faculty of Engineering",
             "role": "Technical Lead",
             "status": "ACTIVE",
-            "team_id": "team_tech"
+            "team_id": "team_tech",
+            "assigned_hr_id": "usr_hr_member"
         },
         {
             "id": "std_hanan",
@@ -551,14 +587,49 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False):
     for ev_data in events_data:
         db.add(Event(**ev_data))
 
+    # 7. Followup & SLA Escalation Seed
+    followups_data = [
+        {
+            "id": "fol_001",
+            "student_id": "std_maurine",
+            "hr_member_id": "usr_hr_member",
+            "flagged_reason": "OVERDUE_TASK",
+            "flagged_at": now - timedelta(days=4),
+            "last_contacted_at": None,
+            "status": "PENDING",
+            "is_escalated": True,
+            "notes": "Task 4 final submission overdue by 4 days"
+        },
+        {
+            "id": "fol_002",
+            "student_id": "std_hanan",
+            "hr_member_id": "usr_admin",
+            "flagged_reason": "ABSENTEEISM",
+            "flagged_at": now - timedelta(days=1),
+            "last_contacted_at": None,
+            "status": "PENDING",
+            "is_escalated": False,
+            "notes": "Missed yesterday's logistics sync"
+        }
+    ]
+    for fol_item in followups_data:
+        db.add(MemberFollowupStatus(**fol_item))
+
     await db.commit()
     print("Database seeded successfully with 8.xlsx ground truth!")
 
 
 if __name__ == "__main__":
+    import sys
+
     async def main():
+        force = "--force" in sys.argv or "--reset" in sys.argv
+        if force:
+            from app.core.database import engine, Base
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
         await init_db()
         async with AsyncSessionLocal() as session:
-            await seed_all(session, include_synthetic=True)
+            await seed_all(session, include_synthetic=True, force=force)
 
     asyncio.run(main())

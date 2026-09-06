@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  openwa:
+    image: openwa/wa-automate:latest
+    container_name: studentops-openwa
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - PORT=8088
+      - AUTH_TIMEOUT=0
+      - POPUP=false
+      - HEADLESS=true
+      - MULTI_DEVICE=true
+      - CACHE_ENABLED=true
+    volumes:
+      - openwa_session:/app/session
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/getConnectionState"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  openwa_session:
+    driver: local

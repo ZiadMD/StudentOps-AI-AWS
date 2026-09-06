@@ -58,10 +58,15 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_ID: Optional[str] = "primary"
     
     # Messaging
-    MESSAGING_PROVIDER: str = "mock"  # "mock" | "whatsapp" | "sms"
+    MESSAGING_PROVIDER: str = "mock"  # "mock" | "whatsapp" | "sms" | "openwa"
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_PHONE_NUMBER: Optional[str] = None
+
+    # OpenWA Official Channel Settings
+    OPENWA_API_URL: str = "http://localhost:8088"
+    OPENWA_API_KEY: Optional[str] = None
+    OPENWA_SESSION_ID: str = "ops_official"
     
     # Policy Thresholds
     ATTENDANCE_LATE_THRESHOLD_MINUTES: int = 10

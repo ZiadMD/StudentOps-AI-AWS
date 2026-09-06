@@ -20,6 +20,7 @@ class StudentBase(BaseModel):
     role: str = "Member"
     status: str = "ACTIVE"
     team_id: Optional[str] = None
+    assigned_hr_id: Optional[str] = None
 
 
 class StudentCreate(StudentBase):
@@ -149,8 +150,51 @@ class SubmissionSchema(BaseModel):
     submitted_at: Optional[datetime] = None
     status: str
     score: Optional[float] = None
+    technical_score: Optional[float] = None
     file_url: Optional[str] = None
     reviewer_notes: Optional[str] = None
+    graded_by_user_id: Optional[str] = None
+
+
+class TechnicalScoreUpdate(BaseModel):
+    score: float = Field(..., ge=0.0, le=10.0, description="Technical score out of 10")
+    reviewer_notes: Optional[str] = ""
+
+
+class BehaviorScoreUpdate(BaseModel):
+    student_id: str
+    month: Optional[str] = None  # e.g. "2026-03"
+    group_interaction: float = Field(..., ge=0.0, le=5.0)
+    social_media: float = Field(..., ge=0.0, le=5.0)
+    hierarchy_rules: float = Field(..., ge=0.0, le=5.0)
+    polite_conduct: float = Field(..., ge=0.0, le=8.0)
+    notes: Optional[str] = ""
+
+
+class AssignCohortRequest(BaseModel):
+    student_ids: list[str]
+    hr_member_id: str
+
+
+class WhatsAppDirectLinkResponse(BaseModel):
+    phone: str
+    student_id: str
+    student_name: str
+    encoded_url: str
+    message_text: str
+
+
+class OfficialWhatsAppStatus(BaseModel):
+    configured: bool
+    status: str  # "CONNECTED", "SCAN_QR_CODE", "STARTING", "DISCONNECTED"
+    phone_number: Optional[str] = None
+    battery: Optional[int] = None
+    qr_code: Optional[str] = None
+
+
+class OfficialWhatsAppSendRequest(BaseModel):
+    phone_number: str
+    message: str
 
 
 # =========================================================
@@ -268,7 +312,11 @@ class UserLoginRequest(BaseModel):
 
 
 class UserRoleUpdateRequest(BaseModel):
-    role: str = Field(..., pattern="^(hr_admin|team_lead|member)$", description="Role: hr_admin, team_lead, or member")
+    role: str = Field(
+        ...,
+        pattern="^(region_hr_head|committee_hr_leader|committee_head|committee_hr_member|committee_member|hr_admin|team_lead|member)$",
+        description="Role: 5-tier role or legacy alias"
+    )
 
 
 class UserAdminCreateRequest(BaseModel):
@@ -276,7 +324,10 @@ class UserAdminCreateRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
     full_name: str = Field(..., min_length=1, max_length=100)
     arabic_name: Optional[str] = Field(None, max_length=100)
-    role: str = Field("member", pattern="^(hr_admin|team_lead|member)$")
+    role: str = Field(
+        "committee_member",
+        pattern="^(region_hr_head|committee_hr_leader|committee_head|committee_hr_member|committee_member|hr_admin|team_lead|member)$"
+    )
     team_id: Optional[str] = Field(None, max_length=50)
 
 

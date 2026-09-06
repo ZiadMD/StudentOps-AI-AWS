@@ -113,16 +113,34 @@ async def get_current_active_user(
     return current_user
 
 
+ROLE_EQUIVALENTS: dict[str, set[str]] = {
+    "region_hr_head": {"region_hr_head", "hr_admin"},
+    "hr_admin": {"region_hr_head", "hr_admin"},
+    "committee_hr_leader": {"committee_hr_leader"},
+    "committee_head": {"committee_head", "team_lead"},
+    "committee_hr_member": {"committee_hr_member"},
+    "committee_member": {"committee_member", "member"},
+    "team_lead": {"team_lead", "committee_head"},
+    "member": {"committee_member", "member"},
+}
+
+
 def require_roles(allowed_roles: list[str]):
     """
     Dependency factory that enforces Role-Based Access Control (RBAC).
-    Usage:
-        @router.get("/admin-only", dependencies=[Depends(require_roles(["hr_admin"]))])
+    Handles new 5-tier role architecture alongside backwards-compatible legacy roles.
     """
+    expanded_allowed = set()
+    for r in allowed_roles:
+        expanded_allowed.add(r)
+        if r in ROLE_EQUIVALENTS:
+            expanded_allowed.update(ROLE_EQUIVALENTS[r])
+
     async def role_checker(
         current_user: User = Depends(get_current_active_user)
     ) -> User:
-        if current_user.role not in allowed_roles:
+        user_roles = ROLE_EQUIVALENTS.get(current_user.role, {current_user.role})
+        if not (user_roles & expanded_allowed):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access forbidden: requires one of roles [{', '.join(allowed_roles)}]. Your role: '{current_user.role}'."
@@ -152,9 +170,10 @@ async def verify_student_access(
 ) -> Student:
     """
     Verifies that the current user has permission to access the target student record:
-    - hr_admin: full access to any student
-    - team_lead: allowed if student.team_id == current_user.team_id (403 otherwise)
-    - member: allowed only if student.id == current_user.student_id (403 otherwise)
+    - region_hr_head / hr_admin: full access to any student.
+    - committee_head / committee_hr_leader / team_lead: allowed if student.team_id == current_user.team_id.
+    - committee_hr_member: allowed if student is assigned to this HR member or in their committee.
+    - committee_member / member: allowed only if student.id == current_user.student_id.
     """
     res = await db.execute(select(Student).where(Student.id == student_id))
     student = res.scalar_one_or_none()
@@ -164,16 +183,23 @@ async def verify_student_access(
             detail="Student not found"
         )
 
-    if current_user.role == "hr_admin":
+    if current_user.role in ("region_hr_head", "hr_admin"):
         return student
-    elif current_user.role == "team_lead":
+    elif current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
         if student.team_id != current_user.team_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access forbidden: this student belongs to a different team."
             )
         return student
-    else:  # member
+    elif current_user.role == "committee_hr_member":
+        if student.assigned_hr_id != current_user.id and student.team_id != current_user.team_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: this student belongs to a different team or cohort."
+            )
+        return student
+    else:  # member or committee_member
         if student.id != current_user.student_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

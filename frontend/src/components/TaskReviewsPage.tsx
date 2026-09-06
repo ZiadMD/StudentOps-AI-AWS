@@ -15,6 +15,7 @@ export const TaskReviewsPage: React.FC = () => {
   const [search, setSearch]             = useState('');
   // Local grading state: { [subId]: { score: string, note: string } }
   const [grades, setGrades]             = useState<Record<string, { score: string; note: string }>>({});
+  const [savingSubId, setSavingSubId]   = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -219,10 +220,24 @@ export const TaskReviewsPage: React.FC = () => {
 
                         {/* Save */}
                         <button
-                          disabled={!local.score}
+                          disabled={!local.score || savingSubId === sub.id}
+                          onClick={async () => {
+                            try {
+                              setSavingSubId(sub.id);
+                              await api.reviewTaskSubmission(sub.id, {
+                                score: Number(local.score),
+                                reviewer_notes: local.note,
+                              });
+                              if (selectedTask) selectTask(selectedTask);
+                            } catch (err: any) {
+                              alert(err.message);
+                            } finally {
+                              setSavingSubId(null);
+                            }
+                          }}
                           className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          Save
+                          {savingSubId === sub.id ? 'Saving…' : 'Save'}
                         </button>
                       </div>
                     </div>

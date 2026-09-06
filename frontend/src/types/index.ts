@@ -1,9 +1,19 @@
+export type UserRole =
+  | 'region_hr_head'
+  | 'committee_hr_leader'
+  | 'committee_head'
+  | 'committee_hr_member'
+  | 'committee_member'
+  | 'hr_admin'
+  | 'team_lead'
+  | 'member';
+
 export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
   arabic_name?: string | null;
-  role: 'hr_admin' | 'team_lead' | 'member';
+  role: UserRole;
   team_id?: string | null;
   team_name?: string | null;
   student_id?: string | null;
@@ -37,6 +47,8 @@ export interface Student {
   university: string;
   role: string;
   status: string;
+  team_id?: string | null;
+  assigned_hr_id?: string | null;
   created_at: string;
 }
 
@@ -124,8 +136,42 @@ export interface SubmissionItem {
   submitted_at?: string;
   status: string;
   score?: number;
+  technical_score?: number;
   file_url?: string;
   reviewer_notes?: string;
+  graded_by_user_id?: string;
+}
+
+export interface WhatsAppDirectLink {
+  phone: string;
+  student_id: string;
+  student_name: string;
+  encoded_url: string;
+  message_text: string;
+}
+
+export interface OfficialWhatsAppStatus {
+  configured: boolean;
+  status: string;
+  phone_number?: string | null;
+  battery?: number | null;
+  qr_code?: string | null;
+}
+
+export interface EscalationRecord {
+  id: string;
+  student_id: string;
+  student_name: string;
+  arabic_name: string;
+  phone: string;
+  hr_member_id: string;
+  hr_member_name: string;
+  flagged_reason: string;
+  flagged_at: string;
+  last_contacted_at?: string | null;
+  days_open: number;
+  status: string;
+  is_escalated: boolean;
 }
 
 export interface DashboardStats {

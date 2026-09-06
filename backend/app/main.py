@@ -19,6 +19,7 @@ from app.api.routes_calendar import router as calendar_router
 from app.api.routes_tasks import router as tasks_router
 from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_audit import router as audit_router
+from app.api.routes_whatsapp import router as whatsapp_router
 
 logger = logging.getLogger("studentops.security")
 
@@ -104,6 +105,7 @@ app.include_router(attendance_router, prefix=settings.API_V1_STR)
 app.include_router(calendar_router, prefix=settings.API_V1_STR)
 app.include_router(tasks_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
+app.include_router(whatsapp_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")
