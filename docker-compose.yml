@@ -22,6 +22,17 @@ services:
       timeout: 10s
       retries: 3
 
+  # Cloudflare Tunnel for zero-cost secure HTTPS access without port forwarding
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: studentops-cloudflared
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - openwa
+
 volumes:
   openwa_session:
     driver: local
