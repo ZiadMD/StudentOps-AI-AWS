@@ -610,8 +610,81 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
     for fol_item in followups_data:
         db.add(MemberFollowupStatus(**fol_item))
 
+    # 8. Automated Task Reminders Seed
+    reminders_data = [
+        {
+            "id": "rem_001",
+            "task_id": "tsk_4",
+            "student_id": "std_ziad",
+            "channel": "WHATSAPP_OFFICIAL",
+            "stage": 1,
+            "status": "SENT",
+            "message_text": "Reminder: Task 4 submission deadline is approaching. Please submit your work on time.",
+            "sent_at": now - timedelta(days=2),
+        },
+        {
+            "id": "rem_002",
+            "task_id": "tsk_4",
+            "student_id": "std_salma",
+            "channel": "WHATSAPP_OFFICIAL",
+            "stage": 1,
+            "status": "SENT",
+            "message_text": "Reminder: Task 4 submission deadline is approaching. Please submit your work on time.",
+            "sent_at": now - timedelta(days=2),
+        },
+    ]
+    for rem_item in reminders_data:
+        db.add(TaskReminder(**rem_item))
+
+    # 9. Sync Organization Members (if members table exists in Supabase PostgreSQL)
+    try:
+        from sqlalchemy import text
+        check_table = await db.execute(text("SELECT to_regclass('public.members');"))
+        if check_table.scalar():
+            org_res = await db.execute(text("SELECT id FROM organizations LIMIT 1;"))
+            org_id = org_res.scalar()
+            if not org_id:
+                org_id = "a6bbd5c1-354a-4b4a-8459-0911e1bc086f"
+                await db.execute(text(
+                    f"INSERT INTO organizations (id, name) VALUES ('{org_id}', 'EYE / IEEE Student Activity') ON CONFLICT DO NOTHING;"
+                ))
+
+            await db.execute(text(f"""
+                INSERT INTO members (id, organization_id, name, email, role, phone_number, created_at)
+                SELECT 
+                    gen_random_uuid(),
+                    '{org_id}'::uuid,
+                    s.full_name,
+                    s.email,
+                    s.role,
+                    s.phone,
+                    s.created_at
+                FROM students s
+                ON CONFLICT (email) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    role = EXCLUDED.role,
+                    phone_number = EXCLUDED.phone_number;
+            """))
+            await db.execute(text(f"""
+                INSERT INTO members (id, organization_id, name, email, role, phone_number, created_at)
+                SELECT 
+                    gen_random_uuid(),
+                    '{org_id}'::uuid,
+                    u.full_name,
+                    u.email,
+                    u.role,
+                    NULL,
+                    u.created_at
+                FROM users u
+                ON CONFLICT (email) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    role = EXCLUDED.role;
+            """))
+    except Exception:
+        pass
+
     await db.commit()
-    print("Database seeded successfully with core team ground truth!")
+    print("Database seeded successfully with core team ground truth and members!")
 
 
 if __name__ == "__main__":
