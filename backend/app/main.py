@@ -60,7 +60,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "script-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com data:; "
-            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://openrouter.ai https://api.groq.com https://*.supabase.co https://*.vercel.app; "
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://openrouter.ai https://api.groq.com https://*.supabase.co https://*.vercel.app https://*.ngrok-free.app https://*.ngrok-free.dev; "
             "frame-ancestors 'none';"
         )
         if settings.ENVIRONMENT == "production":
@@ -70,11 +70,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CORS middleware with explicit trusted origins and Vercel preview support
+# CORS middleware with explicit trusted origins, LAN dev, ngrok tunnels, and Vercel preview support
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
+    allow_origin_regex=r"^(https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?|https:\/\/.*(\.vercel\.app|\.ngrok-free\.app|\.ngrok-free\.dev|\.ngrok\.io))$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
