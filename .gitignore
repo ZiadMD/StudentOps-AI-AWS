@@ -55,6 +55,7 @@ frontend/dist/
 *.db
 *.sqlite
 *.sqlite3
+data/
 8.xlsx
 
 # ==============================

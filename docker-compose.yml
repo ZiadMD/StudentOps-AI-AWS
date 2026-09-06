@@ -27,11 +27,10 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: studentops-cloudflared
     restart: unless-stopped
+    network_mode: host
     command: tunnel run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
-    depends_on:
-      - openwa
 
 volumes:
   openwa_session:
