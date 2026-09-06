@@ -36,9 +36,13 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:8000",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:8000",
         "https://studentops-ai.vercel.app",
     ]
     
@@ -58,10 +62,16 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_ID: Optional[str] = "primary"
     
     # Messaging
-    MESSAGING_PROVIDER: str = "mock"  # "mock" | "whatsapp" | "sms"
+    MESSAGING_PROVIDER: str = "mock"  # "mock" | "whatsapp" | "sms" | "openwa"
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_PHONE_NUMBER: Optional[str] = None
+
+    # OpenWA Official Channel Settings
+    OPENWA_API_URL: str = "http://localhost:2785"
+    OPENWA_API_KEY: Optional[str] = None
+    OPENWA_SESSION_ID: str = "ops_official"
+    OPENWA_OFFICIAL_PHONE: Optional[str] = "+201000000000"  # Fallback display / configured official number
     
     # Policy Thresholds
     ATTENDANCE_LATE_THRESHOLD_MINUTES: int = 10

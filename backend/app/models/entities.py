@@ -13,9 +13,24 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Enum as SQLEnum,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
+import enum
 from app.core.database import Base
+
+
+class UserRole(str, enum.Enum):
+    REGION_HR_HEAD = "region_hr_head"
+    COMMITTEE_HR_LEADER = "committee_hr_leader"
+    COMMITTEE_HEAD = "committee_head"
+    COMMITTEE_HR_MEMBER = "committee_hr_member"
+    COMMITTEE_MEMBER = "committee_member"
+
+    # Backward compatibility aliases
+    HR_ADMIN = "hr_admin"
+    TEAM_LEAD = "team_lead"
+    MEMBER = "member"
 
 
 def utcnow():
@@ -68,10 +83,12 @@ class Student(Base):
     role = Column(String(50), default="Member")  # "Member", "Head", "Vice Head", "Lead"
     status = Column(String(20), default="ACTIVE")  # "ACTIVE", "INACTIVE", "PROBATION"
     team_id = Column(String(36), ForeignKey("teams.id"), nullable=True, index=True)
+    assigned_hr_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     # Relationships
     team = relationship("Team", back_populates="students")
+    assigned_hr = relationship("User", foreign_keys=[assigned_hr_id])
     attendance_records = relationship("AttendanceRecord", back_populates="student", cascade="all, delete-orphan")
     submissions = relationship("Submission", back_populates="student", cascade="all, delete-orphan")
     scores = relationship("ScoreRecord", back_populates="student", cascade="all, delete-orphan")
@@ -172,12 +189,15 @@ class Submission(Base):
     submitted_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String(20), default="PENDING")  # "ON_TIME", "LATE", "PENDING", "MISSED"
     score = Column(Float, nullable=True)  # 0.0 - 10.0
+    technical_score = Column(Float, nullable=True)
     file_url = Column(String(255), default="")
     reviewer_notes = Column(Text, default="")
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    graded_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
 
     task = relationship("Task", back_populates="submissions")
     student = relationship("Student", back_populates="submissions")
+    graded_by = relationship("User", foreign_keys=[graded_by_user_id])
 
 
 class ScoreRecord(Base):
@@ -189,11 +209,14 @@ class ScoreRecord(Base):
     category = Column(String(50), nullable=False)  # "GROUP_INTERACTION", "SOCIAL_MEDIA", "HIERARCHY_RULES", "POLITE_CONDUCT", "TASK_AVERAGE"
     points = Column(Float, nullable=False)
     max_points = Column(Float, nullable=False)
+    month = Column(String(7), nullable=True, index=True)  # "YYYY-MM"
+    graded_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     notes = Column(String(255), default="")
     updated_by = Column(String(50), default="SYSTEM")
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     student = relationship("Student", back_populates="scores")
+    graded_by = relationship("User", foreign_keys=[graded_by_user_id])
 
 
 class ReminderLog(Base):
@@ -225,3 +248,39 @@ class AgentActionAudit(Base):
     confirmed = Column(Boolean, default=True)
     status = Column(String(30), default="EXECUTED")  # "PENDING_CONFIRMATION", "EXECUTED", "REJECTED", "FAILED"
     timestamp = Column(DateTime(timezone=True), default=utcnow)
+
+
+class MemberFollowupStatus(Base):
+    """Track 3-day SLA escalation for committee members."""
+    __tablename__ = "member_followup_statuses"
+
+    id = Column(String(36), primary_key=True, index=True)
+    student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
+    hr_member_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    flagged_reason = Column(String(100), nullable=False)  # e.g. "OVERDUE_TASK", "ABSENTEEISM", "LOW_BEHAVIOR"
+    flagged_at = Column(DateTime(timezone=True), default=utcnow)
+    last_contacted_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(30), default="PENDING")  # "PENDING", "CONTACTED", "RESOLVED", "ESCALATED"
+    is_escalated = Column(Boolean, default=False)
+    notes = Column(Text, default="")
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    student = relationship("Student", foreign_keys=[student_id])
+    hr_member = relationship("User", foreign_keys=[hr_member_id])
+
+
+class TaskReminder(Base):
+    """Tracks automated Stage-1 WhatsApp reminders sent via official org OpenWA number."""
+    __tablename__ = "task_reminders"
+
+    id = Column(String(36), primary_key=True, index=True)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
+    student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
+    channel = Column(String(20), default="WHATSAPP_OFFICIAL")
+    stage = Column(Integer, default=1)  # 1: Official automated, 2: HR personal follow-up
+    status = Column(String(20), default="SENT")  # "SENT", "DELIVERED", "FAILED"
+    message_text = Column(Text, nullable=False)
+    sent_at = Column(DateTime(timezone=True), default=utcnow)
+
+    task = relationship("Task")
+    student = relationship("Student")

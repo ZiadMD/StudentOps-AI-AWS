@@ -12,6 +12,7 @@ import { TaskReviewsPage }    from './components/TaskReviewsPage';
 import { StudentsPage }       from './components/StudentsPage';
 import { NotificationsPage }  from './components/NotificationsPage';
 import { AuditViewer }        from './components/AuditViewer';
+import { WhatsAppAgentPage }  from './components/WhatsAppAgentPage';
 import { api }                from './api/client';
 import { UserProfile }        from './types';
 
@@ -107,10 +108,11 @@ export function App() {
             {activeTab === 'chat'          && <AgentChat initialQuery={chatInitialQuery} onClearInitialQuery={() => setChatInitialQuery(undefined)} />}
             {activeTab === 'students'      && <StudentsPage />}
             {activeTab === 'attendance'    && <AttendanceView />}
-            {activeTab === 'scoreboard'    && <StudentScoreboard />}
+            {activeTab === 'scoreboard'    && <StudentScoreboard currentUser={currentUser} />}
             {activeTab === 'calendar'      && <CalendarView />}
             {activeTab === 'tasks'         && <TaskManagement />}
             {activeTab === 'task-reviews'  && <TaskReviewsPage />}
+            {activeTab === 'whatsapp'      && currentUser && <WhatsAppAgentPage currentUser={currentUser} />}
             {activeTab === 'notifications' && <NotificationsPage />}
             {activeTab === 'audit'         && <AuditViewer />}
           </div>

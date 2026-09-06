@@ -15,7 +15,9 @@ import {
   Bell,
   ClipboardList,
   LogOut,
+  MessageSquare,
 } from 'lucide-react';
+import { UserProfile, UserRole } from '../types';
 
 export type Tab =
   | 'dashboard'
@@ -27,11 +29,17 @@ export type Tab =
   | 'task-reviews'
   | 'students'
   | 'notifications'
-  | 'audit';
+  | 'audit'
+  | 'whatsapp';
 
-export type Role = 'hr_admin' | 'team_lead' | 'member';
+export type Role = UserRole;
 
 const ROLE_LABELS: Record<Role, string> = {
+  region_hr_head: 'Region HR Head',
+  committee_hr_leader: 'HR Committee Leader',
+  committee_head: 'Committee Head',
+  committee_hr_member: 'Committee HR Member',
+  committee_member: 'Member',
   hr_admin: 'HR Admin',
   team_lead: 'Team Lead',
   member: 'Member',
@@ -45,19 +53,76 @@ const NAV_ITEMS: {
   isAgent?: boolean;
   roles: Role[];
 }[] = [
-  { id: 'dashboard',      label: 'Overview',        icon: LayoutDashboard, roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'chat',           label: 'Agent Console',   icon: Bot,             roles: ['hr_admin', 'team_lead'], isAgent: true },
-  { id: 'students',       label: 'Member Registry', icon: Users,           roles: ['hr_admin', 'team_lead'] },
-  { id: 'attendance',     label: 'Meet Attendance', icon: Video,           roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'scoreboard',     label: 'Evaluations',     icon: ClipboardList,   roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'calendar',       label: 'Schedule',        icon: Calendar,        roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'tasks',          label: 'Tasks & Sprints', icon: CheckSquare,     roles: ['hr_admin', 'team_lead', 'member'] },
-  { id: 'task-reviews',   label: 'Task Reviews',    icon: ClipboardList,   roles: ['hr_admin', 'team_lead'] },
-  { id: 'notifications',  label: 'Reminders',       icon: Bell,            roles: ['hr_admin', 'team_lead'] },
-  { id: 'audit',          label: 'Audit Log',       icon: ShieldCheck,     roles: ['hr_admin'] },
+  {
+    id: 'dashboard',
+    label: 'Overview',
+    icon: LayoutDashboard,
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead', 'member'],
+  },
+  {
+    id: 'chat',
+    label: 'AI Agent Console',
+    icon: Bot,
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead'],
+    isAgent: true,
+  },
+  {
+    id: 'students',
+    label: 'Member Registry',
+    icon: Users,
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'hr_admin', 'team_lead'],
+  },
+  {
+    id: 'attendance',
+    label: 'Meet Attendance',
+    icon: Video,
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead', 'member'],
+  },
+  {
+    id: 'scoreboard',
+    label: 'Evaluations',
+    icon: ClipboardList,
+    // Strictly hidden from committee_member
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'hr_admin', 'team_lead', 'member'],
+  },
+  {
+    id: 'calendar',
+    label: 'Schedule & Calendar',
+    icon: Calendar,
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead', 'member'],
+  },
+  {
+    id: 'tasks',
+    label: 'Tasks & Sprints',
+    icon: CheckSquare,
+    roles: ['committee_head', 'committee_member', 'hr_admin', 'team_lead', 'member'],
+  },
+  {
+    id: 'task-reviews',
+    label: 'Task Reviews',
+    icon: ClipboardList,
+    // Restricted to technical committee heads
+    roles: ['committee_head', 'hr_admin', 'team_lead'],
+  },
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp & Escalations',
+    icon: MessageSquare,
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'hr_admin', 'team_lead'],
+  },
+  {
+    id: 'notifications',
+    label: 'Reminders',
+    icon: Bell,
+    roles: ['region_hr_head', 'committee_hr_leader', 'hr_admin', 'team_lead'],
+  },
+  {
+    id: 'audit',
+    label: 'Audit Log',
+    icon: ShieldCheck,
+    roles: ['region_hr_head', 'hr_admin'],
+  },
 ];
-
-import { UserProfile } from '../types';
 
 interface SidebarProps {
   activeTab: Tab;

@@ -25,15 +25,22 @@ async def get_dashboard_stats(
     - member: personal performance and upcoming events.
     """
     # 1. Total Students
-    if current_user.role == "team_lead":
+    if current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
         std_res = await db.execute(
             select(func.count(Student.id)).where(Student.team_id == current_user.team_id)
         )
-    elif current_user.role == "member":
+    elif current_user.role == "committee_hr_member":
+        std_res = await db.execute(
+            select(func.count(Student.id)).where(
+                (Student.assigned_hr_id == current_user.id) |
+                (Student.team_id == current_user.team_id)
+            )
+        )
+    elif current_user.role in ("committee_member", "member"):
         std_res = await db.execute(
             select(func.count(Student.id)).where(Student.id == current_user.student_id)
         )
-    else:
+    else:  # region_hr_head or hr_admin
         std_res = await db.execute(select(func.count(Student.id)))
     total_students = std_res.scalar() or 0
 
@@ -43,9 +50,14 @@ async def get_dashboard_stats(
         .join(Student, AttendanceRecord.student_id == Student.id)
         .where(AttendanceRecord.meeting_id == "today_sync")
     )
-    if current_user.role == "team_lead":
+    if current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
         att_query = att_query.where(Student.team_id == current_user.team_id)
-    elif current_user.role == "member":
+    elif current_user.role == "committee_hr_member":
+        att_query = att_query.where(
+            (Student.assigned_hr_id == current_user.id) |
+            (Student.team_id == current_user.team_id)
+        )
+    elif current_user.role in ("committee_member", "member"):
         att_query = att_query.where(Student.id == current_user.student_id)
 
     att_res = await db.execute(att_query)
@@ -67,13 +79,19 @@ async def get_dashboard_stats(
         .join(Student, Submission.student_id == Student.id)
         .where(Submission.status == "PENDING")
     )
-    if current_user.role == "team_lead":
+    if current_user.role in ("committee_head", "team_lead"):
         sub_query = sub_query.where(Student.team_id == current_user.team_id)
-    elif current_user.role == "member":
-        sub_query = sub_query.where(Student.id == current_user.student_id)
+    elif current_user.role in ("region_hr_head", "committee_hr_leader", "committee_hr_member"):
+        # HR roles do not track technical submissions
+        sub_query = None
+    elif current_user.role in ("committee_member", "member"):
+        sub_query = sub_query.where(Submission.student_id == current_user.student_id)
 
-    sub_res = await db.execute(sub_query)
-    pending_submissions = sub_res.scalar() or 0
+    if sub_query is not None:
+        sub_res = await db.execute(sub_query)
+        pending_submissions = sub_res.scalar() or 0
+    else:
+        pending_submissions = 0
 
     # 5. Recent Agent Actions Count
     act_res = await db.execute(select(func.count(AgentActionAudit.id)))

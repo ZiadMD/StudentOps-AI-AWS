@@ -113,12 +113,12 @@ async def test_non_admin_cannot_change_user_roles(sec_client):
     """
     SECURITY TEST: Non-admin users cannot call the role update endpoint.
     """
-    member_headers = auth_headers("usr_maurine", "member", "team_tech")
+    member_headers = auth_headers("usr_ziad_member", "member", "team_tech")
     lead_headers = auth_headers("usr_lead_tech", "team_lead", "team_tech")
 
     # Member attempting to promote self to admin
     res1 = await sec_client.patch(
-        "/api/auth/users/usr_maurine/role",
+        "/api/auth/users/usr_ziad_member/role",
         headers=member_headers,
         json={"role": "hr_admin"}
     )
@@ -126,7 +126,7 @@ async def test_non_admin_cannot_change_user_roles(sec_client):
 
     # Team Lead attempting to promote member to admin
     res2 = await sec_client.patch(
-        "/api/auth/users/usr_maurine/role",
+        "/api/auth/users/usr_ziad_member/role",
         headers=lead_headers,
         json={"role": "hr_admin"}
     )
@@ -140,7 +140,7 @@ async def test_admin_can_legitimately_update_user_role(sec_client):
     """
     admin_headers = auth_headers("usr_admin", "hr_admin")
     res = await sec_client.patch(
-        "/api/auth/users/usr_maurine/role",
+        "/api/auth/users/usr_ziad_member/role",
         headers=admin_headers,
         json={"role": "team_lead"}
     )
@@ -160,7 +160,7 @@ async def test_unauthenticated_cannot_access_protected_endpoints(sec_client):
     endpoints = [
         ("GET", "/api/auth/me"),
         ("GET", "/api/students"),
-        ("GET", "/api/students/std_maurine"),
+        ("GET", "/api/students/std_ziad"),
         ("GET", "/api/attendance/meetings"),
         ("GET", "/api/tasks"),
         ("GET", "/api/audit/logs"),
@@ -178,10 +178,10 @@ async def test_unauthenticated_cannot_access_protected_endpoints(sec_client):
 @pytest.mark.asyncio
 async def test_member_cannot_access_other_member_profile_idor(sec_client):
     """
-    SECURITY TEST: Member 'Maurine' cannot access 'Hanan' profile (BOLA/IDOR protection).
+    SECURITY TEST: Member 'Ziad' cannot access 'Salma' profile (BOLA/IDOR protection).
     """
-    maurine_headers = auth_headers("usr_maurine", "member", "team_tech")
-    res = await sec_client.get("/api/students/std_hanan", headers=maurine_headers)
+    ziad_headers = auth_headers("usr_ziad_member", "member", "team_tech")
+    res = await sec_client.get("/api/students/std_salma", headers=ziad_headers)
     assert res.status_code == 403
 
 
@@ -191,7 +191,7 @@ async def test_team_lead_cannot_access_other_team_student_profile(sec_client):
     SECURITY TEST: Tech team lead cannot access Ops team student profile.
     """
     tech_lead_headers = auth_headers("usr_lead_tech", "team_lead", "team_tech")
-    res = await sec_client.get("/api/students/std_hanan", headers=tech_lead_headers)
+    res = await sec_client.get("/api/students/std_salma", headers=tech_lead_headers)
     assert res.status_code == 403
 
 
@@ -201,7 +201,7 @@ async def test_non_admin_cannot_access_audit_logs(sec_client):
     SECURITY TEST: Audit logs are restricted to HR Admin only.
     """
     lead_headers = auth_headers("usr_lead_tech", "team_lead", "team_tech")
-    member_headers = auth_headers("usr_maurine", "member", "team_tech")
+    member_headers = auth_headers("usr_ziad_member", "member", "team_tech")
 
     res1 = await sec_client.get("/api/audit/logs", headers=lead_headers)
     assert res1.status_code == 403
@@ -229,7 +229,7 @@ async def test_agent_action_confirmation_anti_replay(sec_client, sec_test_db):
         user_id="usr_admin",
         intent="SEND_REMINDER",
         tool_name="send_reminder",
-        parameters='{"student_ids": ["std_maurine"]}',
+        parameters='{"student_ids": ["std_ziad"]}',
         result="{}",
         requires_confirmation=True,
         confirmed=False,
@@ -263,14 +263,14 @@ async def test_team_lead_cannot_confirm_reminders_for_other_teams(sec_client, se
     tech_lead_headers = auth_headers("usr_lead_tech", "team_lead", "team_tech")
 
     action_id = "act_test_cross_team_456"
-    # Action targeting Ops member 'Hanan' (std_hanan is in team_ops)
+    # Action targeting Ops member 'Salma' (std_salma is in team_ops)
     audit = AgentActionAudit(
         id=f"aud_{action_id}",
         action_id=action_id,
         user_id="usr_lead_ops",
         intent="SEND_REMINDER",
         tool_name="send_reminder",
-        parameters='{"student_ids": ["std_hanan"]}',
+        parameters='{"student_ids": ["std_salma"]}',
         result="{}",
         requires_confirmation=True,
         confirmed=False,

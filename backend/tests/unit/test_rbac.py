@@ -53,7 +53,7 @@ async def get_token(client: AsyncClient, email: str, password: str) -> str:
 async def test_audit_logs_rbac_matrix(client):
     admin_token = await get_token(client, "admin@studentops.org", "admin123")
     lead_token = await get_token(client, "lead@studentops.org", "lead123")
-    member_token = await get_token(client, "maurine.magdy@studentops.org", "member123")
+    member_token = await get_token(client, "ziad.member@studentops.org", "member123")
 
     # 1. Unauthenticated -> 401
     unauth_resp = await client.get("/api/audit/logs")
@@ -81,46 +81,46 @@ async def test_audit_logs_rbac_matrix(client):
 async def test_students_list_scoping(client):
     admin_token = await get_token(client, "admin@studentops.org", "admin123")
     lead_token = await get_token(client, "lead@studentops.org", "lead123") # TECH team
-    member_token = await get_token(client, "maurine.magdy@studentops.org", "member123") # Maurine (std_maurine)
+    member_token = await get_token(client, "ziad.member@studentops.org", "member123") # Ziad (std_ziad)
 
-    # 1. Admin sees all 5 seeded students
+    # 1. Admin sees all 6 seeded students
     admin_res = await client.get("/api/students", headers={"Authorization": f"Bearer {admin_token}"})
     assert admin_res.status_code == 200
-    assert len(admin_res.json()) == 5
+    assert len(admin_res.json()) == 6
 
-    # 2. Team Lead of TECH sees 2 students (Maurine & Alaa)
+    # 2. Team Lead of TECH sees 2 students (Ziad & Ali)
     lead_res = await client.get("/api/students", headers={"Authorization": f"Bearer {lead_token}"})
     assert lead_res.status_code == 200
     lead_students = lead_res.json()
     assert len(lead_students) == 2
     student_codes = [s["student_code"] for s in lead_students]
-    assert "ST-2026-001" in student_codes # Maurine
-    assert "ST-2026-002" in student_codes # Alaa
+    assert "CORE-2026-001" in student_codes # Ziad
+    assert "CORE-2026-002" in student_codes # Ali
 
     # 3. Member sees only their own student record
     member_res = await client.get("/api/students", headers={"Authorization": f"Bearer {member_token}"})
     assert member_res.status_code == 200
     member_students = member_res.json()
     assert len(member_students) == 1
-    assert member_students[0]["id"] == "std_maurine"
+    assert member_students[0]["id"] == "std_ziad"
 
 
 @pytest.mark.asyncio
 async def test_student_detail_access_permissions(client):
     lead_token = await get_token(client, "lead@studentops.org", "lead123") # TECH team lead
-    member_token = await get_token(client, "maurine.magdy@studentops.org", "member123") # TECH member (Maurine)
+    member_token = await get_token(client, "ziad.member@studentops.org", "member123") # TECH member (Ziad)
 
-    # 1. Lead can access student in their team (Maurine) -> 200
-    res1 = await client.get("/api/students/std_maurine", headers={"Authorization": f"Bearer {lead_token}"})
+    # 1. Lead can access student in their team (Ziad) -> 200
+    res1 = await client.get("/api/students/std_ziad", headers={"Authorization": f"Bearer {lead_token}"})
     assert res1.status_code == 200
 
-    # 2. Lead attempts to access student in another team (Hanan, OPS team) -> 403
-    res2 = await client.get("/api/students/std_hanan", headers={"Authorization": f"Bearer {lead_token}"})
+    # 2. Lead attempts to access student in another team (Salma, OPS team) -> 403
+    res2 = await client.get("/api/students/std_salma", headers={"Authorization": f"Bearer {lead_token}"})
     assert res2.status_code == 403
     assert "different team" in res2.json()["detail"]
 
-    # 3. Member attempts to access another student's profile (Alaa) -> 403
-    res3 = await client.get("/api/students/std_alaa", headers={"Authorization": f"Bearer {member_token}"})
+    # 3. Member attempts to access another student's profile (Ali) -> 403
+    res3 = await client.get("/api/students/std_ali", headers={"Authorization": f"Bearer {member_token}"})
     assert res3.status_code == 403
     assert "only view your own" in res3.json()["detail"]
 
@@ -129,28 +129,28 @@ async def test_student_detail_access_permissions(client):
 async def test_scoreboard_scoping(client):
     admin_token = await get_token(client, "admin@studentops.org", "admin123")
     lead_token = await get_token(client, "lead@studentops.org", "lead123") # TECH team lead
-    member_token = await get_token(client, "maurine.magdy@studentops.org", "member123")
+    member_token = await get_token(client, "ziad.member@studentops.org", "member123")
 
-    # Admin: all scoreboards (5 members)
+    # Admin: all scoreboards (6 members)
     res_admin = await client.get("/api/students/scoreboard/all", headers={"Authorization": f"Bearer {admin_token}"})
     assert res_admin.status_code == 200
-    assert len(res_admin.json()) == 5
+    assert len(res_admin.json()) == 6
 
-    # Team Lead TECH: only TECH members (Maurine, Alaa)
+    # Team Lead TECH: only TECH members (Ziad, Ali)
     res_lead = await client.get("/api/students/scoreboard/all", headers={"Authorization": f"Bearer {lead_token}"})
     assert res_lead.status_code == 200
     lead_scores = res_lead.json()
     assert len(lead_scores) == 2
     scored_ids = [s["student_id"] for s in lead_scores]
-    assert "std_maurine" in scored_ids
-    assert "std_alaa" in scored_ids
+    assert "std_ziad" in scored_ids
+    assert "std_ali" in scored_ids
 
-    # Member: only Maurine's score
+    # Member: only Ziad's score
     res_member = await client.get("/api/students/scoreboard/all", headers={"Authorization": f"Bearer {member_token}"})
     assert res_member.status_code == 200
     member_scores = res_member.json()
     assert len(member_scores) == 1
-    assert member_scores[0]["student_id"] == "std_maurine"
+    assert member_scores[0]["student_id"] == "std_ziad"
 
 
 # =========================================================
@@ -161,11 +161,11 @@ async def test_scoreboard_scoping(client):
 async def test_dashboard_stats_scoping(client):
     admin_token = await get_token(client, "admin@studentops.org", "admin123")
     lead_token = await get_token(client, "lead@studentops.org", "lead123") # TECH lead (2 students)
-    member_token = await get_token(client, "maurine.magdy@studentops.org", "member123")
+    member_token = await get_token(client, "ziad.member@studentops.org", "member123")
 
-    # Admin stats -> 5 total students
+    # Admin stats -> 6 total students
     admin_stats = (await client.get("/api/dashboard/stats", headers={"Authorization": f"Bearer {admin_token}"})).json()
-    assert admin_stats["total_students"] == 5
+    assert admin_stats["total_students"] == 6
 
     # Lead stats -> 2 team students
     lead_stats = (await client.get("/api/dashboard/stats", headers={"Authorization": f"Bearer {lead_token}"})).json()
@@ -184,7 +184,7 @@ async def test_dashboard_stats_scoping(client):
 async def test_agent_console_rbac(client):
     admin_token = await get_token(client, "admin@studentops.org", "admin123")
     lead_token = await get_token(client, "lead@studentops.org", "lead123")
-    member_token = await get_token(client, "maurine.magdy@studentops.org", "member123")
+    member_token = await get_token(client, "ziad.member@studentops.org", "member123")
 
     # Member is forbidden from agent console
     member_resp = await client.post("/api/agent/chat", headers={

@@ -183,7 +183,7 @@ async def test_refresh_token_endpoint(client):
 async def test_get_current_user_me(client):
     # 1. Login
     login_resp = await client.post("/api/auth/login", json={
-        "email": "maurine.magdy@studentops.org",
+        "email": "ziad.member@studentops.org",
         "password": "member123"
     })
     access_token = login_resp.json()["access_token"]
@@ -194,11 +194,11 @@ async def test_get_current_user_me(client):
     })
     assert me_resp.status_code == 200
     data = me_resp.json()
-    assert data["email"] == "maurine.magdy@studentops.org"
-    assert data["full_name"] == "Maurine Magdy Adly"
+    assert data["email"] == "ziad.member@studentops.org"
+    assert "Ziad" in data["full_name"]
     assert data["role"] == "member"
     assert data["team_name"] == "Technical & Engineering"
-    assert data["student_id"] == "std_maurine"
+    assert data["student_id"] == "std_ziad"
 
 
 @pytest.mark.asyncio
@@ -253,7 +253,7 @@ async def test_create_team_admin_only(client):
 
     # 3. Login as member
     member_login = await client.post("/api/auth/login", json={
-        "email": "maurine.magdy@studentops.org",
+        "email": "ziad.member@studentops.org",
         "password": "member123"
     })
     member_token = member_login.json()["access_token"]

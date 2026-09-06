@@ -1,46 +1,136 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import { StudentScoreSummary } from '../types';
-import { Search, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { StudentScoreSummary, UserProfile } from '../types';
+import {
+  Search,
+  SlidersHorizontal,
+  ChevronDown,
+  Shield,
+  Edit3,
+  X,
+  Check,
+  Eye,
+} from 'lucide-react';
 import { Badge } from './ui/Badge';
 
-export const StudentScoreboard: React.FC = () => {
+interface StudentScoreboardProps {
+  currentUser?: UserProfile | null;
+}
+
+export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUser }) => {
   const [data, setData] = useState<StudentScoreSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const board = await api.getScoreboard();
-        setData(board);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
+  // Editing state for HR members
+  const [editingStudent, setEditingStudent] = useState<StudentScoreSummary | null>(null);
+  const [editForm, setEditForm] = useState({
+    group_interaction: 5,
+    social_media: 5,
+    hierarchy_rules: 5,
+    polite_conduct: 8,
+    notes: '',
+  });
+  const [saving, setSaving] = useState(false);
 
-  const filteredData = data.filter(s => 
-    s.student_name.toLowerCase().includes(search.toLowerCase()) ||
-    s.arabic_name.includes(search)
+  const isCommitteeMember = currentUser?.role === 'committee_member';
+  const isCommitteeHead = currentUser?.role === 'committee_head' || currentUser?.role === 'team_lead';
+  const canEditBehavior =
+    currentUser?.role === 'committee_hr_member' ||
+    currentUser?.role === 'committee_hr_leader' ||
+    currentUser?.role === 'region_hr_head' ||
+    currentUser?.role === 'hr_admin';
+
+  const loadData = async () => {
+    if (isCommitteeMember) {
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      const board = await api.getScoreboard();
+      setData(board);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [currentUser?.role]);
+
+  const handleOpenEdit = (student: StudentScoreSummary) => {
+    setEditingStudent(student);
+    setEditForm({
+      group_interaction: student.group_interaction_score,
+      social_media: student.social_media_score,
+      hierarchy_rules: student.hierarchy_rules_score,
+      polite_conduct: student.polite_conduct_score,
+      notes: '',
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    try {
+      setSaving(true);
+      await api.updateBehaviorScore(editingStudent.student_id, editForm);
+      setEditingStudent(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update behavior score');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isCommitteeMember) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
+        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+          <Shield className="w-6 h-6" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Scorecards are Confidential</h2>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            Member behavioral evaluations and scorecards are confidential and only accessible to Committee Heads
+            and HR coordinators.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const filteredData = data.filter(
+    (s) =>
+      s.student_name.toLowerCase().includes(search.toLowerCase()) ||
+      s.arabic_name.includes(search)
   );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Member Evaluations</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Member Evaluations</h2>
+            {isCommitteeHead && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+                <Eye className="w-3 h-3" />
+                Read-Only (Committee Head)
+              </span>
+            )}
+          </div>
           <p className="text-sm text-slate-500 mt-1">Behavior score (/23) and task quality average (/10)</p>
         </div>
-        
+
         <div className="flex items-center space-x-3">
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Search members..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -67,10 +157,11 @@ export const StudentScoreboard: React.FC = () => {
                     <ChevronDown className="w-3 h-3" />
                   </th>
                   <th className="px-6 py-4 font-medium">Member</th>
-                  <th className="px-6 py-4 font-medium text-right">Attendance Count</th>
+                  <th className="px-6 py-4 font-medium text-right">Attendance</th>
                   <th className="px-6 py-4 font-medium text-right">Task Quality (Avg/10)</th>
                   <th className="px-6 py-4 font-medium text-right">Behavior (/23)</th>
                   <th className="px-6 py-4 font-medium text-right">Final Status</th>
+                  {canEditBehavior && <th className="px-6 py-4 font-medium text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-slate-100">
@@ -79,11 +170,15 @@ export const StudentScoreboard: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
                         {idx < 3 ? (
-                          <div className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${
-                            idx === 0 ? 'bg-amber-100 text-amber-700' :
-                            idx === 1 ? 'bg-slate-200 text-slate-700' :
-                            'bg-amber-50 text-amber-800'
-                          }`}>
+                          <div
+                            className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${
+                              idx === 0
+                                ? 'bg-amber-100 text-amber-700'
+                                : idx === 1
+                                ? 'bg-slate-200 text-slate-700'
+                                : 'bg-amber-50 text-amber-800'
+                            }`}
+                          >
                             {idx + 1}
                           </div>
                         ) : (
@@ -95,7 +190,9 @@ export const StudentScoreboard: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{student.arabic_name}</span>
+                        <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {student.arabic_name}
+                        </span>
                         <span className="text-[11px] text-slate-500">{student.student_name}</span>
                       </div>
                     </td>
@@ -106,8 +203,12 @@ export const StudentScoreboard: React.FC = () => {
                       {student.average_task_quality.toFixed(1)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right font-mono">
-                      <span className={student.total_behavior_score >= 20 ? 'text-emerald-600 font-bold' : 'text-slate-700'}>
-                        {student.total_behavior_score}
+                      <span
+                        className={
+                          student.total_behavior_score >= 20 ? 'text-emerald-600 font-bold' : 'text-slate-700'
+                        }
+                      >
+                        {student.total_behavior_score} / 23
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -119,6 +220,17 @@ export const StudentScoreboard: React.FC = () => {
                         <Badge variant="warning">Needs Review</Badge>
                       )}
                     </td>
+                    {canEditBehavior && (
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => handleOpenEdit(student)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          Grade /23
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -126,6 +238,130 @@ export const StudentScoreboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Slide-over / Modal for Grading Behavior */}
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Evaluate Behavior: {editingStudent.arabic_name}
+                </h3>
+                <span className="text-xs text-slate-500">{editingStudent.student_name}</span>
+              </div>
+              <button
+                onClick={() => setEditingStudent(null)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Group Interaction (/5)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.5"
+                    value={editForm.group_interaction}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, group_interaction: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Social Media (/5)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.5"
+                    value={editForm.social_media}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, social_media: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Hierarchy Rules (/5)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.5"
+                    value={editForm.hierarchy_rules}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, hierarchy_rules: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Polite Conduct (/8)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="8"
+                    step="0.5"
+                    value={editForm.polite_conduct}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, polite_conduct: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">HR Evaluation Notes</label>
+                <textarea
+                  rows={2}
+                  placeholder="Optional observation notes..."
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                <span className="font-semibold text-slate-800">
+                  Total:{' '}
+                  {(
+                    editForm.group_interaction +
+                    editForm.social_media +
+                    editForm.hierarchy_rules +
+                    editForm.polite_conduct
+                  ).toFixed(1)}{' '}
+                  / 23
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingStudent(null)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    {saving ? 'Saving...' : 'Save Evaluation'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

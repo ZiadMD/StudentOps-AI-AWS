@@ -10,7 +10,10 @@ import {
   AuditLogItem,
   UserProfile,
   TokenResponse,
-  TeamItem
+  TeamItem,
+  WhatsAppDirectLink,
+  OfficialWhatsAppStatus,
+  EscalationRecord,
 } from '../types';
 
 export const API_BASE = ((import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, '')) || '/api';
@@ -132,8 +135,34 @@ export const api = {
     }),
 
   // Students & Scoreboards
-  getStudents: () => fetchJson<Student[]>('/students'),
+  getStudents: (assignedOnly: boolean = false) =>
+    fetchJson<Student[]>(`/students${assignedOnly ? '?assigned_only=true' : ''}`),
   getScoreboard: () => fetchJson<StudentScoreSummary[]>('/students/scoreboard/all'),
+  updateBehaviorScore: (
+    studentId: string,
+    payload: {
+      group_interaction: number;
+      social_media: number;
+      hierarchy_rules: number;
+      polite_conduct: number;
+      notes?: string;
+      month?: string;
+    }
+  ) =>
+    fetchJson<StudentScoreSummary>(`/students/${studentId}/behavior-score`, {
+      method: 'PUT',
+      body: JSON.stringify({ student_id: studentId, ...payload }),
+    }),
+  assignCohort: (payload: { student_ids: string[]; hr_member_id: string }) =>
+    fetchJson<{ status: string; assigned_count: number }>('/students/assign-cohort', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateStudentPhone: (studentId: string, phone: string) =>
+    fetchJson<Student>(`/students/${studentId}/phone`, {
+      method: 'PATCH',
+      body: JSON.stringify({ phone }),
+    }),
 
   // Attendance & Meetings
   getMeetings: () => fetchJson<MeetingDetail[]>('/attendance/meetings'),
@@ -146,9 +175,42 @@ export const api = {
   // Calendar
   getEvents: () => fetchJson<EventItem[]>('/calendar/events'),
 
-  // Tasks
+  // Tasks & Submissions
   getTasks: () => fetchJson<TaskItem[]>('/tasks'),
   getTaskSubmissions: (taskId: string) => fetchJson<SubmissionItem[]>(`/tasks/${taskId}/submissions`),
+  reviewTaskSubmission: (
+    submissionId: string,
+    payload: { score: number; reviewer_notes?: string }
+  ) =>
+    fetchJson<SubmissionItem>(`/tasks/submissions/${submissionId}/review`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  submitTask: (taskId: string, fileUrl: string) =>
+    fetchJson<SubmissionItem>(`/tasks/${taskId}/submit?file_url=${encodeURIComponent(fileUrl)}`, {
+      method: 'POST',
+    }),
+
+  // WhatsApp & Escalations
+  getWhatsAppStatus: () => fetchJson<OfficialWhatsAppStatus>('/whatsapp/status'),
+  getWhatsAppQr: () => fetchJson<{ qr?: string; message?: string }>('/whatsapp/qr'),
+  sendOfficialWhatsApp: (payload: { phone_number: string; message: string }) =>
+    fetchJson<{ success: boolean; message_id?: string; error?: string }>('/whatsapp/send-official', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  generateWhatsAppLink: (
+    studentId: string,
+    templateType: string = 'OVERDUE_TASK',
+    taskId?: string,
+    customText?: string
+  ) => {
+    let url = `/whatsapp/generate-link?student_id=${encodeURIComponent(studentId)}&template_type=${encodeURIComponent(templateType)}`;
+    if (taskId) url += `&task_id=${encodeURIComponent(taskId)}`;
+    if (customText) url += `&custom_text=${encodeURIComponent(customText)}`;
+    return fetchJson<WhatsAppDirectLink>(url, { method: 'POST' });
+  },
+  getSlaEscalations: () => fetchJson<EscalationRecord[]>('/whatsapp/escalations'),
 
   // Audit Logs
   getAuditLogs: () => fetchJson<AuditLogItem[]>('/audit/logs'),

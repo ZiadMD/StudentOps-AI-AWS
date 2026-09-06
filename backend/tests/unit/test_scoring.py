@@ -19,15 +19,15 @@ async def test_scoring_summary_matches_8_xlsx():
     async with SessionLocal() as db:
         await seed_all(db)
 
-        # 1. Maurine Magdy (8.xlsx: 5 On-time att, 3 tasks on time, avg quality 9.0, total behavior 23/23)
-        summary_m = await ScoringService.get_student_score_summary("std_maurine", db)
+        # 1. Ziad Mohamed (5 On-time att, 3 tasks on time, avg quality 9.0, total behavior 23/23)
+        summary_m = await ScoringService.get_student_score_summary("std_ziad", db)
         assert summary_m is not None
         assert summary_m.total_behavior_score == 23.0
         assert summary_m.on_time_task_count == 3
         assert summary_m.overall_rating == "Outstanding"
 
-        # 2. Hanan Ahmed (8.xlsx: 2 On-time att, 3 absences, 0 tasks on time, avg quality 0.0, total behavior 18/23)
-        summary_h = await ScoringService.get_student_score_summary("std_hanan", db)
+        # 2. Salma Ahmed (2 On-time att, 3 absences, 0 tasks on time, avg quality 0.0, total behavior 18/23)
+        summary_h = await ScoringService.get_student_score_summary("std_salma", db)
         assert summary_h is not None
         assert summary_h.total_behavior_score == 18.0
         assert summary_h.absence_count >= 2
