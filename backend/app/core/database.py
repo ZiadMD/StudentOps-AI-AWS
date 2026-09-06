@@ -3,6 +3,7 @@ Async Database connection and session management.
 Supports local SQLite and Supabase PostgreSQL with PgBouncer transaction pooling.
 """
 from typing import AsyncGenerator
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from app.core.config import settings
@@ -66,8 +67,24 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+POSTGRES_SAFE_MIGRATIONS = [
+    "ALTER TABLE students ADD COLUMN IF NOT EXISTS assigned_hr_id VARCHAR(36) REFERENCES users(id);",
+    "CREATE INDEX IF NOT EXISTS ix_students_assigned_hr_id ON students(assigned_hr_id);",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS technical_score FLOAT;",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS graded_by_user_id VARCHAR(36) REFERENCES users(id);",
+    "CREATE INDEX IF NOT EXISTS ix_submissions_graded_by_user_id ON submissions(graded_by_user_id);",
+    "ALTER TABLE score_records ADD COLUMN IF NOT EXISTS month VARCHAR(7);",
+    "ALTER TABLE score_records ADD COLUMN IF NOT EXISTS graded_by_user_id VARCHAR(36) REFERENCES users(id);",
+    "CREATE INDEX IF NOT EXISTS ix_score_records_month ON score_records(month);",
+    "CREATE INDEX IF NOT EXISTS ix_score_records_graded_by_user_id ON score_records(graded_by_user_id);",
+]
+
+
 async def init_db():
-    """Initializes the database schema."""
+    """Initializes the database schema and verifies required incremental columns."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if engine.dialect.name == "postgresql":
+            for stmt in POSTGRES_SAFE_MIGRATIONS:
+                await conn.execute(text(stmt))
 
