@@ -176,6 +176,10 @@ class AssignCohortRequest(BaseModel):
     hr_member_id: str
 
 
+class StudentPhoneUpdate(BaseModel):
+    phone: str = Field(..., min_length=7, max_length=25, description="International format e.g. +201012345678")
+
+
 class WhatsAppDirectLinkResponse(BaseModel):
     phone: str
     student_id: str

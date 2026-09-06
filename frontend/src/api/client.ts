@@ -158,6 +158,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  updateStudentPhone: (studentId: string, phone: string) =>
+    fetchJson<Student>(`/students/${studentId}/phone`, {
+      method: 'PATCH',
+      body: JSON.stringify({ phone }),
+    }),
 
   // Attendance & Meetings
   getMeetings: () => fetchJson<MeetingDetail[]>('/attendance/meetings'),

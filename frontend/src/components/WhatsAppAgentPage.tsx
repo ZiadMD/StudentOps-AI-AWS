@@ -11,6 +11,10 @@ import {
   Phone,
   UserCheck,
   Flame,
+  QrCode,
+  Edit3,
+  Save,
+  X,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { UserProfile, OfficialWhatsAppStatus, EscalationRecord, Student, TaskItem } from '../types';
@@ -42,6 +46,16 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
   const [officialPhone, setOfficialPhone] = useState('');
   const [officialMsg, setOfficialMsg] = useState('');
   const [broadcastStatus, setBroadcastStatus] = useState<string | null>(null);
+
+  // QR pairing state (Region Head)
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrPayload, setQrPayload] = useState<{ qr?: string; message?: string } | null>(null);
+  const [loadingQr, setLoadingQr] = useState(false);
+
+  // Student phone edit state
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [newPhoneInput, setNewPhoneInput] = useState('');
+  const [phoneSaveStatus, setPhoneSaveStatus] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -112,6 +126,33 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
     }
   };
 
+  const handleFetchQr = async () => {
+    setShowQrModal(true);
+    setLoadingQr(true);
+    try {
+      const res = await api.getWhatsAppQr();
+      setQrPayload(res);
+    } catch (err: any) {
+      setQrPayload({ message: err.message || 'Unable to fetch pairing QR code' });
+    } finally {
+      setLoadingQr(false);
+    }
+  };
+
+  const handleSavePhone = async () => {
+    if (!selectedStudentId || !newPhoneInput.trim()) return;
+    try {
+      setPhoneSaveStatus('Saving...');
+      const updated = await api.updateStudentPhone(selectedStudentId, newPhoneInput.trim());
+      setStudents((prev) => prev.map((s) => (s.id === updated.id ? { ...s, phone: updated.phone } : s)));
+      setPhoneSaveStatus('Saved!');
+      setEditingPhone(false);
+      setTimeout(() => setPhoneSaveStatus(null), 2500);
+    } catch (err: any) {
+      setPhoneSaveStatus(`Failed: ${err.message}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
@@ -164,25 +205,35 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               <Shield className="w-4 h-4 text-indigo-600" />
               <h2 className="text-sm font-semibold text-slate-900">Official Organization Channel (ops_official)</h2>
             </div>
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                status?.status === 'CONNECTED'
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : 'bg-amber-50 text-amber-700 border border-amber-200'
-              }`}
-            >
-              {status?.status === 'CONNECTED' ? (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Live ({status.phone_number || 'Official Number'})
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  {status?.status || 'Docker Daemon Disconnected'}
-                </>
-              )}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleFetchQr}
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-semibold transition-colors"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                Pair Official SIM (Scan QR)
+              </button>
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                  status?.status === 'CONNECTED'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                }`}
+              >
+                {status?.status === 'CONNECTED' ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Live ({status.phone_number || 'Official Number'})
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {status?.status || 'Docker Daemon Disconnected'}
+                  </>
+                )}
+              </span>
+            </div>
           </div>
 
           <p className="text-xs text-slate-500 leading-relaxed">
@@ -260,6 +311,61 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                 </option>
               ))}
             </select>
+            {(() => {
+              const selectedStudent = students.find((s) => s.id === selectedStudentId);
+              if (!selectedStudent) return null;
+              return (
+                <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                  {editingPhone ? (
+                    <div className="flex items-center gap-1.5 w-full">
+                      <input
+                        type="text"
+                        value={newPhoneInput}
+                        onChange={(e) => setNewPhoneInput(e.target.value)}
+                        placeholder="+2010XXXXXXXX"
+                        className="text-[11px] px-1.5 py-0.5 border border-slate-300 rounded flex-1 focus:outline-none focus:ring-1 focus:ring-slate-900 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSavePhone}
+                        className="text-emerald-700 hover:text-emerald-800 font-semibold px-1"
+                        title="Save Phone"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingPhone(false)}
+                        className="text-slate-400 hover:text-slate-600 px-1"
+                        title="Cancel"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="font-mono">{selectedStudent.phone || 'No phone set'}</span>
+                      {(isRegionHead || isHrLeader) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewPhoneInput(selectedStudent.phone || '');
+                            setEditingPhone(true);
+                          }}
+                          className="inline-flex items-center gap-0.5 text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                          <Edit3 className="w-2.5 h-2.5" />
+                          Edit Phone
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+            {phoneSaveStatus && (
+              <p className="text-[10px] text-emerald-600 mt-0.5">{phoneSaveStatus}</p>
+            )}
           </div>
 
           <div>
@@ -395,6 +501,89 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
           </div>
         )}
       </div>
+
+      {/* Official WhatsApp SIM QR Pairing Modal */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-900">Pair Official Organization SIM</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-600 space-y-2">
+              <p className="font-medium text-slate-900">How to link the official organization phone number:</p>
+              <ol className="list-decimal list-inside space-y-1 text-slate-500 pl-1">
+                <li>Open WhatsApp on the official organization phone</li>
+                <li>Go to <strong>Settings</strong> &gt; <strong>Linked Devices</strong></li>
+                <li>Tap <strong>Link a Device</strong></li>
+                <li>Scan the QR code below using your phone camera</li>
+              </ol>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 flex flex-col items-center justify-center min-h-[220px]">
+              {loadingQr ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
+                  Generating secure pairing QR...
+                </div>
+              ) : qrPayload?.qr ? (
+                qrPayload.qr.startsWith('data:image') || qrPayload.qr.startsWith('http') ? (
+                  <img src={qrPayload.qr} alt="WhatsApp QR Code" className="w-52 h-52 rounded border border-slate-200" />
+                ) : (
+                  <pre className="font-mono text-[9px] leading-none bg-white p-2 border rounded max-w-full overflow-auto">
+                    {qrPayload.qr}
+                  </pre>
+                )
+              ) : (
+                <div className="text-center space-y-2">
+                  <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
+                  <p className="text-xs text-slate-700 font-semibold">
+                    {qrPayload?.message || 'OpenWA Container Offline'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
+                    Start the OpenWA Docker daemon to display the live pairing QR code:
+                    <br />
+                    <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-800 text-[10px] mt-1.5 inline-block font-mono">
+                      docker compose up -d openwa
+                    </code>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleFetchQr}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Refresh QR
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQrModal(false);
+                  loadData();
+                }}
+                className="px-4 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

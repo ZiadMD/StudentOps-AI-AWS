@@ -11,6 +11,7 @@ from app.models.schemas import (
     StudentScoreSummary,
     BehaviorScoreUpdate,
     AssignCohortRequest,
+    StudentPhoneUpdate,
 )
 from app.services.scoring_service import ScoringService
 
@@ -227,3 +228,21 @@ async def assign_student_cohort(
 
     await db.commit()
     return {"status": "success", "assigned_count": len(students), "hr_member_id": body.hr_member_id}
+
+
+@router.patch("/{student_id}/phone", response_model=StudentResponse)
+async def update_student_phone(
+    student_id: str,
+    body: StudentPhoneUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["region_hr_head", "committee_hr_leader", "hr_admin"]))
+):
+    """
+    Updates a student's WhatsApp contact phone number.
+    Restricted to Region HR Head, Committee HR Leader, and Organization Admin.
+    """
+    student = await verify_student_access(student_id, current_user, db)
+    student.phone = body.phone.strip()
+    await db.commit()
+    await db.refresh(student)
+    return student

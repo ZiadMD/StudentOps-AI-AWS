@@ -64,13 +64,14 @@ class OpenWAProvider(MessagingProvider):
                 resp = await client.get(url, headers=self.headers)
                 if resp.status_code == 200:
                     state = resp.json().get("state", "UNKNOWN")
-                    # If connected, fetch host info
-                    phone_number = None
+                    phone_number = settings.OPENWA_OFFICIAL_PHONE
                     if state == "CONNECTED":
                         try:
                             me_resp = await client.get(f"{self.base_url}/getMe", headers=self.headers)
                             if me_resp.status_code == 200:
-                                phone_number = me_resp.json().get("id", {}).get("user")
+                                live_num = me_resp.json().get("id", {}).get("user")
+                                if live_num:
+                                    phone_number = f"+{live_num}"
                         except Exception:
                             pass
                     return {
@@ -84,9 +85,9 @@ class OpenWAProvider(MessagingProvider):
             pass
 
         return {
-            "configured": True,
+            "configured": bool(settings.OPENWA_OFFICIAL_PHONE or settings.OPENWA_API_URL),
             "status": "DISCONNECTED",
-            "phone_number": None,
+            "phone_number": settings.OPENWA_OFFICIAL_PHONE,
             "battery": None,
             "qr_code": None,
         }

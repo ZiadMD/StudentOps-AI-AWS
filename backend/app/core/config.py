@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     OPENWA_API_URL: str = "http://localhost:8088"
     OPENWA_API_KEY: Optional[str] = None
     OPENWA_SESSION_ID: str = "ops_official"
+    OPENWA_OFFICIAL_PHONE: Optional[str] = "+201000000000"  # Fallback display / configured official number
     
     # Policy Thresholds
     ATTENDANCE_LATE_THRESHOLD_MINUTES: int = 10
