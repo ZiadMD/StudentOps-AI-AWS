@@ -67,23 +67,23 @@ class MockAttendanceProvider(AttendanceProvider):
             start_time=today_sync_start,
             end_time=today_sync_end,
             sessions=[
-                # Maurine: Joined on time (18:02), left at 18:59 -> 57 mins (PRESENT)
+                # Ziad: Joined on time (18:02), left at 18:59 -> 57 mins (PRESENT)
                 RawParticipantSession(
-                    display_name="Maurine Magdy",
-                    email="maurine.magdy@studentops.org",
+                    display_name="Ziad Mohamed",
+                    email="ziad.member@studentops.org",
                     join_time=today_sync_start + timedelta(minutes=2),
                     leave_time=today_sync_end - timedelta(minutes=1),
                     duration_seconds=57 * 60
                 ),
-                # Alaa: Joined on time (18:05), left at 19:00 -> 55 mins (PRESENT)
+                # Ali: Joined on time (18:05), left at 19:00 -> 55 mins (PRESENT)
                 RawParticipantSession(
-                    display_name="Alaa Mohamed",
-                    email="alaa.mohamed@studentops.org",
+                    display_name="Ali Hassan",
+                    email="ali.member@studentops.org",
                     join_time=today_sync_start + timedelta(minutes=5),
                     leave_time=today_sync_end,
                     duration_seconds=55 * 60
                 ),
-                # Note: Hanan Ahmed did not join -> ABSENT
+                # Note: Salma Ahmed did not join -> ABSENT
             ]
         )
 
@@ -97,22 +97,22 @@ class MockAttendanceProvider(AttendanceProvider):
             end_time=camp_end,
             sessions=[
                 RawParticipantSession(
-                    display_name="مورين مجدي",
-                    email="maurine.magdy@studentops.org",
+                    display_name="زياد محمد",
+                    email="ziad.member@studentops.org",
                     join_time=camp_start + timedelta(minutes=1),
                     leave_time=camp_end,
                     duration_seconds=119 * 60
                 ),
                 RawParticipantSession(
-                    display_name="Alaa Mohamed",
-                    email="alaa.mohamed@studentops.org",
+                    display_name="Ali Hassan",
+                    email="ali.member@studentops.org",
                     join_time=camp_start + timedelta(minutes=3),
                     leave_time=camp_end,
                     duration_seconds=117 * 60
                 ),
                 RawParticipantSession(
-                    display_name="Hanan Ahmed",
-                    email="hanan.ahmed@studentops.org",
+                    display_name="Salma Ahmed",
+                    email="salma.member@studentops.org",
                     join_time=camp_start + timedelta(minutes=4),
                     leave_time=camp_end,
                     duration_seconds=116 * 60

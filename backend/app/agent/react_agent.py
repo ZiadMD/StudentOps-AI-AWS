@@ -238,7 +238,7 @@ class ReActAgent:
                     "I can help you with:\n"
                     "• **Meeting Attendance:** *'Who was absent from today\\'s meeting?'*\n"
                     "• **Dispatching Reminders:** *'Remind absent members about the next meeting'*\n"
-                    "• **Member Scorecards:** *'Show Maurine\\'s evaluation scores'* or *'Alaa scorecard'*\n"
+                    "• **Member Scorecards:** *'Show Ziad\\'s evaluation scores'* or *'Ali scorecard'*\n"
                     "• **Task Submissions:** *'Show pending task submissions'*\n"
                     "• **Schedule & Calendar:** *'What upcoming meetings are scheduled?'*\n\n"
                     "How can I help you today?"
@@ -254,7 +254,7 @@ class ReActAgent:
                     "**دليل الأوامر السريعة لمنصة StudentOps AI:**\n\n"
                     "1. **الحضور والغياب:** اكتب `مين غاب النهاردة؟` لمطابقة بيانات Google Meet آلياً.\n"
                     "2. **التذكيرات مع التحقق البشري:** اكتب `ابعت تذكير للغائبين` لإنشاء مسودة رسالة تذكيرية.\n"
-                    "3. **بطاقة التقييم والسلوك:** اكتب `تقييم مورين` أو `درجات الاء` لعرض تقييم السلوك (من 23) وجودة التاسكات (من 10).\n"
+                    "3. **بطاقة التقييم والسلوك:** اكتب `تقييم زياد` أو `درجات علي` لعرض تقييم السلوك (من 23) وجودة التاسكات (من 10).\n"
                     "4. **متابعة التاسكات:** اكتب `التاسكات المعلقة` لعرض الأعضاء الذين لم يسلموا مهامهم.\n"
                     "5. **الأحداث والمواعيد:** اكتب `الاجتماعات القادمة` لاستعراض جدول الجلسات والمواعيد النهائية."
                 )
@@ -263,7 +263,7 @@ class ReActAgent:
                     "**StudentOps AI Quick Action Guide:**\n\n"
                     "1. **Attendance Tracking:** Type `Who was absent today?` to query verified Google Meet logs.\n"
                     "2. **Reminder Dispatch:** Type `Remind absent members` to draft targeted WhatsApp/SMS reminders with human confirmation.\n"
-                    "3. **Scorecards & Discipline:** Type `Show Maurine's score` to inspect behavior (/23) and task quality (/10).\n"
+                    "3. **Scorecards & Discipline:** Type `Show Ziad's score` to inspect behavior (/23) and task quality (/10).\n"
                     "4. **Task Reviews:** Type `Show pending submissions` to list pending deliverables.\n"
                     "5. **Calendar & Schedule:** Type `Upcoming meetings` to see the cohort timeline."
                 )
@@ -408,11 +408,11 @@ class ReActAgent:
 
         # ── INTENT 3: Score / Evaluation ──────────────────────────────────
         elif any(w in query_clean.lower() for w in ["score", "درجة", "درجات", "تقييم", "points", "نقاط", "evaluation", "behavior", "سلوك"]):
-            target_name = "std_maurine"
-            if "alaa" in query_clean.lower() or "الاء" in query_clean:
-                target_name = "std_alaa"
-            elif "hanan" in query_clean.lower() or "حنان" in query_clean:
-                target_name = "std_hanan"
+            target_name = "std_ziad"
+            if "ali" in query_clean.lower() or "علي" in query_clean or "alaa" in query_clean.lower():
+                target_name = "std_ali"
+            elif "salma" in query_clean.lower() or "سلمى" in query_clean or "hanan" in query_clean.lower():
+                target_name = "std_salma"
             params = {"student_id_or_name": target_name}
             result, status = await self.execute_tool("get_student_score", params, db)
             tool_executions.append(ToolCallExecution(

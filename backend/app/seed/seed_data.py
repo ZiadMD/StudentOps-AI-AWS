@@ -102,6 +102,7 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
         db.add(Team(**t_data))
 
     # 1. User Accounts (Pre-hashed passwords for dev)
+    # 1. User Accounts (Pre-hashed passwords for dev)
     users_data = [
         {
             "id": "usr_admin",
@@ -118,44 +119,11 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
             "id": "usr_lead_tech",
             "email": "lead@studentops.org",
             "hashed_password": get_password_hash("lead123"),
-            "full_name": "Alaa Mohamed",
-            "arabic_name": "الاء محمد حسن",
+            "full_name": "Ali Hassan (Team Lead)",
+            "arabic_name": "علي حسن",
             "role": "team_lead",
             "team_id": "team_tech",
-            "student_id": "std_alaa",
-            "is_active": True
-        },
-        {
-            "id": "usr_maurine",
-            "email": "maurine.magdy@studentops.org",
-            "hashed_password": get_password_hash("member123"),
-            "full_name": "Maurine Magdy Adly",
-            "arabic_name": "مورين مجدي عدلي",
-            "role": "member",
-            "team_id": "team_tech",
-            "student_id": "std_maurine",
-            "is_active": True
-        },
-        {
-            "id": "usr_hanan",
-            "email": "hanan.ahmed@studentops.org",
-            "hashed_password": get_password_hash("member123"),
-            "full_name": "Hanan Ahmed Ramadan",
-            "arabic_name": "حنان احمد رمضان",
-            "role": "member",
-            "team_id": "team_ops",
-            "student_id": "std_hanan",
-            "is_active": True
-        },
-        {
-            "id": "usr_sara",
-            "email": "sara.omar@studentops.org",
-            "hashed_password": get_password_hash("member123"),
-            "full_name": "Sara Omar Mostafa",
-            "arabic_name": "سارة عمر مصطفى",
-            "role": "member",
-            "team_id": "team_media",
-            "student_id": "std_sara",
+            "student_id": "std_ali",
             "is_active": True
         },
         {
@@ -173,8 +141,8 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
             "id": "usr_hr_leader",
             "email": "hr.leader@studentops.org",
             "hashed_password": get_password_hash("leader123"),
-            "full_name": "Nour El-Din (HR Leader)",
-            "arabic_name": "نور الدين سامي",
+            "full_name": "HR Committee Leader",
+            "arabic_name": "قائد الموارد البشرية للجنة",
             "role": "committee_hr_leader",
             "team_id": "team_tech",
             "student_id": None,
@@ -184,54 +152,77 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
             "id": "usr_hr_member",
             "email": "hr.member@studentops.org",
             "hashed_password": get_password_hash("hrmember123"),
-            "full_name": "Yasmine Adel (HR Member)",
-            "arabic_name": "ياسمين عادل",
+            "full_name": "Committee HR Member",
+            "arabic_name": "عضو الموارد البشرية باللجنة",
             "role": "committee_hr_member",
             "team_id": "team_tech",
             "student_id": None,
             "is_active": True
         }
     ]
-    if include_synthetic:
-        core_pwd = get_password_hash("SuperSecret#1234#")
-        for i, p in enumerate(CORE_TEAM, 1):
-            name_lower = p["name"].lower()
-            users_data.extend([
-                {
-                    "id": f"usr_{name_lower}_member",
-                    "email": f"{name_lower}.member@studentops.org",
-                    "hashed_password": core_pwd,
-                    "full_name": f"{p['name']} (Member)",
-                    "arabic_name": p["arabic"],
-                    "role": "member",
-                    "team_id": p["team_id"],
-                    "student_id": f"std_{name_lower}",
-                    "is_active": True
-                },
-                {
-                    "id": f"usr_{name_lower}_lead",
-                    "email": f"{name_lower}.lead@studentops.org",
-                    "hashed_password": core_pwd,
-                    "full_name": f"{p['name']} (Team Lead)",
-                    "arabic_name": f"{p['arabic']} (قائد الفريق)",
-                    "role": "team_lead",
-                    "team_id": p["team_id"],
-                    "student_id": None,
-                    "is_active": True
-                },
-                {
-                    "id": f"usr_{name_lower}_hr",
-                    "email": f"{name_lower}.hr@studentops.org",
-                    "hashed_password": core_pwd,
-                    "full_name": f"{p['name']} (HR Admin)",
-                    "arabic_name": f"{p['arabic']} (مسؤول الموارد البشرية)",
-                    "role": "hr_admin",
-                    "team_id": None,
-                    "student_id": None,
-                    "is_active": True
-                }
-            ])
 
+    core_pwd = get_password_hash("SuperSecret#1234#")
+    for i, p in enumerate(CORE_TEAM, 1):
+        name_lower = p["name"].lower()
+        users_data.extend([
+            {
+                "id": f"usr_{name_lower}_member",
+                "email": f"{name_lower}.member@studentops.org",
+                "hashed_password": core_pwd,
+                "full_name": f"{p['name']} (Member)",
+                "arabic_name": p["arabic"],
+                "role": "member",
+                "team_id": p["team_id"],
+                "student_id": f"std_{name_lower}",
+                "is_active": True
+            },
+            {
+                "id": f"usr_{name_lower}_lead",
+                "email": f"{name_lower}.lead@studentops.org",
+                "hashed_password": core_pwd,
+                "full_name": f"{p['name']} (Team Lead)",
+                "arabic_name": f"{p['arabic']} (قائد الفريق)",
+                "role": "team_lead",
+                "team_id": p["team_id"],
+                "student_id": None,
+                "is_active": True
+            },
+            {
+                "id": f"usr_{name_lower}_hr",
+                "email": f"{name_lower}.hr@studentops.org",
+                "hashed_password": core_pwd,
+                "full_name": f"{p['name']} (HR Leader)",
+                "arabic_name": f"{p['arabic']} (مسؤول الموارد البشرية)",
+                "role": "committee_hr_leader",
+                "team_id": p["team_id"],
+                "student_id": None,
+                "is_active": True
+            },
+            {
+                "id": f"usr_{name_lower}_region",
+                "email": f"{name_lower}.region@studentops.org",
+                "hashed_password": core_pwd,
+                "full_name": f"{p['name']} (Regional HR Head)",
+                "arabic_name": f"{p['arabic']} (رئيس الموارد البشرية بالإقليم)",
+                "role": "region_hr_head",
+                "team_id": None,
+                "student_id": None,
+                "is_active": True
+            },
+            {
+                "id": f"usr_{name_lower}_hrmember",
+                "email": f"{name_lower}.hrmember@studentops.org",
+                "hashed_password": core_pwd,
+                "full_name": f"{p['name']} (HR Member)",
+                "arabic_name": f"{p['arabic']} (عضو الموارد البشرية)",
+                "role": "committee_hr_member",
+                "team_id": p["team_id"],
+                "student_id": None,
+                "is_active": True
+            }
+        ])
+
+    if include_synthetic:
         for i, (first, last, ar_name, team_id) in enumerate(SYNTHETIC_PEOPLE, 1):
             users_data.append({
                 "id": f"usr_syn_{i:03d}",
@@ -248,14 +239,14 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
     for u_data in users_data:
         db.add(User(**u_data))
 
-    # 2. Students from 8.xlsx + cohort members
+    # 2. Students from Core Team + Synthetic Cohorts
     students_data = [
         {
-            "id": "std_maurine",
-            "student_code": "ST-2026-001",
-            "full_name": "Maurine Magdy Adly",
-            "arabic_name": "مورين مجدي عدلي",
-            "email": "maurine.magdy@studentops.org",
+            "id": "std_ziad",
+            "student_code": "CORE-2026-001",
+            "full_name": "Ziad Mohamed",
+            "arabic_name": "زياد محمد",
+            "email": "ziad.member@studentops.org",
             "phone": "+201012345678",
             "university": "Faculty of Engineering",
             "role": "Vice Head",
@@ -264,11 +255,11 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
             "assigned_hr_id": "usr_hr_member"
         },
         {
-            "id": "std_alaa",
-            "student_code": "ST-2026-002",
-            "full_name": "Alaa Mohamed Hassan",
-            "arabic_name": "الاء محمد حسن",
-            "email": "alaa.mohamed@studentops.org",
+            "id": "std_ali",
+            "student_code": "CORE-2026-002",
+            "full_name": "Ali Hassan",
+            "arabic_name": "علي حسن",
+            "email": "ali.member@studentops.org",
             "phone": "+201098765432",
             "university": "Faculty of Engineering",
             "role": "Technical Lead",
@@ -277,59 +268,56 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
             "assigned_hr_id": "usr_hr_member"
         },
         {
-            "id": "std_hanan",
-            "student_code": "ST-2026-003",
-            "full_name": "Hanan Ahmed Ramadan",
-            "arabic_name": "حنان احمد رمضان",
-            "email": "hanan.ahmed@studentops.org",
+            "id": "std_salma",
+            "student_code": "CORE-2026-003",
+            "full_name": "Salma Ahmed",
+            "arabic_name": "سلمى أحمد",
+            "email": "salma.member@studentops.org",
             "phone": "+201055551234",
             "university": "Faculty of Engineering",
-            "role": "Member",
+            "role": "Operations Lead",
             "status": "ACTIVE",
             "team_id": "team_ops"
         },
         {
-            "id": "std_ahmed",
-            "student_code": "ST-2026-004",
-            "full_name": "Ahmed Youssef Ibrahim",
-            "arabic_name": "أحمد يوسف إبراهيم",
-            "email": "ahmed.youssef@studentops.org",
+            "id": "std_rana",
+            "student_code": "CORE-2026-004",
+            "full_name": "Rana Mahmoud",
+            "arabic_name": "رنا محمود",
+            "email": "rana.member@studentops.org",
             "phone": "+201033334444",
             "university": "Faculty of Engineering",
-            "role": "Member",
+            "role": "Operations Member",
             "status": "ACTIVE",
             "team_id": "team_ops"
         },
         {
-            "id": "std_sara",
-            "student_code": "ST-2026-005",
-            "full_name": "Sara Omar Mostafa",
-            "arabic_name": "سارة عمر مصطفى",
-            "email": "sara.omar@studentops.org",
+            "id": "std_mohamed",
+            "student_code": "CORE-2026-005",
+            "full_name": "Mohamed Ibrahim",
+            "arabic_name": "محمد إبراهيم",
+            "email": "mohamed.member@studentops.org",
             "phone": "+201077778888",
             "university": "Faculty of Computer & AI",
-            "role": "Member",
+            "role": "Media Lead",
+            "status": "ACTIVE",
+            "team_id": "team_media"
+        },
+        {
+            "id": "std_khaled",
+            "student_code": "CORE-2026-006",
+            "full_name": "Khaled Youssef",
+            "arabic_name": "خالد يوسف",
+            "email": "khaled.member@studentops.org",
+            "phone": "+201088889999",
+            "university": "Faculty of Engineering",
+            "role": "Media Member",
             "status": "ACTIVE",
             "team_id": "team_media"
         }
     ]
 
     if include_synthetic:
-        for i, p in enumerate(CORE_TEAM, 1):
-            name_lower = p["name"].lower()
-            students_data.append({
-                "id": f"std_{name_lower}",
-                "student_code": f"CORE-2026-{i:03d}",
-                "full_name": f"{p['name']} Operations",
-                "arabic_name": p["arabic"],
-                "email": f"{name_lower}.member@studentops.org",
-                "phone": f"+20100000{i:04d}",
-                "university": "Faculty of Engineering",
-                "role": "Member",
-                "status": "ACTIVE",
-                "team_id": p["team_id"]
-            })
-
         for i, (first, last, ar_name, team_id) in enumerate(SYNTHETIC_PEOPLE, 1):
             students_data.append({
                 "id": f"std_syn_{i:03d}",
@@ -346,6 +334,7 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
 
     for s_data in students_data:
         db.add(Student(**s_data))
+
 
     # 2. Historical Meetings from 8.xlsx + Today's Live Meeting
     meetings_data = [
@@ -423,46 +412,52 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
     # 3. Attendance Records (from 8.xlsx exact matrix)
     att_history = [
         # Meeting 31/07
-        ("meet_31_07", "std_maurine", "PRESENT", 58.0),
-        ("meet_31_07", "std_alaa", "PRESENT", 56.0),
-        ("meet_31_07", "std_hanan", "UNEXCUSED_ABSENT", 0.0),
-        ("meet_31_07", "std_ahmed", "PRESENT", 55.0),
-        ("meet_31_07", "std_sara", "PRESENT", 57.0),
+        ("meet_31_07", "std_ziad", "PRESENT", 58.0),
+        ("meet_31_07", "std_ali", "PRESENT", 56.0),
+        ("meet_31_07", "std_salma", "UNEXCUSED_ABSENT", 0.0),
+        ("meet_31_07", "std_rana", "PRESENT", 55.0),
+        ("meet_31_07", "std_mohamed", "PRESENT", 57.0),
+        ("meet_31_07", "std_khaled", "PRESENT", 58.0),
 
         # Meeting 07/08
-        ("meet_07_08", "std_maurine", "PRESENT", 59.0),
-        ("meet_07_08", "std_alaa", "PRESENT", 58.0),
-        ("meet_07_08", "std_hanan", "EXCUSED_MODERATE", 0.0),
-        ("meet_07_08", "std_ahmed", "PRESENT", 56.0),
-        ("meet_07_08", "std_sara", "LATE", 35.0),
+        ("meet_07_08", "std_ziad", "PRESENT", 59.0),
+        ("meet_07_08", "std_ali", "PRESENT", 58.0),
+        ("meet_07_08", "std_salma", "EXCUSED_MODERATE", 0.0),
+        ("meet_07_08", "std_rana", "PRESENT", 56.0),
+        ("meet_07_08", "std_mohamed", "LATE", 35.0),
+        ("meet_07_08", "std_khaled", "PRESENT", 57.0),
 
         # Meeting 14/08
-        ("meet_14_08", "std_maurine", "PRESENT", 60.0),
-        ("meet_14_08", "std_alaa", "PRESENT", 57.0),
-        ("meet_14_08", "std_hanan", "PRESENT", 55.0),
-        ("meet_14_08", "std_ahmed", "PRESENT", 58.0),
-        ("meet_14_08", "std_sara", "PRESENT", 59.0),
+        ("meet_14_08", "std_ziad", "PRESENT", 60.0),
+        ("meet_14_08", "std_ali", "PRESENT", 57.0),
+        ("meet_14_08", "std_salma", "PRESENT", 55.0),
+        ("meet_14_08", "std_rana", "PRESENT", 58.0),
+        ("meet_14_08", "std_mohamed", "PRESENT", 59.0),
+        ("meet_14_08", "std_khaled", "PRESENT", 60.0),
 
         # Meeting 20/08 (Camp Day 1)
-        ("meet_20_08", "std_maurine", "PRESENT", 119.0),
-        ("meet_20_08", "std_alaa", "PRESENT", 117.0),
-        ("meet_20_08", "std_hanan", "PRESENT", 116.0),
-        ("meet_20_08", "std_ahmed", "PRESENT", 118.0),
-        ("meet_20_08", "std_sara", "PRESENT", 115.0),
+        ("meet_20_08", "std_ziad", "PRESENT", 119.0),
+        ("meet_20_08", "std_ali", "PRESENT", 117.0),
+        ("meet_20_08", "std_salma", "PRESENT", 116.0),
+        ("meet_20_08", "std_rana", "PRESENT", 118.0),
+        ("meet_20_08", "std_mohamed", "PRESENT", 115.0),
+        ("meet_20_08", "std_khaled", "PRESENT", 119.0),
 
         # Meeting 21/08
-        ("meet_21_08", "std_maurine", "PRESENT", 57.0),
-        ("meet_21_08", "std_alaa", "PRESENT", 58.0),
-        ("meet_21_08", "std_hanan", "UNEXCUSED_ABSENT", 0.0),
-        ("meet_21_08", "std_ahmed", "LATE", 40.0),
-        ("meet_21_08", "std_sara", "PRESENT", 55.0),
+        ("meet_21_08", "std_ziad", "PRESENT", 57.0),
+        ("meet_21_08", "std_ali", "PRESENT", 58.0),
+        ("meet_21_08", "std_salma", "UNEXCUSED_ABSENT", 0.0),
+        ("meet_21_08", "std_rana", "LATE", 40.0),
+        ("meet_21_08", "std_mohamed", "PRESENT", 55.0),
+        ("meet_21_08", "std_khaled", "PRESENT", 58.0),
 
         # Today's Sync
-        ("today_sync", "std_maurine", "PRESENT", 57.0),
-        ("today_sync", "std_alaa", "PRESENT", 55.0),
-        ("today_sync", "std_hanan", "UNEXCUSED_ABSENT", 0.0),
-        ("today_sync", "std_ahmed", "PRESENT", 56.0),
-        ("today_sync", "std_sara", "PRESENT", 58.0),
+        ("today_sync", "std_ziad", "PRESENT", 57.0),
+        ("today_sync", "std_ali", "PRESENT", 55.0),
+        ("today_sync", "std_salma", "UNEXCUSED_ABSENT", 0.0),
+        ("today_sync", "std_rana", "PRESENT", 56.0),
+        ("today_sync", "std_mohamed", "PRESENT", 58.0),
+        ("today_sync", "std_khaled", "PRESENT", 57.0),
     ]
 
     for m_id, s_id, status, dur in att_history:
@@ -490,58 +485,58 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
     for t_data in tasks_data:
         db.add(Task(**t_data))
 
-    # 5. Task Submissions & Scores from 8.xlsx
-    # Maurine: T1=7, T2=10, T3=10, T4=pending, T5=pending
-    # Alaa: T1=9, T2=8, T3=10, T4=pending, T5=pending
-    # Hanan: T1=0, T2=0, T3=0, T4=pending, T5=pending
+    # 5. Task Submissions & Scores
+    # Ziad: T1=7, T2=10, T3=10, T4=pending, T5=pending
+    # Ali: T1=9, T2=8, T3=10, T4=pending, T5=pending
+    # Salma: T1=0, T2=0, T3=0, T4=pending, T5=pending
     submissions_data = [
-        # Maurine
-        {"id": "sub_m1", "task_id": "tsk_1", "student_id": "std_maurine", "status": "ON_TIME", "score": 7.0, "file_url": "https://drive.google.com/maurine_t1"},
-        {"id": "sub_m2", "task_id": "tsk_2", "student_id": "std_maurine", "status": "ON_TIME", "score": 10.0, "file_url": "https://drive.google.com/maurine_t2"},
-        {"id": "sub_m3", "task_id": "tsk_3", "student_id": "std_maurine", "status": "ON_TIME", "score": 10.0, "file_url": "https://drive.google.com/maurine_t3"},
-        {"id": "sub_m4", "task_id": "tsk_4", "student_id": "std_maurine", "status": "PENDING", "score": None, "file_url": ""},
-        {"id": "sub_m5", "task_id": "tsk_5", "student_id": "std_maurine", "status": "PENDING", "score": None, "file_url": ""},
+        # Ziad
+        {"id": "sub_z1", "task_id": "tsk_1", "student_id": "std_ziad", "status": "ON_TIME", "score": 7.0, "file_url": "https://drive.google.com/ziad_t1"},
+        {"id": "sub_z2", "task_id": "tsk_2", "student_id": "std_ziad", "status": "ON_TIME", "score": 10.0, "file_url": "https://drive.google.com/ziad_t2"},
+        {"id": "sub_z3", "task_id": "tsk_3", "student_id": "std_ziad", "status": "ON_TIME", "score": 10.0, "file_url": "https://drive.google.com/ziad_t3"},
+        {"id": "sub_z4", "task_id": "tsk_4", "student_id": "std_ziad", "status": "PENDING", "score": None, "file_url": ""},
+        {"id": "sub_z5", "task_id": "tsk_5", "student_id": "std_ziad", "status": "PENDING", "score": None, "file_url": ""},
 
-        # Alaa
-        {"id": "sub_a1", "task_id": "tsk_1", "student_id": "std_alaa", "status": "ON_TIME", "score": 9.0, "file_url": "https://drive.google.com/alaa_t1"},
-        {"id": "sub_a2", "task_id": "tsk_2", "student_id": "std_alaa", "status": "ON_TIME", "score": 8.0, "file_url": "https://drive.google.com/alaa_t2"},
-        {"id": "sub_a3", "task_id": "tsk_3", "student_id": "std_alaa", "status": "ON_TIME", "score": 10.0, "file_url": "https://drive.google.com/alaa_t3"},
-        {"id": "sub_a4", "task_id": "tsk_4", "student_id": "std_alaa", "status": "PENDING", "score": None, "file_url": ""},
-        {"id": "sub_a5", "task_id": "tsk_5", "student_id": "std_alaa", "status": "PENDING", "score": None, "file_url": ""},
+        # Ali
+        {"id": "sub_a1", "task_id": "tsk_1", "student_id": "std_ali", "status": "ON_TIME", "score": 9.0, "file_url": "https://drive.google.com/ali_t1"},
+        {"id": "sub_a2", "task_id": "tsk_2", "student_id": "std_ali", "status": "ON_TIME", "score": 8.0, "file_url": "https://drive.google.com/ali_t2"},
+        {"id": "sub_a3", "task_id": "tsk_3", "student_id": "std_ali", "status": "ON_TIME", "score": 10.0, "file_url": "https://drive.google.com/ali_t3"},
+        {"id": "sub_a4", "task_id": "tsk_4", "student_id": "std_ali", "status": "PENDING", "score": None, "file_url": ""},
+        {"id": "sub_a5", "task_id": "tsk_5", "student_id": "std_ali", "status": "PENDING", "score": None, "file_url": ""},
 
-        # Hanan
-        {"id": "sub_h1", "task_id": "tsk_1", "student_id": "std_hanan", "status": "MISSED", "score": 0.0, "file_url": ""},
-        {"id": "sub_h2", "task_id": "tsk_2", "student_id": "std_hanan", "status": "MISSED", "score": 0.0, "file_url": ""},
-        {"id": "sub_h3", "task_id": "tsk_3", "student_id": "std_hanan", "status": "MISSED", "score": 0.0, "file_url": ""},
-        {"id": "sub_h4", "task_id": "tsk_4", "student_id": "std_hanan", "status": "PENDING", "score": None, "file_url": ""},
-        {"id": "sub_h5", "task_id": "tsk_5", "student_id": "std_hanan", "status": "PENDING", "score": None, "file_url": ""},
+        # Salma
+        {"id": "sub_s1", "task_id": "tsk_1", "student_id": "std_salma", "status": "MISSED", "score": 0.0, "file_url": ""},
+        {"id": "sub_s2", "task_id": "tsk_2", "student_id": "std_salma", "status": "MISSED", "score": 0.0, "file_url": ""},
+        {"id": "sub_s3", "task_id": "tsk_3", "student_id": "std_salma", "status": "MISSED", "score": 0.0, "file_url": ""},
+        {"id": "sub_s4", "task_id": "tsk_4", "student_id": "std_salma", "status": "PENDING", "score": None, "file_url": ""},
+        {"id": "sub_s5", "task_id": "tsk_5", "student_id": "std_salma", "status": "PENDING", "score": None, "file_url": ""},
     ]
 
     for sub_data in submissions_data:
         db.add(Submission(**sub_data))
 
-    # 6. Behavior & Discipline Scores from 8.xlsx (Total 23 pts)
-    # Maurine: Group 5/5, Social 5/5, Hierarchy 5/5, Conduct 8/8 -> Total 23/23
-    # Alaa: Group 5/5, Social 5/5, Hierarchy 5/5, Conduct 8/8 -> Total 23/23
-    # Hanan: Group 5/5, Social 5/5, Hierarchy 3/5, Conduct 5/8 -> Total 18/23
+    # 6. Behavior & Discipline Scores (Total 23 pts)
+    # Ziad: Group 5/5, Social 5/5, Hierarchy 5/5, Conduct 8/8 -> Total 23/23
+    # Ali: Group 5/5, Social 5/5, Hierarchy 5/5, Conduct 8/8 -> Total 23/23
+    # Salma: Group 5/5, Social 5/5, Hierarchy 3/5, Conduct 5/8 -> Total 18/23
     scores_data = [
-        # Maurine
-        {"id": "sc_m1", "student_id": "std_maurine", "category": "GROUP_INTERACTION", "points": 5.0, "max_points": 5.0, "notes": "Active in discussions"},
-        {"id": "sc_m2", "student_id": "std_maurine", "category": "SOCIAL_MEDIA", "points": 5.0, "max_points": 5.0, "notes": "Great engagement"},
-        {"id": "sc_m3", "student_id": "std_maurine", "category": "HIERARCHY_RULES", "points": 5.0, "max_points": 5.0, "notes": "Full compliance"},
-        {"id": "sc_m4", "student_id": "std_maurine", "category": "POLITE_CONDUCT", "points": 8.0, "max_points": 8.0, "notes": "Highly professional"},
+        # Ziad
+        {"id": "sc_z1", "student_id": "std_ziad", "category": "GROUP_INTERACTION", "points": 5.0, "max_points": 5.0, "notes": "Active in discussions"},
+        {"id": "sc_z2", "student_id": "std_ziad", "category": "SOCIAL_MEDIA", "points": 5.0, "max_points": 5.0, "notes": "Great engagement"},
+        {"id": "sc_z3", "student_id": "std_ziad", "category": "HIERARCHY_RULES", "points": 5.0, "max_points": 5.0, "notes": "Full compliance"},
+        {"id": "sc_z4", "student_id": "std_ziad", "category": "POLITE_CONDUCT", "points": 8.0, "max_points": 8.0, "notes": "Highly professional"},
 
-        # Alaa
-        {"id": "sc_a1", "student_id": "std_alaa", "category": "GROUP_INTERACTION", "points": 5.0, "max_points": 5.0, "notes": "Active mentor"},
-        {"id": "sc_a2", "student_id": "std_alaa", "category": "SOCIAL_MEDIA", "points": 5.0, "max_points": 5.0, "notes": "Shared key announcements"},
-        {"id": "sc_a3", "student_id": "std_alaa", "category": "HIERARCHY_RULES", "points": 5.0, "max_points": 5.0, "notes": "Lead coordination"},
-        {"id": "sc_a4", "student_id": "std_alaa", "category": "POLITE_CONDUCT", "points": 8.0, "max_points": 8.0, "notes": "Exemplary attitude"},
+        # Ali
+        {"id": "sc_a1", "student_id": "std_ali", "category": "GROUP_INTERACTION", "points": 5.0, "max_points": 5.0, "notes": "Active mentor"},
+        {"id": "sc_a2", "student_id": "std_ali", "category": "SOCIAL_MEDIA", "points": 5.0, "max_points": 5.0, "notes": "Shared key announcements"},
+        {"id": "sc_a3", "student_id": "std_ali", "category": "HIERARCHY_RULES", "points": 5.0, "max_points": 5.0, "notes": "Lead coordination"},
+        {"id": "sc_a4", "student_id": "std_ali", "category": "POLITE_CONDUCT", "points": 8.0, "max_points": 8.0, "notes": "Exemplary attitude"},
 
-        # Hanan
-        {"id": "sc_h1", "student_id": "std_hanan", "category": "GROUP_INTERACTION", "points": 5.0, "max_points": 5.0, "notes": "Responsive in chat"},
-        {"id": "sc_h2", "student_id": "std_hanan", "category": "SOCIAL_MEDIA", "points": 5.0, "max_points": 5.0, "notes": "Good engagement"},
-        {"id": "sc_h3", "student_id": "std_hanan", "category": "HIERARCHY_RULES", "points": 3.0, "max_points": 5.0, "notes": "Minor deadline communication delay"},
-        {"id": "sc_h4", "student_id": "std_hanan", "category": "POLITE_CONDUCT", "points": 5.0, "max_points": 8.0, "notes": "Needs more proactive updates"},
+        # Salma
+        {"id": "sc_s1", "student_id": "std_salma", "category": "GROUP_INTERACTION", "points": 5.0, "max_points": 5.0, "notes": "Responsive in chat"},
+        {"id": "sc_s2", "student_id": "std_salma", "category": "SOCIAL_MEDIA", "points": 5.0, "max_points": 5.0, "notes": "Good engagement"},
+        {"id": "sc_s3", "student_id": "std_salma", "category": "HIERARCHY_RULES", "points": 3.0, "max_points": 5.0, "notes": "Minor deadline communication delay"},
+        {"id": "sc_s4", "student_id": "std_salma", "category": "POLITE_CONDUCT", "points": 5.0, "max_points": 8.0, "notes": "Needs more proactive updates"},
     ]
 
     for sc_data in scores_data:
@@ -591,7 +586,7 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
     followups_data = [
         {
             "id": "fol_001",
-            "student_id": "std_maurine",
+            "student_id": "std_ziad",
             "hr_member_id": "usr_hr_member",
             "flagged_reason": "OVERDUE_TASK",
             "flagged_at": now - timedelta(days=4),
@@ -602,7 +597,7 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
         },
         {
             "id": "fol_002",
-            "student_id": "std_hanan",
+            "student_id": "std_salma",
             "hr_member_id": "usr_admin",
             "flagged_reason": "ABSENTEEISM",
             "flagged_at": now - timedelta(days=1),
@@ -616,7 +611,7 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
         db.add(MemberFollowupStatus(**fol_item))
 
     await db.commit()
-    print("Database seeded successfully with 8.xlsx ground truth!")
+    print("Database seeded successfully with core team ground truth!")
 
 
 if __name__ == "__main__":

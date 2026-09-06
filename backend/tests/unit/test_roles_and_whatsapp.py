@@ -48,9 +48,12 @@ async def get_token(client: AsyncClient, email: str, password: str) -> str:
 
 @pytest.mark.asyncio
 async def test_five_tier_logins(client):
-    """Verifies that all 5 roles can authenticate successfully."""
+    """Verifies that all 5 roles can authenticate successfully, including dev regional HR."""
     region_token = await get_token(client, "region.head@studentops.org", "head123")
     assert region_token is not None
+
+    dev_region_token = await get_token(client, "ziad.region@studentops.org", "head123")
+    assert dev_region_token is not None
 
     leader_token = await get_token(client, "hr.leader@studentops.org", "leader123")
     assert leader_token is not None
@@ -61,7 +64,7 @@ async def test_five_tier_logins(client):
     hr_member_token = await get_token(client, "hr.member@studentops.org", "hrmember123")
     assert hr_member_token is not None
 
-    member_token = await get_token(client, "maurine.magdy@studentops.org", "member123")
+    member_token = await get_token(client, "ziad.member@studentops.org", "member123")
     assert member_token is not None
 
 
@@ -103,7 +106,7 @@ async def test_technical_submission_review_by_committee_head(client):
 
     # Head reviews submission
     review_res = await client.put(
-        "/api/tasks/submissions/sub_m1/review",
+        "/api/tasks/submissions/sub_z1/review",
         headers={"Authorization": f"Bearer {head_token}"},
         json={"score": 9.5, "reviewer_notes": "Excellent architecture and documentation"}
     )
@@ -115,7 +118,7 @@ async def test_technical_submission_review_by_committee_head(client):
 
     # HR Member cannot review technical submission -> 403
     bad_res = await client.put(
-        "/api/tasks/submissions/sub_m1/review",
+        "/api/tasks/submissions/sub_z1/review",
         headers={"Authorization": f"Bearer {hr_member_token}"},
         json={"score": 10.0, "reviewer_notes": "Attempt by HR"}
     )
@@ -130,10 +133,10 @@ async def test_behavior_score_update_by_hr_member(client):
 
     # HR Member updates behavior scores
     update_res = await client.put(
-        "/api/students/std_maurine/behavior-score",
+        "/api/students/std_ziad/behavior-score",
         headers={"Authorization": f"Bearer {hr_member_token}"},
         json={
-            "student_id": "std_maurine",
+            "student_id": "std_ziad",
             "group_interaction": 4.5,
             "social_media": 5.0,
             "hierarchy_rules": 4.0,
@@ -148,10 +151,10 @@ async def test_behavior_score_update_by_hr_member(client):
 
     # Committee Head cannot update behavior score (Read-only) -> 403
     head_bad = await client.put(
-        "/api/students/std_maurine/behavior-score",
+        "/api/students/std_ziad/behavior-score",
         headers={"Authorization": f"Bearer {head_token}"},
         json={
-            "student_id": "std_maurine",
+            "student_id": "std_ziad",
             "group_interaction": 5.0,
             "social_media": 5.0,
             "hierarchy_rules": 5.0,
@@ -167,15 +170,15 @@ async def test_whatsapp_direct_link_generation(client):
     hr_member_token = await get_token(client, "hr.member@studentops.org", "hrmember123")
 
     res = await client.post(
-        "/api/whatsapp/generate-link?student_id=std_maurine&template_type=OVERDUE_TASK",
+        "/api/whatsapp/generate-link?student_id=std_ziad&template_type=OVERDUE_TASK",
         headers={"Authorization": f"Bearer {hr_member_token}"}
     )
     assert res.status_code == 200
     data = res.json()
     assert "https://wa.me/201012345678" in data["encoded_url"]
-    assert "Maurine" in data["message_text"]
-    assert "مورين" in data["message_text"]
-    assert data["student_name"] == "Maurine Magdy Adly"
+    assert "Ziad" in data["message_text"]
+    assert "زياد" in data["message_text"]
+    assert data["student_name"] == "Ziad Mohamed"
 
 
 @pytest.mark.asyncio
@@ -187,7 +190,7 @@ async def test_whatsapp_sla_escalations(client):
     assert res.status_code == 200
     escalations = res.json()
     assert len(escalations) >= 1
-    maurine_flag = next((e for e in escalations if e["student_id"] == "std_maurine"), None)
-    assert maurine_flag is not None
-    assert maurine_flag["is_escalated"] is True
-    assert maurine_flag["days_open"] >= 3
+    ziad_flag = next((e for e in escalations if e["student_id"] == "std_ziad"), None)
+    assert ziad_flag is not None
+    assert ziad_flag["is_escalated"] is True
+    assert ziad_flag["days_open"] >= 3

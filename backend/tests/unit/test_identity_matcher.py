@@ -5,16 +5,16 @@ from app.services.identity_matcher import IdentityMatcher
 
 
 STUDENTS = [
-    {"id": "std_1", "full_name": "Maurine Magdy Adly", "arabic_name": "مورين مجدي عدلي", "email": "maurine.magdy@studentops.org"},
-    {"id": "std_2", "full_name": "Alaa Mohamed Hassan", "arabic_name": "الاء محمد حسن", "email": "alaa.mohamed@studentops.org"},
-    {"id": "std_3", "full_name": "Hanan Ahmed Ramadan", "arabic_name": "حنان احمد رمضان", "email": "hanan.ahmed@studentops.org"}
+    {"id": "std_1", "full_name": "Ziad Mohamed Gamal", "arabic_name": "زياد محمد", "email": "ziad.member@studentops.org"},
+    {"id": "std_2", "full_name": "Ali Hassan Mahmoud", "arabic_name": "علي حسن", "email": "ali.member@studentops.org"},
+    {"id": "std_3", "full_name": "Salma Ahmed", "arabic_name": "سلمى أحمد", "email": "salma.member@studentops.org"}
 ]
 
 
 def test_exact_email_match():
     match = IdentityMatcher.match_participant(
         display_name="Unknown Display Name",
-        email="alaa.mohamed@studentops.org",
+        email="ali.member@studentops.org",
         students=STUDENTS
     )
     assert match.student_id == "std_2"
@@ -24,7 +24,7 @@ def test_exact_email_match():
 
 def test_arabic_name_match():
     match = IdentityMatcher.match_participant(
-        display_name="مورين مجدي",
+        display_name="زياد محمد",
         email=None,
         students=STUDENTS
     )
@@ -35,7 +35,7 @@ def test_arabic_name_match():
 
 def test_latin_name_match():
     match = IdentityMatcher.match_participant(
-        display_name="Hanan Ahmed",
+        display_name="Salma Ahmed",
         email="",
         students=STUDENTS
     )

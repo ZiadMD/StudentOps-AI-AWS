@@ -30,7 +30,7 @@ async def test_meeting_attendance_tool_returns_grounded_data():
         assert res["summary"]["absent_count"] >= 1
         
         absent_ids = [s["student_id"] for s in res["absent_students"]]
-        assert "std_hanan" in absent_ids
+        assert "std_salma" in absent_ids
 
 
 @pytest.mark.asyncio
@@ -46,7 +46,7 @@ async def test_send_reminder_requires_confirmation():
         # Calling send_reminder without is_confirmed=True MUST be intercepted
         res = await tool_send_reminder(
             db=db,
-            student_ids=["std_hanan"],
+            student_ids=["std_salma"],
             is_confirmed=False
         )
         assert res["status"] == "REQUIRES_CONFIRMATION"
@@ -56,7 +56,7 @@ async def test_send_reminder_requires_confirmation():
         # Calling with is_confirmed=True executes successfully
         exec_res = await tool_send_reminder(
             db=db,
-            student_ids=["std_hanan"],
+            student_ids=["std_salma"],
             is_confirmed=True
         )
         assert exec_res["success"] is True

@@ -38,7 +38,7 @@ async def test_primary_demo_workflow_end_to_end():
         assert turn1_resp.conversation_id == conv_id
         assert len(turn1_resp.tool_executions) == 1
         assert turn1_resp.tool_executions[0].tool_name == "get_meeting_attendance"
-        assert "Hanan" in turn1_resp.response or "حنان" in turn1_resp.response
+        assert "Salma" in turn1_resp.response or "سلمى" in turn1_resp.response
         assert turn1_resp.requires_confirmation is False
 
         # Turn 2: HR asks to remind absent members
