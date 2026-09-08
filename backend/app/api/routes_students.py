@@ -12,6 +12,7 @@ from app.models.schemas import (
     BehaviorScoreUpdate,
     AssignCohortRequest,
     StudentPhoneUpdate,
+    BonusAwardRequest,
 )
 from app.services.scoring_service import ScoringService
 
@@ -138,7 +139,7 @@ async def update_behavior_score(
     student_id: str,
     body: BehaviorScoreUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"]))
+    current_user: User = Depends(require_roles(["committee_hr_member", "hr_admin"]))
 ):
     """
     Submits or updates behavior scores (/23) for a student.
@@ -246,3 +247,49 @@ async def update_student_phone(
     await db.commit()
     await db.refresh(student)
     return student
+
+
+@router.post("/{student_id}/bonus", response_model=StudentScoreSummary)
+async def award_student_bonus(
+    student_id: str,
+    body: BonusAwardRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_hr_leader", "hr_admin"]))
+):
+    """
+    Awards bonus points to a member.
+    Authoritative workflow: HR Leader can give bonuses to members.
+    Committee Head and Members are strictly forbidden.
+    """
+    student = await verify_student_access(student_id, current_user, db)
+
+    import uuid
+    query = select(ScoreRecord).where(
+        ScoreRecord.student_id == student_id,
+        ScoreRecord.category == "BONUS"
+    )
+    res = await db.execute(query)
+    record = res.scalar_one_or_none()
+
+    if record:
+        record.points = record.points + body.points
+        record.notes = f"{record.notes} | {body.notes}" if record.notes and body.notes else (body.notes or record.notes)
+        record.graded_by_user_id = current_user.id
+        record.updated_by = current_user.full_name
+    else:
+        record = ScoreRecord(
+            id=f"score_bonus_{uuid.uuid4().hex[:10]}",
+            student_id=student_id,
+            category="BONUS",
+            points=body.points,
+            max_points=10.0,
+            graded_by_user_id=current_user.id,
+            notes=body.notes or "Bonus awarded by HR Leader",
+            updated_by=current_user.full_name,
+        )
+        db.add(record)
+
+    await db.commit()
+    summary = await ScoringService.get_student_score_summary(student_id, db)
+    return summary
+

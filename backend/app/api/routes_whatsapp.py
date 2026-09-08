@@ -47,7 +47,7 @@ openwa = OpenWAProvider()
 
 @router.get("/status", response_model=OfficialWhatsAppStatus)
 async def get_official_status(
-    _: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Returns live connectivity status of official organization OpenWA daemon.
@@ -59,21 +59,62 @@ async def get_official_status(
         phone_number=status_info.get("phone_number"),
         battery=status_info.get("battery"),
         qr_code=status_info.get("qr_code"),
+        session_name=status_info.get("session_name"),
+        error=status_info.get("error"),
     )
 
 
 @router.get("/qr")
 async def get_official_qr(
-    _: User = Depends(require_roles(["region_hr_head", "hr_admin"]))
+    current_user: User = Depends(require_roles(["region_hr_head", "hr_admin", "committee_hr_leader", "committee_hr_member"]))
 ):
     """
-    Returns QR authentication payload for pairing official org number.
-    Restricted to Region HR Head.
+    Returns QR authentication payload for pairing official org number or HR session.
+    Restricted to HR personnel.
     """
+    status_info = await openwa.get_status()
+    current_status = status_info.get("status", "DISCONNECTED")
+    phone = status_info.get("phone_number")
+
+    if current_status == "CONNECTED":
+        return {
+            "status": "CONNECTED",
+            "qr": None,
+            "phone_number": phone,
+            "message": f"WhatsApp is already active and paired ({phone or 'Official Number'}).",
+        }
+
     qr = await openwa.get_qr()
-    if not qr:
-        return {"qr": None, "message": "No QR code required or OpenWA is already connected"}
-    return {"qr": qr}
+    if qr:
+        return {
+            "status": "SCAN_QR_CODE",
+            "qr": qr,
+            "phone_number": phone,
+            "message": "Please scan the QR code using WhatsApp on your device.",
+        }
+
+    if current_status == "AUTHENTICATING":
+        return {
+            "status": "AUTHENTICATING",
+            "qr": None,
+            "phone_number": phone,
+            "message": "QR code scanned! Authenticating WhatsApp session...",
+        }
+
+    if current_status == "GATEWAY_UNAVAILABLE":
+        return {
+            "status": "GATEWAY_UNAVAILABLE",
+            "qr": None,
+            "phone_number": phone,
+            "message": "Cannot reach OpenWA gateway at container port 2785. Ensure the container is healthy.",
+        }
+
+    return {
+        "status": current_status,
+        "qr": None,
+        "phone_number": phone,
+        "message": status_info.get("error") or "Session initializing or disconnected. Please retry shortly.",
+    }
 
 
 @router.post("/send-official")
@@ -85,6 +126,7 @@ async def send_official_message(
     """
     Dispatches an official organization broadcast via the headless OpenWA container.
     Restricted to Regional Head.
+    Guards against duplicate sends if gateway times out.
     """
     msg = OutgoingMessage(
         recipient_name="Recipient",
@@ -93,16 +135,31 @@ async def send_official_message(
         channel="WHATSAPP_OFFICIAL",
     )
     result = await openwa.send_message(msg)
+
     if not result.success:
+        if getattr(result, "is_uncertain", False):
+            # Uncertain delivery: return non-fatal 200 payload with explicit flag to prevent auto-retries
+            return {
+                "success": False,
+                "message_id": result.message_id,
+                "recipient_phone": result.recipient_phone,
+                "delivered_at": result.delivered_at,
+                "delivery_status": result.delivery_status,
+                "is_uncertain": True,
+                "error": result.error_message,
+            }
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=result.error_message or "Could not deliver message via OpenWA",
         )
+
     return {
         "success": result.success,
         "message_id": result.message_id,
         "recipient_phone": result.recipient_phone,
         "delivered_at": result.delivered_at,
+        "delivery_status": getattr(result, "delivery_status", "DELIVERED"),
+        "is_uncertain": False,
         "error": result.error_message,
     }
 
@@ -137,6 +194,24 @@ async def generate_student_whatsapp_link(
             f"Hello {student.full_name}, this is your HR coordinator from the student activity.\n"
             f"We noticed that {task_title} is pending submission. Please submit your work or reach out if you have any questions!\n\n"
             f"مرحباً {student.arabic_name}، نود تذكيرك بتسليم المهمة ({task_title}). يسعدنا تواصلك في حال واجهتك أي صعوبات."
+        )
+    elif template_type == "MEETING_REMINDER":
+        message_text = (
+            f"Hello {student.full_name}, this is your Social Media HR coordinator.\n"
+            f"Friendly reminder: our upcoming committee meeting will start soon. Looking forward to seeing you there!\n\n"
+            f"مرحباً {student.arabic_name}، نذكرك باقتراب موعد لقاء لجنة السوشيال ميديا القادم. نتمنى لك كل التوفيق!"
+        )
+    elif template_type == "TASK_DEADLINE_REMINDER":
+        task_title = "Social Media Assignment"
+        if task_id:
+            t_res = await db.execute(select(Task).where(Task.id == task_id))
+            t = t_res.scalar_one_or_none()
+            if t:
+                task_title = t.title
+        message_text = (
+            f"Hello {student.full_name}, this is a reminder from your HR coordinator.\n"
+            f"The deadline for {task_title} is approaching shortly. Make sure to submit your work before the cutoff!\n\n"
+            f"مرحباً {student.arabic_name}، تذكير باقتراب الموعد النهائي لتسليم مهمة ({task_title}). يرجى التأكد من التسليم في الوقت المحدد!"
         )
     elif template_type == "ATTENDANCE_WARNING":
         message_text = (
@@ -191,7 +266,13 @@ async def list_sla_escalations(
     )
 
     if current_user.role == "committee_hr_leader":
-        query = query.where(Student.team_id == current_user.team_id)
+        if current_user.team_id:
+            team_hr_res = await db.execute(select(User.id).where(User.team_id == current_user.team_id))
+            team_hr_ids = set(team_hr_res.scalars().all())
+            query = query.where(
+                (Student.team_id == current_user.team_id) |
+                (MemberFollowupStatus.hr_member_id.in_(team_hr_ids))
+            )
     elif current_user.role == "committee_hr_member":
         query = query.where(MemberFollowupStatus.hr_member_id == current_user.id)
 

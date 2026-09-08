@@ -17,6 +17,9 @@ import {
   WhatsAppChatMessage,
   WhatsAppThreadSummary,
   WhatsAppSendMessagePayload,
+  MemberFeedbackItem,
+  MemberQuestionItem,
+  CommitteeReportItem,
 } from '../types';
 
 export const API_BASE = ((import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, '')) || '/api';
@@ -167,9 +170,32 @@ export const api = {
       body: JSON.stringify({ phone }),
     }),
 
+  awardBonus: (
+    studentId: string,
+    payload: { points: number; max_points?: number; notes?: string }
+  ) =>
+    fetchJson<StudentScoreSummary>(`/students/${studentId}/bonus`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   // Attendance & Meetings
   getMeetings: () => fetchJson<MeetingDetail[]>('/attendance/meetings'),
   getMeetingDetail: (meetingId: string) => fetchJson<MeetingDetail>(`/attendance/meetings/${meetingId}`),
+  createMeeting: (payload: {
+    title: string;
+    topic?: string;
+    start_time: string;
+    end_time: string;
+    duration_minutes?: number;
+    meet_url?: string;
+    session_number?: number;
+    student_ids?: string[];
+  }) =>
+    fetchJson<MeetingDetail>('/attendance/meetings', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   reprocessAttendance: (meetingId: string) =>
     fetchJson<{ success: boolean; processed_count: number }>(`/attendance/meetings/${meetingId}/process`, {
       method: 'POST',
@@ -180,6 +206,18 @@ export const api = {
 
   // Tasks & Submissions
   getTasks: () => fetchJson<TaskItem[]>('/tasks'),
+  createTask: (payload: {
+    title: string;
+    description?: string;
+    deadline: string;
+    max_score?: number;
+    task_number?: number;
+    student_ids?: string[];
+  }) =>
+    fetchJson<TaskItem>('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   getTaskSubmissions: (taskId: string) => fetchJson<SubmissionItem[]>(`/tasks/${taskId}/submissions`),
   reviewTaskSubmission: (
     submissionId: string,
@@ -193,6 +231,49 @@ export const api = {
     fetchJson<SubmissionItem>(`/tasks/${taskId}/submit?file_url=${encodeURIComponent(fileUrl)}`, {
       method: 'POST',
     }),
+
+  // Member Feedback (Flows to HR Leader)
+  getFeedback: (studentId?: string, status?: string) => {
+    let url = '/feedback';
+    const params: string[] = [];
+    if (studentId) params.push(`student_id=${encodeURIComponent(studentId)}`);
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    if (params.length) url += `?${params.join('&')}`;
+    return fetchJson<MemberFeedbackItem[]>(url);
+  },
+  submitFeedback: (payload: { hr_member_id?: string; hr_member_name?: string; category: string; content: string }) =>
+    fetchJson<MemberFeedbackItem>('/feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateFeedbackStatus: (feedbackId: string, payload: { status: string; notes?: string }) =>
+    fetchJson<MemberFeedbackItem>(`/feedback/${feedbackId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  // Member Questions (Answered by Committee Head)
+  getQuestions: (status?: string) =>
+    fetchJson<MemberQuestionItem[]>(`/questions${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  askQuestion: (payload: { title: string; content: string; team_id?: string }) =>
+    fetchJson<MemberQuestionItem>('/questions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  answerQuestion: (questionId: string, answer: string) =>
+    fetchJson<MemberQuestionItem>(`/questions/${questionId}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ answer }),
+    }),
+
+  // Committee Performance Reports (HR Leader -> HR Head)
+  getCommitteeSummary: () => fetchJson<any>('/reports/committee/summary'),
+  submitCommitteeReport: (payload: { report_title: string; notes?: string }) =>
+    fetchJson<CommitteeReportItem>('/reports/submit-to-head', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getCommitteeReports: () => fetchJson<CommitteeReportItem[]>('/reports'),
 
   // WhatsApp & Escalations
   getWhatsAppStatus: () => fetchJson<OfficialWhatsAppStatus>('/whatsapp/status'),

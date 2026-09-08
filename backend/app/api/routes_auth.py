@@ -162,12 +162,27 @@ async def login_user(
     returning access and refresh JWT tokens.
     Protected by server-side brute-force rate limiting.
     """
-    email_clean = payload.email.strip().lower()
+    raw_id = payload.email or payload.username or payload.identifier
+    if not raw_id or not raw_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username is required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    identifier_clean = raw_id.strip().lower()
+
+    # Search candidates: exact email/identifier, or with default domain @studentops.org if domain omitted
+    lookup_candidates = [identifier_clean]
+    if "@" not in identifier_clean:
+        lookup_candidates.append(f"{identifier_clean}@studentops.org")
 
     res = await db.execute(
         select(User)
         .options(selectinload(User.team))
-        .where(func.lower(User.email) == email_clean)
+        .where(
+            (func.lower(User.email).in_(lookup_candidates)) |
+            (User.id == identifier_clean)
+        )
     )
     user = res.scalar_one_or_none()
 

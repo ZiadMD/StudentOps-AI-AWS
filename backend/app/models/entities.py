@@ -107,11 +107,17 @@ class Meeting(Base):
     duration_minutes = Column(Integer, default=60)
     meet_url = Column(String(255), default="https://meet.google.com/abc-defg-hij")
     status = Column(String(20), default="COMPLETED")  # "SCHEDULED", "LIVE", "COMPLETED"
+    session_number = Column(Integer, default=1)
+    responsible_user_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     # Relationships
+    responsible_user = relationship("User", foreign_keys=[responsible_user_id])
+    team = relationship("Team", foreign_keys=[team_id])
     sessions = relationship("ParticipantSession", back_populates="meeting", cascade="all, delete-orphan")
     attendance_records = relationship("AttendanceRecord", back_populates="meeting", cascade="all, delete-orphan")
+    assignments = relationship("MeetingAssignment", back_populates="meeting", cascade="all, delete-orphan")
 
 
 class ParticipantSession(Base):
@@ -176,9 +182,12 @@ class Task(Base):
     deadline = Column(DateTime(timezone=True), nullable=False, index=True)
     max_score = Column(Float, default=10.0)
     score_rule = Column(String(100), default="Out of 10 points based on quality and punctuality")
+    created_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     submissions = relationship("Submission", back_populates="task", cascade="all, delete-orphan")
+    assignments = relationship("TaskAssignment", back_populates="task", cascade="all, delete-orphan")
 
 
 class Submission(Base):
@@ -316,3 +325,123 @@ class WhatsAppChatMessage(Base):
 
     student = relationship("Student", back_populates="whatsapp_messages")
     assigned_hr = relationship("User", foreign_keys=[assigned_hr_id])
+
+
+class MeetingAssignment(Base):
+    """Explicit member assignment to meetings. Attendance reminders target assigned members."""
+    __tablename__ = "meeting_assignments"
+
+    id = Column(String(36), primary_key=True, index=True)
+    meeting_id = Column(String(36), ForeignKey("meetings.id"), nullable=False, index=True)
+    student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
+    assigned_at = Column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("meeting_id", "student_id", name="uq_meeting_student_assignment"),
+    )
+
+    meeting = relationship("Meeting", back_populates="assignments")
+    student = relationship("Student")
+
+class TaskAssignment(Base):
+    """Explicit member assignment to tasks. Tasks fail closed if no assignments exist."""
+    __tablename__ = "task_assignments"
+
+    id = Column(String(36), primary_key=True, index=True)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
+    student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
+    assigned_at = Column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("task_id", "student_id", name="uq_task_student_assignment"),
+    )
+
+    task = relationship("Task", back_populates="assignments")
+    student = relationship("Student")
+
+
+class AutomationSettings(Base):
+    """Per-HR automation configurations with inheritance and precedence rules."""
+    __tablename__ = "automation_settings"
+
+    id = Column(String(36), primary_key=True, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), unique=True, nullable=False, index=True)
+
+    # Attendance automation
+    attendance_enabled = Column(Boolean, default=True)
+    attendance_grace_minutes = Column(Integer, default=10)
+    attendance_message = Column(Text, nullable=True)
+
+    # Task pre-deadline reminder
+    task_pre_enabled = Column(Boolean, default=True)
+    task_pre_hours = Column(Integer, default=24)
+    task_pre_message = Column(Text, nullable=True)
+
+    # Task post-deadline escalation
+    task_post_enabled = Column(Boolean, default=True)
+    task_post_delay_hours = Column(Integer, default=2)
+    task_post_message = Column(Text, nullable=True)
+
+    # Channels
+    whatsapp_enabled = Column(Boolean, default=True)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user = relationship("User")
+
+
+class MemberFeedback(Base):
+    """Member feedback for HR members flowing upward to HR Leader."""
+    __tablename__ = "member_feedbacks"
+
+    id = Column(String(36), primary_key=True, index=True)
+    student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
+    hr_member_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    hr_member_name = Column(String(100), nullable=True)
+    category = Column(String(50), default="HR_INTERACTION")  # "HR_INTERACTION", "COMMUNICATION", "ATTENDANCE_SUPPORT", "BEHAVIOR_EVALUATION", "CONDUCT"
+    content = Column(Text, nullable=False)
+    submitted_at = Column(DateTime(timezone=True), default=utcnow)
+    reviewed_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(20), default="SUBMITTED")  # "SUBMITTED", "REVIEWED", "ACTIONED"
+    notes = Column(Text, default="")
+
+    student = relationship("Student", foreign_keys=[student_id])
+    hr_member = relationship("User", foreign_keys=[hr_member_id])
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_user_id])
+
+
+class MemberQuestion(Base):
+    """Questions asked by members and answered by the Social Media Committee Head."""
+    __tablename__ = "member_questions"
+
+    id = Column(String(36), primary_key=True, index=True)
+    student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=False, index=True)
+    title = Column(String(150), nullable=False)
+    content = Column(Text, nullable=False)
+    status = Column(String(20), default="OPEN")  # "OPEN", "ANSWERED"
+    asked_at = Column(DateTime(timezone=True), default=utcnow)
+    answered_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    answer = Column(Text, default="")
+    answered_at = Column(DateTime(timezone=True), nullable=True)
+
+    student = relationship("Student", foreign_keys=[student_id])
+    team = relationship("Team", foreign_keys=[team_id])
+    answered_by = relationship("User", foreign_keys=[answered_by_user_id])
+
+
+class CommitteeReport(Base):
+    """Formal performance report submitted upward by HR Leader to HR Region Head."""
+    __tablename__ = "committee_reports"
+
+    id = Column(String(36), primary_key=True, index=True)
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=False, index=True)
+    submitted_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    report_title = Column(String(150), nullable=False)
+    metrics_summary = Column(Text, default="{}")  # JSON-encoded metrics summary
+    notes = Column(Text, default="")
+    submitted_at = Column(DateTime(timezone=True), default=utcnow)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+
+    team = relationship("Team", foreign_keys=[team_id])
+    submitted_by = relationship("User", foreign_keys=[submitted_by_user_id])

@@ -2,6 +2,7 @@
 Async Database connection and session management.
 Supports local SQLite and Supabase PostgreSQL with PgBouncer transaction pooling.
 """
+from pathlib import Path
 from typing import AsyncGenerator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -13,12 +14,21 @@ def get_normalized_database_url(raw_url: str) -> str:
     """
     Normalizes database connection string:
     - Converts postgres:// or postgresql:// to postgresql+asyncpg://
+    - Anchors relative SQLite paths to the backend directory so all processes share the exact same DB
     """
     url = raw_url.strip()
     if url.startswith("postgres://"):
         url = "postgresql+asyncpg://" + url[len("postgres://"):]
     elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
         url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    elif "sqlite" in url and ":///" in url and not url.startswith("sqlite+aiosqlite:///:memory:"):
+        prefix = url.split(":///", 1)[0] + ":///"
+        db_path_str = url.split(":///", 1)[1]
+        db_path = Path(db_path_str)
+        if not db_path.is_absolute():
+            backend_dir = Path(__file__).resolve().parent.parent.parent
+            resolved_path = (backend_dir / db_path).resolve().as_posix()
+            url = f"{prefix}{resolved_path}"
     return url
 
 
@@ -77,6 +87,9 @@ POSTGRES_SAFE_MIGRATIONS = [
     "ALTER TABLE score_records ADD COLUMN IF NOT EXISTS graded_by_user_id VARCHAR(36) REFERENCES users(id);",
     "CREATE INDEX IF NOT EXISTS ix_score_records_month ON score_records(month);",
     "CREATE INDEX IF NOT EXISTS ix_score_records_graded_by_user_id ON score_records(graded_by_user_id);",
+    "ALTER TABLE meetings ADD COLUMN IF NOT EXISTS session_number INTEGER DEFAULT 1;",
+    "ALTER TABLE member_feedbacks ADD COLUMN IF NOT EXISTS hr_member_id VARCHAR(36) REFERENCES users(id);",
+    "ALTER TABLE member_feedbacks ADD COLUMN IF NOT EXISTS hr_member_name VARCHAR(100);",
 ]
 
 
@@ -87,4 +100,21 @@ async def init_db():
         if engine.dialect.name == "postgresql":
             for stmt in POSTGRES_SAFE_MIGRATIONS:
                 await conn.execute(text(stmt))
+        elif engine.dialect.name == "sqlite":
+            # Incremental safe migrations for SQLite
+            res = await conn.execute(text("PRAGMA table_info(meetings)"))
+            cols = [r[1] for r in res.fetchall()]
+            if cols and "responsible_user_id" not in cols:
+                await conn.execute(text("ALTER TABLE meetings ADD COLUMN responsible_user_id VARCHAR(36) REFERENCES users(id)"))
+            if cols and "team_id" not in cols:
+                await conn.execute(text("ALTER TABLE meetings ADD COLUMN team_id VARCHAR(36) REFERENCES teams(id)"))
+            if cols and "session_number" not in cols:
+                await conn.execute(text("ALTER TABLE meetings ADD COLUMN session_number INTEGER DEFAULT 1"))
+
+            res_fb = await conn.execute(text("PRAGMA table_info(member_feedbacks)"))
+            cols_fb = [r[1] for r in res_fb.fetchall()]
+            if cols_fb and "hr_member_id" not in cols_fb:
+                await conn.execute(text("ALTER TABLE member_feedbacks ADD COLUMN hr_member_id VARCHAR(36) REFERENCES users(id)"))
+            if cols_fb and "hr_member_name" not in cols_fb:
+                await conn.execute(text("ALTER TABLE member_feedbacks ADD COLUMN hr_member_name VARCHAR(100)"))
 

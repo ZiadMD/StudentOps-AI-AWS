@@ -10,6 +10,7 @@ import {
   X,
   Check,
   Eye,
+  Award,
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
 
@@ -33,8 +34,17 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
   });
   const [saving, setSaving] = useState(false);
 
-  const isCommitteeMember = currentUser?.role === 'committee_member';
+  // Bonus awarding state for HR Leader
+  const [bonusStudent, setBonusStudent] = useState<StudentScoreSummary | null>(null);
+  const [bonusPoints, setBonusPoints] = useState<number>(2.0);
+  const [bonusReason, setBonusReason] = useState<string>('');
+  const [awardingBonus, setAwardingBonus] = useState(false);
+
+  const isCommitteeMember = currentUser?.role === 'committee_member' || currentUser?.role === 'member';
   const isCommitteeHead = currentUser?.role === 'committee_head' || currentUser?.role === 'team_lead';
+  const isHrLeader =
+    currentUser?.role === 'committee_hr_leader' ||
+    currentUser?.role === 'hr_admin';
   const canEditBehavior =
     currentUser?.role === 'committee_hr_member' ||
     currentUser?.role === 'committee_hr_leader' ||
@@ -87,6 +97,23 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
     }
   };
 
+  const handleAwardBonus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bonusStudent || !bonusReason.trim()) return;
+    try {
+      setAwardingBonus(true);
+      await api.awardBonus(bonusStudent.student_id, { points: bonusPoints, notes: bonusReason });
+      setBonusStudent(null);
+      setBonusPoints(2.0);
+      setBonusReason('');
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to award bonus');
+    } finally {
+      setAwardingBonus(false);
+    }
+  };
+
   if (isCommitteeMember) {
     return (
       <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
@@ -123,7 +150,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500 mt-1">Behavior score (/23) and task quality average (/10)</p>
+          <p className="text-sm text-slate-500 mt-1">Behavior score (/23), interaction score (/5), task quality (/10), and bonuses</p>
         </div>
 
         <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -158,10 +185,13 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   </th>
                   <th className="px-6 py-4 font-medium">Member</th>
                   <th className="px-6 py-4 font-medium text-right">Attendance</th>
-                  <th className="px-6 py-4 font-medium text-right">Task Quality (Avg/10)</th>
+                  <th className="px-6 py-4 font-medium text-right">Task Quality (/10)</th>
                   <th className="px-6 py-4 font-medium text-right">Behavior (/23)</th>
+                  <th className="px-6 py-4 font-medium text-right">Interaction (/5)</th>
+                  <th className="px-6 py-4 font-medium text-right">Bonus</th>
+                  <th className="px-6 py-4 font-medium text-right font-bold text-slate-800">Total Score</th>
                   <th className="px-6 py-4 font-medium text-right">Final Status</th>
-                  {canEditBehavior && <th className="px-6 py-4 font-medium text-right">Actions</th>}
+                  {(canEditBehavior || isHrLeader) && <th className="px-6 py-4 font-medium text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-slate-100">
@@ -211,6 +241,30 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                         {student.total_behavior_score} / 23
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-slate-700">
+                      {student.group_interaction_score ?? 5.0} / 5
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-xs">
+                      {student.bonus_points && student.bonus_points > 0 ? (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+                          +{student.bonus_points}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-mono">0</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono font-bold text-indigo-700">
+                      {student.total_score !== undefined && student.total_score !== null ? (
+                        student.total_score
+                      ) : (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200"
+                          title="Score components are kept separate. Total score formula is pending organization definition."
+                        >
+                          Separate Components
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       {student.overall_rating === 'Outstanding' ? (
                         <Badge variant="success">Outstanding</Badge>
@@ -220,15 +274,30 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                         <Badge variant="warning">Needs Review</Badge>
                       )}
                     </td>
-                    {canEditBehavior && (
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <button
-                          onClick={() => handleOpenEdit(student)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          Grade /23
-                        </button>
+                    {(canEditBehavior || isHrLeader) && (
+                      <td className="px-6 py-4 whitespace-nowrap text-right space-x-1.5">
+                        {canEditBehavior && (
+                          <button
+                            onClick={() => handleOpenEdit(student)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            Grade /23
+                          </button>
+                        )}
+                        {isHrLeader && (
+                          <button
+                            onClick={() => {
+                              setBonusStudent(student);
+                              setBonusPoints(2.0);
+                              setBonusReason('');
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md border border-indigo-100 transition-colors"
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                            Bonus
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -357,6 +426,83 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                     {saving ? 'Saving...' : 'Save Evaluation'}
                   </button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Award Bonus (HR Leader) */}
+      {bonusStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                  <Award className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Award Member Bonus: {bonusStudent.arabic_name || bonusStudent.student_name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setBonusStudent(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              The HR Leader can grant merit bonus points that flow directly into the member&apos;s Total Score.
+            </p>
+
+            <form onSubmit={handleAwardBonus} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Bonus Points (e.g. 1.0 to 5.0)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="10.0"
+                  value={bonusPoints}
+                  onChange={(e) => setBonusPoints(parseFloat(e.target.value) || 0)}
+                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600 font-mono"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Recognition Reason / Justification
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Exceptional reel editing turn-around and active community moderation..."
+                  value={bonusReason}
+                  onChange={(e) => setBonusReason(e.target.value)}
+                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setBonusStudent(null)}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={awardingBonus}
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+                >
+                  {awardingBonus ? 'Awarding...' : 'Grant Bonus Points'}
+                </button>
               </div>
             </form>
           </div>

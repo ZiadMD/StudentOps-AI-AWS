@@ -56,7 +56,14 @@ class ScoringService:
         polite = scores_by_cat.get("POLITE_CONDUCT", 8.0)
         total_behavior = group_int + social_med + hierarchy + polite
 
-        # Overall qualitative rating
+        # 5. Bonus Points (awarded by HR Leader)
+        bonus_points = sum(r.points for r in score_records if r.category == "BONUS")
+
+        # Total Score: Authoritative score components are kept separate.
+        # No arbitrary weights or attendance point values are invented.
+        total_score = None
+
+        # Overall qualitative rating based on authoritative 8.xlsx rules
         if avg_quality >= 8.5 and total_behavior >= 20 and absence == 0:
             rating = "Outstanding"
         elif avg_quality >= 6.0 and total_behavior >= 15 and absence <= 2:
@@ -81,6 +88,9 @@ class ScoringService:
             hierarchy_rules_score=hierarchy,
             polite_conduct_score=polite,
             total_behavior_score=total_behavior,
+            bonus_points=bonus_points,
+            total_score=total_score,
+            total_score_status="PENDING_FORMULA_DEFINITION",
             overall_rating=rating
         )
 
