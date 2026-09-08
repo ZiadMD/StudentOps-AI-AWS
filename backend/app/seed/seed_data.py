@@ -613,6 +613,20 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
         {"id": "sub_s3", "task_id": "tsk_3", "student_id": "std_salma", "status": "MISSED", "score": 0.0, "file_url": ""},
         {"id": "sub_s4", "task_id": "tsk_4", "student_id": "std_salma", "status": "PENDING", "score": None, "file_url": ""},
         {"id": "sub_s5", "task_id": "tsk_5", "student_id": "std_salma", "status": "PENDING", "score": None, "file_url": ""},
+
+        # Mohamed (Media Member)
+        {"id": "sub_m1", "task_id": "tsk_1", "student_id": "std_mohamed", "status": "ON_TIME", "score": 8.0, "technical_score": 8.0, "file_url": "https://drive.google.com/mohamed_t1"},
+        {"id": "sub_m2", "task_id": "tsk_2", "student_id": "std_mohamed", "status": "ON_TIME", "score": 9.0, "technical_score": 9.0, "file_url": "https://drive.google.com/mohamed_t2"},
+        {"id": "sub_m3", "task_id": "tsk_3", "student_id": "std_mohamed", "status": "ON_TIME", "score": 8.5, "technical_score": 8.5, "file_url": "https://drive.google.com/mohamed_t3"},
+        {"id": "sub_m4", "task_id": "tsk_4", "student_id": "std_mohamed", "status": "PENDING", "score": None, "technical_score": None, "file_url": ""},
+        {"id": "sub_m5", "task_id": "tsk_5", "student_id": "std_mohamed", "status": "PENDING", "score": None, "technical_score": None, "file_url": ""},
+
+        # Khaled (Media Member)
+        {"id": "sub_k1", "task_id": "tsk_1", "student_id": "std_khaled", "status": "ON_TIME", "score": 9.0, "technical_score": 9.0, "file_url": "https://drive.google.com/khaled_t1"},
+        {"id": "sub_k2", "task_id": "tsk_2", "student_id": "std_khaled", "status": "ON_TIME", "score": 8.5, "technical_score": 8.5, "file_url": "https://drive.google.com/khaled_t2"},
+        {"id": "sub_k3", "task_id": "tsk_3", "student_id": "std_khaled", "status": "ON_TIME", "score": 9.5, "technical_score": 9.5, "file_url": "https://drive.google.com/khaled_t3"},
+        {"id": "sub_k4", "task_id": "tsk_4", "student_id": "std_khaled", "status": "PENDING", "score": None, "technical_score": None, "file_url": ""},
+        {"id": "sub_k5", "task_id": "tsk_5", "student_id": "std_khaled", "status": "PENDING", "score": None, "technical_score": None, "file_url": ""},
     ]
 
     for sub_data in submissions_data:

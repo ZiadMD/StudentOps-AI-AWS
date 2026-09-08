@@ -151,8 +151,8 @@ class TaskSchema(BaseModel):
     title: str
     description: str
     deadline: datetime
-    max_score: float
-    score_rule: str
+    max_score: Optional[float] = None
+    score_rule: Optional[str] = None
     submission_count: int = 0
     pending_count: int = 0
     assigned_count: int = 0

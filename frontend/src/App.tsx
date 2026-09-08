@@ -114,7 +114,7 @@ export function App() {
             {activeTab === 'scoreboard'    && <StudentScoreboard currentUser={currentUser} />}
             {activeTab === 'calendar'      && <CalendarView />}
             {activeTab === 'tasks'         && <TaskManagement currentUser={currentUser} />}
-            {activeTab === 'task-reviews'  && <TaskReviewsPage />}
+            {activeTab === 'task-reviews'  && <TaskReviewsPage currentUser={currentUser} />}
             {activeTab === 'qna'           && <CommitteeQnA currentUser={currentUser} />}
             {activeTab === 'feedback'      && <MemberFeedbackView currentUser={currentUser} />}
             {activeTab === 'reports'       && <CommitteeReportsView currentUser={currentUser} />}

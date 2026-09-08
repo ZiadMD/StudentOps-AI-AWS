@@ -40,7 +40,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
   const [bonusReason, setBonusReason] = useState<string>('');
   const [awardingBonus, setAwardingBonus] = useState(false);
 
-  const isCommitteeMember = currentUser?.role === 'committee_member';
+  const isCommitteeMember = currentUser?.role === 'committee_member' || currentUser?.role === 'member';
   const isCommitteeHead = currentUser?.role === 'committee_head' || currentUser?.role === 'team_lead';
   const isHrLeader =
     currentUser?.role === 'committee_hr_leader' ||

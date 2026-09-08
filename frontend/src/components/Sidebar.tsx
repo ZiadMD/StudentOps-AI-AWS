@@ -88,8 +88,8 @@ const NAV_ITEMS: {
     id: 'scoreboard',
     label: 'Evaluations',
     icon: ClipboardList,
-    // Strictly hidden from committee_member
-    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'hr_admin', 'team_lead', 'member'],
+    // Strictly hidden from committee_member and member
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'hr_admin', 'team_lead'],
   },
   {
     id: 'calendar',
@@ -101,7 +101,7 @@ const NAV_ITEMS: {
     id: 'tasks',
     label: 'Tasks & Sprints',
     icon: CheckSquare,
-    roles: ['committee_head', 'committee_member', 'hr_admin', 'team_lead', 'member'],
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead', 'member'],
   },
   {
     id: 'task-reviews',

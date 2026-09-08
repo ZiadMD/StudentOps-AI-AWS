@@ -170,10 +170,11 @@ export interface TaskItem {
   title: string;
   description: string;
   deadline: string;
-  max_score: number;
-  score_rule: string;
+  max_score?: number | null;
+  score_rule?: string | null;
   submission_count: number;
   pending_count: number;
+  assigned_count?: number;
 }
 
 export interface SubmissionItem {

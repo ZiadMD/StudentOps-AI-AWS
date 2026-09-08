@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import { TaskItem, SubmissionItem } from '../types';
+import { TaskItem, SubmissionItem, UserProfile } from '../types';
 import {
   ChevronRight, CheckCircle2, Circle, Clock, Search,
-  ExternalLink
+  ExternalLink, Shield
 } from 'lucide-react';
 
-export const TaskReviewsPage: React.FC = () => {
+interface TaskReviewsPageProps {
+  currentUser?: UserProfile | null;
+}
+
+export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser }) => {
   const [tasks, setTasks]               = useState<TaskItem[]>([]);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [subs, setSubs]                 = useState<SubmissionItem[]>([]);
@@ -17,14 +21,34 @@ export const TaskReviewsPage: React.FC = () => {
   const [grades, setGrades]             = useState<Record<string, { score: string; note: string }>>({});
   const [savingSubId, setSavingSubId]   = useState<string | null>(null);
 
+  const isMember = currentUser?.role === 'committee_member' || currentUser?.role === 'member';
+
   useEffect(() => {
+    if (isMember) {
+      setLoading(false);
+      return;
+    }
     async function load() {
       try { const t = await api.getTasks(); setTasks(t); if (t.length) selectTask(t[0]); }
       catch (e) { console.error(e); }
       finally { setLoading(false); }
     }
     load();
-  }, []);
+  }, [isMember]);
+
+  if (isMember) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-8 text-center max-w-md mx-auto my-12 space-y-3">
+        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+          <Shield className="w-6 h-6" />
+        </div>
+        <h2 className="text-base font-bold text-slate-900">Task Reviews are Restricted</h2>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          Technical evaluation and grading of deliverables is reserved for Committee Heads.
+        </p>
+      </div>
+    );
+  }
 
   const selectTask = async (task: TaskItem) => {
     setSelectedTask(task);

@@ -77,12 +77,31 @@ async def get_task_reminder_candidates(
 @router.get("", response_model=list[TaskSchema])
 async def list_tasks(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     res = await db.execute(select(Task).order_by(Task.task_number.asc()))
     tasks = res.scalars().all()
     results = []
+
+    is_member = current_user.role in ("committee_member", "member")
+
+    assigned_task_ids = None
+    if is_member and current_user.student_id:
+        assign_res = await db.execute(
+            select(TaskAssignment.task_id).where(TaskAssignment.student_id == current_user.student_id)
+        )
+        assigned_task_ids = set(assign_res.scalars().all())
+
     for t in tasks:
+        # For members, if explicit assignments exist, filter out non-assigned tasks
+        if is_member and assigned_task_ids is not None:
+            task_assign_count = await db.execute(
+                select(func.count(TaskAssignment.id)).where(TaskAssignment.task_id == t.id)
+            )
+            count = task_assign_count.scalar() or 0
+            if count > 0 and t.id not in assigned_task_ids:
+                continue
+
         sub_res = await db.execute(
             select(Submission).where(Submission.task_id == t.id)
         )
@@ -93,14 +112,15 @@ async def list_tasks(
         )
         assigned_count = assign_res.scalar() or 0
 
+        # Authoritative rule: committee_member MUST NOT see max_score or score_rule
         results.append(TaskSchema(
             id=t.id,
             task_number=t.task_number,
             title=t.title,
             description=t.description,
             deadline=t.deadline,
-            max_score=t.max_score,
-            score_rule=t.score_rule,
+            max_score=None if is_member else t.max_score,
+            score_rule=None if is_member else t.score_rule,
             submission_count=sum(1 for s in submissions if s.status != "PENDING"),
             pending_count=sum(1 for s in submissions if s.status == "PENDING"),
             assigned_count=assigned_count
@@ -242,15 +262,22 @@ async def list_submissions_for_task(
         .where(Submission.task_id == task_id)
     )
 
+    is_member = current_user.role in ("committee_member", "member")
+
     if current_user.role in ("committee_head", "team_lead"):
         query = query.where(Student.team_id == current_user.team_id)
-    elif current_user.role in ("committee_member", "member"):
+    elif is_member:
+        if not current_user.student_id:
+            return []
         query = query.where(Submission.student_id == current_user.student_id)
 
     res = await db.execute(query)
     records = res.all()
-    return [
-        SubmissionSchema(
+    results = []
+    for sub, std, t in records:
+        if is_member and sub.student_id != current_user.student_id:
+            continue
+        results.append(SubmissionSchema(
             id=sub.id,
             task_id=sub.task_id,
             task_title=t.title,
@@ -258,14 +285,88 @@ async def list_submissions_for_task(
             student_name=std.full_name,
             submitted_at=sub.submitted_at,
             status=sub.status,
-            score=sub.score,
-            technical_score=sub.technical_score or sub.score,
+            score=None if is_member else sub.score,
+            technical_score=None if is_member else (sub.technical_score or sub.score),
             file_url=sub.file_url,
-            reviewer_notes=sub.reviewer_notes,
-            graded_by_user_id=sub.graded_by_user_id
+            reviewer_notes=None if is_member else sub.reviewer_notes,
+            graded_by_user_id=None if is_member else sub.graded_by_user_id
+        ))
+    return results
+
+
+@router.get("/submissions/{submission_id}", response_model=SubmissionSchema)
+async def get_submission(
+    submission_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Retrieves a single task submission with strict IDOR and confidentiality enforcement:
+    - committee_member / member: can only retrieve their own submission, with scores redacted server-side.
+    - committee_head / team_lead: can retrieve submissions for their team (with scores).
+    - HR roles: strictly forbidden (403).
+    """
+    if current_user.role in ("region_hr_head", "committee_hr_leader", "committee_hr_member"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: HR roles do not have permission to view technical task submissions."
         )
-        for sub, std, t in records
-    ]
+
+    res = await db.execute(
+        select(Submission, Student, Task)
+        .join(Student, Submission.student_id == Student.id)
+        .join(Task, Submission.task_id == Task.id)
+        .where(Submission.id == submission_id)
+    )
+    row = res.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    sub, std, t = row
+    is_member = current_user.role in ("committee_member", "member")
+
+    if is_member:
+        if sub.student_id != current_user.student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: you cannot access another member's submission."
+            )
+        return SubmissionSchema(
+            id=sub.id,
+            task_id=sub.task_id,
+            task_title=t.title,
+            student_id=std.id,
+            student_name=std.full_name,
+            submitted_at=sub.submitted_at,
+            status=sub.status,
+            score=None,
+            technical_score=None,
+            file_url=sub.file_url,
+            reviewer_notes=None,
+            graded_by_user_id=None
+        )
+
+    if current_user.role in ("committee_head", "team_lead"):
+        if std.team_id != current_user.team_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: this student belongs to a different committee."
+            )
+
+    return SubmissionSchema(
+        id=sub.id,
+        task_id=sub.task_id,
+        task_title=t.title,
+        student_id=std.id,
+        student_name=std.full_name,
+        submitted_at=sub.submitted_at,
+        status=sub.status,
+        score=sub.score,
+        technical_score=sub.technical_score or sub.score,
+        file_url=sub.file_url,
+        reviewer_notes=sub.reviewer_notes,
+        graded_by_user_id=sub.graded_by_user_id
+    )
 
 
 @router.put("/submissions/{submission_id}/review", response_model=SubmissionSchema)
@@ -390,9 +491,9 @@ async def submit_task(
         student_name=std.full_name if std else "",
         submitted_at=submission.submitted_at,
         status=submission.status,
-        score=submission.score,
-        technical_score=submission.technical_score,
+        score=None,
+        technical_score=None,
         file_url=submission.file_url,
-        reviewer_notes=submission.reviewer_notes,
-        graded_by_user_id=submission.graded_by_user_id
+        reviewer_notes=None,
+        graded_by_user_id=None
     )
