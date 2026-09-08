@@ -154,7 +154,7 @@ export const NotificationsPage: React.FC = () => {
             <span className="text-xs text-slate-400">Human-authorized dispatch only</span>
           </div>
           <div className="p-5 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">Title</label>
                 <input
@@ -165,7 +165,7 @@ export const NotificationsPage: React.FC = () => {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700">Channel</label>
                   <select
@@ -235,7 +235,7 @@ export const NotificationsPage: React.FC = () => {
       {!composing && (
         <div>
           <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Quick Templates</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {QUICK_TEMPLATES.map((tpl) => (
               <button
                 key={tpl.label}

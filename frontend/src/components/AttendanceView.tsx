@@ -30,13 +30,13 @@ export const AttendanceView: React.FC = () => {
           <p className="text-sm text-slate-500 mt-1">Deterministic attendance matching against Google Meet exports.</p>
         </div>
         
-        <div className="flex items-center space-x-3">
-          <div className="relative">
+        <div className="flex items-center space-x-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
               placeholder="Search meetings..."
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-64 transition-all"
+              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full sm:w-64 transition-all"
             />
           </div>
         </div>
@@ -47,7 +47,7 @@ export const AttendanceView: React.FC = () => {
           <div className="p-12 text-center text-slate-500 text-sm">Ingesting Meet records...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[640px]">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   <th className="px-6 py-4 font-medium">Session / Event</th>
