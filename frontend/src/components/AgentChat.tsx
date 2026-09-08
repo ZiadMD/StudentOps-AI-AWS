@@ -20,9 +20,10 @@ export interface AgentMessage {
 interface AgentChatProps {
   initialQuery?: string;
   onClearInitialQuery?: () => void;
+  isDesktopCollapsed?: boolean;
 }
 
-export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearInitialQuery }) => {
+export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearInitialQuery, isDesktopCollapsed = false }) => {
   const [messages, setMessages]     = useState<AgentMessage[]>([]);
   const [input, setInput]           = useState('');
   const [loading, setLoading]       = useState(false);
@@ -315,7 +316,11 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
       </div>
 
       {/* Input bar */}
-      <div className="fixed bottom-0 left-64 right-0 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC] to-transparent pt-10 pb-6 px-4">
+      <div
+        className={`fixed bottom-0 right-0 left-0 transition-all duration-300 ${
+          isDesktopCollapsed ? 'md:left-16' : 'md:left-60'
+        } bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC] to-transparent pt-6 md:pt-10 pb-4 md:pb-6 px-3 sm:px-4 z-20`}
+      >
         <div className="max-w-3xl mx-auto">
           <div className="relative bg-white border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden focus-within:border-slate-300 focus-within:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-all flex flex-col">
             <textarea

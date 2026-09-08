@@ -34,13 +34,13 @@ export const TaskManagement: React.FC = () => {
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 sm:flex-initial">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
               placeholder="Filter tasks..."
-              className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-blue-500 focus:bg-white w-48 transition-all"
+              className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-blue-500 focus:bg-white w-full sm:w-48 transition-all"
             />
           </div>
           <button className="p-1.5 text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-md shadow-sm">
@@ -64,8 +64,8 @@ export const TaskManagement: React.FC = () => {
           
           <div className="divide-y divide-slate-100">
             {tasks.map((task) => (
-              <div key={task.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50/80 transition-colors group cursor-pointer">
-                <div className="flex items-center space-x-3 w-1/2">
+              <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 sm:py-2.5 hover:bg-slate-50/80 transition-colors group cursor-pointer">
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
                   <div className="flex-shrink-0 mt-0.5">
                     {task.pending_count === 0 ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Circle className="w-4 h-4 text-slate-300" />}
                   </div>
@@ -75,12 +75,12 @@ export const TaskManagement: React.FC = () => {
                   </span>
                 </div>
                 
-                <div className="flex items-center space-x-4 w-1/2 justify-end">
+                <div className="flex items-center space-x-3 sm:space-x-4 shrink-0 justify-end pl-7 sm:pl-0">
                   <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                     Max: {task.max_score}pts
                   </span>
 
-                  <div className="flex items-center space-x-2 w-32 shrink-0 border-l border-slate-100 pl-4">
+                  <div className="flex items-center space-x-2 shrink-0 border-l border-slate-100 pl-3 sm:pl-4">
                     <span className="text-[11px] text-slate-600 truncate">{task.submission_count} Submitted</span>
                   </div>
                 </div>

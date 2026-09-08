@@ -51,8 +51,8 @@ export const StudentsPage: React.FC = () => {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="relative w-full sm:w-auto flex-1 max-w-sm">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -63,7 +63,7 @@ export const StudentsPage: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
+        <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
           {STATUS_FILTERS.map(f => (
             <button
               key={f}
@@ -79,7 +79,7 @@ export const StudentsPage: React.FC = () => {
           ))}
         </div>
 
-        <button className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 shadow-xs transition-colors">
+        <button className="hidden sm:block p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 shadow-xs transition-colors">
           <Filter className="w-4 h-4" />
         </button>
       </div>
@@ -90,7 +90,8 @@ export const StudentsPage: React.FC = () => {
           <div className="p-16 text-center text-slate-400 text-sm">Loading member registry…</div>
         ) : (
           <>
-            <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[640px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/60 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   <th className="px-5 py-3.5">Member</th>
@@ -165,6 +166,7 @@ export const StudentsPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
 
             {filtered.length === 0 && (
               <div className="py-16 text-center space-y-2">

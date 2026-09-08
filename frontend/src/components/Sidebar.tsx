@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Bot,
   LayoutDashboard,
@@ -10,12 +10,15 @@ import {
   Layers,
   Search,
   Command,
-  ChevronsUpDown,
   Settings,
   Bell,
   ClipboardList,
   LogOut,
+  X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
+import { UserProfile } from '../types';
 
 export type Tab =
   | 'dashboard'
@@ -57,107 +60,250 @@ const NAV_ITEMS: {
   { id: 'audit',          label: 'Audit Log',       icon: ShieldCheck,     roles: ['hr_admin'] },
 ];
 
-import { UserProfile } from '../types';
-
-interface SidebarProps {
+export interface SidebarProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   role: Role;
   currentUser?: UserProfile | null;
   onLogout: () => void;
+  isMobileOpen: boolean;
+  setIsMobileOpen: (open: boolean) => void;
+  isDesktopCollapsed?: boolean;
+  setIsDesktopCollapsed?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role, currentUser, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeTab,
+  setActiveTab,
+  role,
+  currentUser,
+  onLogout,
+  isMobileOpen,
+  setIsMobileOpen,
+  isDesktopCollapsed = false,
+  setIsDesktopCollapsed,
+}) => {
   const visibleItems = NAV_ITEMS.filter(item => item.roles.includes(role));
 
+  // Lock body scroll on mobile when full-screen drawer is open
+  useEffect(() => {
+    if (isMobileOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isMobileOpen]);
+
+  // Handle ESC key to close mobile menu & desktop keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMobileOpen) {
+        setIsMobileOpen(false);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b' && setIsDesktopCollapsed) {
+        e.preventDefault();
+        setIsDesktopCollapsed(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileOpen, setIsMobileOpen, setIsDesktopCollapsed]);
+
+  const handleSelectTab = (tab: Tab) => {
+    setActiveTab(tab);
+    if (isMobileOpen) {
+      setIsMobileOpen(false);
+    }
+  };
+
   return (
-    <aside className="w-60 border-r border-slate-200/80 bg-white flex flex-col h-screen sticky top-0 shrink-0">
-      {/* Workspace Header */}
-      <div className="h-14 flex items-center px-3 border-b border-slate-200/60">
-        <div className="flex items-center justify-between w-full px-1.5 py-1 rounded-lg hover:bg-slate-100/60 transition-colors cursor-pointer">
-          <div className="flex items-center space-x-2.5 overflow-hidden">
-            <div className="w-6 h-6 rounded-md bg-slate-900 flex items-center justify-center shrink-0">
-              <Layers className="w-3.5 h-3.5 text-white" />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-bold text-[13px] text-slate-900 truncate leading-tight">StudentOps.AI</span>
-              <span className="text-[10px] text-slate-500 truncate">Engineering Branch</span>
-            </div>
-          </div>
-          <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="px-3 pt-3 pb-2">
-        <button
-          onClick={() => setActiveTab('chat')}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md bg-slate-100/60 hover:bg-slate-100 text-slate-400 hover:text-slate-700 border border-transparent hover:border-slate-200 text-xs transition-all"
-        >
-          <div className="flex items-center space-x-2">
-            <Search className="w-3.5 h-3.5" />
-            <span>Search or ask AI…</span>
-          </div>
-          <div className="flex items-center text-[10px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded">
-            <Command className="w-3 h-3 mr-0.5" />K
-          </div>
-        </button>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
-        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-2 pt-2">
-          Workspace
-        </div>
-        {visibleItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center justify-between px-2.5 py-[7px] rounded-md text-[13px] transition-colors ${
-                isActive
-                  ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100/60 hover:text-slate-900'
-              }`}
+    <aside
+      id="app-sidebar"
+      aria-label="Sidebar navigation"
+      className={`
+        fixed inset-0 z-50 w-full h-full bg-white flex flex-col justify-between
+        transform transition-all duration-300 ease-in-out
+        ${isMobileOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'}
+        md:static md:translate-x-0 md:opacity-100 md:pointer-events-auto md:h-screen md:sticky md:top-0 md:shrink-0
+        md:border-r md:border-slate-200/80
+        ${isDesktopCollapsed ? 'md:w-16' : 'md:w-60'}
+      `}
+    >
+      {/* Top Section */}
+      <div className="flex flex-col flex-1 min-h-0">
+        {/* Header & Brand */}
+        <div className="h-16 md:h-14 flex items-center justify-between px-4 md:px-3 border-b border-slate-200/60 shrink-0">
+          {/* Logo / Workspace Info */}
+          <div className={`flex items-center space-x-2.5 overflow-hidden ${isDesktopCollapsed ? 'md:justify-center md:w-full' : ''}`}>
+            <div
+              className="w-8 h-8 md:w-6 md:h-6 rounded-lg md:rounded-md bg-slate-900 flex items-center justify-center shrink-0 shadow-xs"
+              title="StudentOps.AI"
             >
-              <div className="flex items-center space-x-2.5">
-                <Icon className={`w-4 h-4 ${isActive ? 'text-slate-800' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
-              </div>
-              {item.isAgent && (
-                <span className="flex h-4 w-4 items-center justify-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
+              <Layers className="w-4 h-4 md:w-3.5 md:h-3.5 text-white" />
+            </div>
+            <div className={`flex flex-col min-w-0 ${isDesktopCollapsed ? 'md:hidden' : 'block'}`}>
+              <span className="font-bold text-sm md:text-[13px] text-slate-900 truncate leading-tight">StudentOps.AI</span>
+              <span className="text-[11px] md:text-[10px] text-slate-500 truncate">Engineering Branch</span>
+            </div>
+          </div>
 
-      {/* User / Footer */}
-      <div className="p-3 border-t border-slate-200/60 space-y-1">
-        <button className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-md text-slate-600 hover:bg-slate-100/60 hover:text-slate-900 transition-colors text-[13px]">
-          <Settings className="w-4 h-4 text-slate-400" />
-          <span>Settings</span>
+          {/* Mobile Close Button (Native App Style) */}
+          <button
+            onClick={() => setIsMobileOpen(false)}
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 transition-colors md:hidden focus:outline-none focus:ring-2 focus:ring-slate-300"
+            aria-label="Close navigation menu"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          {/* Desktop Collapse / Expand Toggle Button */}
+          {setIsDesktopCollapsed && (
+            <button
+              onClick={() => setIsDesktopCollapsed(prev => !prev)}
+              className={`hidden md:flex p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300 ${
+                isDesktopCollapsed ? 'hidden' : ''
+              }`}
+              title="Collapse sidebar (⌘B)"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Desktop Expanded Re-open Button when collapsed */}
+        {isDesktopCollapsed && setIsDesktopCollapsed && (
+          <div className="hidden md:flex justify-center py-2 border-b border-slate-100">
+            <button
+              onClick={() => setIsDesktopCollapsed(false)}
+              className="p-1.5 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              title="Expand sidebar (⌘B)"
+              aria-label="Expand sidebar"
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Search Button */}
+        <div className={`p-4 md:px-3 md:pt-3 md:pb-2 shrink-0 ${isDesktopCollapsed ? 'md:px-2' : ''}`}>
+          {isDesktopCollapsed ? (
+            <button
+              onClick={() => handleSelectTab('chat')}
+              className="hidden md:flex w-full items-center justify-center p-2 rounded-md bg-slate-100/60 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+              title="Search or ask AI (⌘K)"
+              aria-label="Search or ask AI"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          ) : null}
+
+          <div className={isDesktopCollapsed ? 'md:hidden' : 'block'}>
+            <button
+              onClick={() => handleSelectTab('chat')}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 md:px-2.5 md:py-1.5 rounded-xl md:rounded-md bg-slate-100/70 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200/50 hover:border-slate-300 text-sm md:text-xs transition-all"
+            >
+              <div className="flex items-center space-x-2.5 md:space-x-2">
+                <Search className="w-4 h-4 md:w-3.5 md:h-3.5 text-slate-400" />
+                <span className="text-slate-500">Search or ask AI…</span>
+              </div>
+              <div className="flex items-center text-[11px] md:text-[10px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-500">
+                <Command className="w-3 h-3 mr-0.5" />K
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation Items */}
+        <nav className="flex-1 overflow-y-auto px-4 md:px-2 py-2 space-y-1 md:space-y-0.5">
+          <div className={`text-[11px] md:text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 md:mb-1.5 px-3 md:px-2 pt-2 ${
+            isDesktopCollapsed ? 'md:hidden' : ''
+          }`}>
+            Workspace Navigation
+          </div>
+          {visibleItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleSelectTab(item.id)}
+                title={isDesktopCollapsed ? item.label : undefined}
+                className={`w-full flex items-center ${
+                  isDesktopCollapsed ? 'md:justify-center md:px-0' : 'justify-between px-3 md:px-2.5'
+                } py-3 md:py-[7px] rounded-xl md:rounded-md text-[15px] md:text-[13px] transition-colors ${
+                  isActive
+                    ? 'bg-slate-900 text-white md:bg-slate-100 md:text-slate-900 font-semibold shadow-xs md:shadow-none'
+                    : 'text-slate-700 md:text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 active:bg-slate-100'
+                }`}
+              >
+                <div className={`flex items-center ${isDesktopCollapsed ? 'md:space-x-0' : 'space-x-3 md:space-x-2.5'}`}>
+                  <Icon
+                    className={`w-5 h-5 md:w-4 md:h-4 shrink-0 ${
+                      isActive
+                        ? 'text-white md:text-slate-900'
+                        : 'text-slate-400'
+                    }`}
+                  />
+                  <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>
+                    {item.label}
+                  </span>
+                </div>
+                {item.isAgent && (
+                  <span className={`flex h-4 w-4 items-center justify-center ${isDesktopCollapsed ? 'md:hidden' : ''}`}>
+                    <span className="w-2 h-2 md:w-1.5 md:h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* User / Footer Section */}
+      <div className={`p-4 md:p-3 border-t border-slate-200/70 space-y-2 md:space-y-1 shrink-0 ${
+        isDesktopCollapsed ? 'md:px-2 md:space-y-2' : ''
+      }`}>
+        {/* Settings button */}
+        <button
+          title={isDesktopCollapsed ? 'Settings' : undefined}
+          className={`w-full flex items-center ${
+            isDesktopCollapsed ? 'md:justify-center md:px-0' : 'space-x-3 md:space-x-2.5 px-3 md:px-2.5'
+          } py-2.5 md:py-2 rounded-xl md:rounded-md text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 transition-colors text-[14px] md:text-[13px]`}
+        >
+          <Settings className="w-5 h-5 md:w-4 md:h-4 text-slate-400 shrink-0" />
+          <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>Settings</span>
         </button>
+
+        {/* Sign out button */}
         <button
           onClick={onLogout}
-          className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-md text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors text-[13px]"
+          title={isDesktopCollapsed ? 'Sign out' : undefined}
+          className={`w-full flex items-center ${
+            isDesktopCollapsed ? 'md:justify-center md:px-0' : 'space-x-3 md:space-x-2.5 px-3 md:px-2.5'
+          } py-2.5 md:py-2 rounded-xl md:rounded-md text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors text-[14px] md:text-[13px]`}
         >
-          <LogOut className="w-4 h-4 text-slate-400" />
-          <span>Sign out</span>
+          <LogOut className="w-5 h-5 md:w-4 md:h-4 text-slate-400 hover:text-rose-600 shrink-0" />
+          <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>Sign out</span>
         </button>
-        <div className="flex items-center space-x-2.5 px-2.5 py-2 rounded-md mt-1 border border-slate-200 bg-slate-50/60">
-          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+
+        {/* User profile card */}
+        <div
+          title={isDesktopCollapsed ? (currentUser?.full_name || 'Admin User') : undefined}
+          className={`flex items-center ${
+            isDesktopCollapsed ? 'md:justify-center md:p-2' : 'space-x-3 md:space-x-2.5 px-3 py-2.5 md:px-2.5 md:py-2'
+          } rounded-xl md:rounded-md mt-1 border border-slate-200 bg-slate-50/80`}
+        >
+          <div className="w-8 h-8 md:w-6 md:h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs md:text-[10px] font-bold shrink-0 shadow-xs">
             {currentUser?.full_name?.charAt(0) || ROLE_LABELS[role].charAt(0)}
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-[12px] font-semibold text-slate-900 truncate">
+          <div className={`flex flex-col min-w-0 ${isDesktopCollapsed ? 'md:hidden' : 'block'}`}>
+            <span className="text-[13px] md:text-[12px] font-semibold text-slate-900 truncate">
               {currentUser?.full_name || 'Admin User'}
             </span>
-            <span className="text-[10px] text-slate-500 truncate">
+            <span className="text-[11px] md:text-[10px] text-slate-500 truncate">
               {ROLE_LABELS[role]}{currentUser?.team_name ? ` · ${currentUser.team_name}` : ''}
             </span>
           </div>
