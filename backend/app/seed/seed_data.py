@@ -4,7 +4,7 @@ Database Seeding Module based on 8.xlsx Ground Truth and Operational Data.
 import asyncio
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.core.database import AsyncSessionLocal, init_db
 from app.models.entities import (
     Student, Meeting, ParticipantSession, AttendanceRecord,
@@ -71,11 +71,11 @@ SYNTHETIC_PEOPLE = [
 
 async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: bool = False):
     """Populates database with complete realistic operational data seeded from 8.xlsx, plus optional synthetic cohorts."""
-    # Check if data already exists
+    # Check if students are already seeded in the database
+    existing_students = False
     if not force:
-        existing = await db.execute(select(Student))
-        if existing.scalars().first():
-            return
+        res = await db.execute(select(Student.id).limit(1))
+        existing_students = res.scalar() is not None
 
     now = datetime.now(timezone.utc)
 
@@ -101,7 +101,14 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
         }
     ]
     for t_data in teams_data:
-        db.add(Team(**t_data))
+        t_res = await db.execute(select(Team).where(Team.id == t_data["id"]))
+        existing_t = t_res.scalar_one_or_none()
+        if not existing_t:
+            db.add(Team(**t_data))
+        else:
+            existing_t.name = t_data["name"]
+            existing_t.code = t_data["code"]
+            existing_t.description = t_data["description"]
 
     # 1. User Accounts (5 Authoritative Operational Account Types)
     users_data = [
@@ -289,7 +296,31 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
                 existing_ids.add(uid)
 
     for u_data in users_data:
-        db.add(User(**u_data))
+        u_res = await db.execute(
+            select(User).where(
+                (User.id == u_data["id"]) |
+                (func.lower(User.email) == u_data["email"].lower())
+            )
+        )
+        existing_u = u_res.scalar_one_or_none()
+        if not existing_u:
+            db.add(User(**u_data))
+        else:
+            existing_u.hashed_password = u_data["hashed_password"]
+            existing_u.role = u_data["role"]
+            existing_u.team_id = u_data["team_id"]
+            existing_u.full_name = u_data["full_name"]
+            existing_u.arabic_name = u_data["arabic_name"]
+            if u_data.get("student_id") is not None:
+                existing_u.student_id = u_data["student_id"]
+            existing_u.is_active = True
+
+    # If students and operational data are already populated and force is not set,
+    # safely commit updated users/teams and return idempotently.
+    if existing_students and not force:
+        await db.commit()
+        print("Database verified: all 5 Social Media demo accounts and teams synchronized successfully!")
+        return
 
     # 2. Students from Core Team + Synthetic Cohorts
     students_data = [

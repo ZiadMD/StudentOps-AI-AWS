@@ -3,6 +3,49 @@ import { Layers, Eye, EyeOff, ChevronRight } from 'lucide-react';
 import { api } from '../../api/client';
 import { UserProfile } from '../../types';
 
+const DEMO_ACCOUNTS = [
+  {
+    roleName: 'HR Region / HR Head',
+    arabicRole: 'رئيس الموارد البشرية للإقليم',
+    email: 'region.head@studentops.org',
+    password: 'head123',
+    badge: 'Oversight & Reports',
+    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+  },
+  {
+    roleName: 'HR Leader',
+    arabicRole: 'قائد الموارد البشرية للجنة',
+    email: 'hr.leader@studentops.org',
+    password: 'leader123',
+    badge: 'Scores, Feedback & Reports',
+    badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  {
+    roleName: 'Social Media Committee Head',
+    arabicRole: 'رئيس لجنة السوشيال ميديا',
+    email: 'media.head@studentops.org',
+    password: 'lead123',
+    badge: 'Tasks, Sessions & Q&A',
+    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
+  {
+    roleName: 'Social Media HR Member',
+    arabicRole: 'عضو الموارد البشرية باللجنة',
+    email: 'hr.member@studentops.org',
+    password: 'hrmember123',
+    badge: 'Attendance & WhatsApp Flags',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  {
+    roleName: 'Social Media Committee Member',
+    arabicRole: 'عضو لجنة السوشيال ميديا',
+    email: 'member@studentops.org',
+    password: 'member123',
+    badge: 'Deliverables & Questions',
+    badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
+  },
+];
+
 interface LoginPageProps {
   onLogin: (user: UserProfile) => void;
   onGoToRegister: () => void;
@@ -18,7 +61,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      setError('Please enter your email and password.');
+      setError('Please enter your email or username and password.');
       return;
     }
     setError('');
@@ -27,6 +70,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
       const res = await api.login({
         email: email.trim(),
         password: password.trim()
+      });
+      onLogin(res.user);
+    } catch (err: any) {
+      setError(err?.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (demo: typeof DEMO_ACCOUNTS[0]) => {
+    setEmail(demo.email);
+    setPassword(demo.password);
+    setError('');
+    setLoading(true);
+    try {
+      const res = await api.login({
+        email: demo.email,
+        password: demo.password
       });
       onLogin(res.user);
     } catch (err: any) {
@@ -85,9 +146,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
       </div>
 
       {/* Right login form */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 sm:px-12 py-12">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 sm:px-12 py-10 overflow-y-auto">
         {/* Mobile logo */}
-        <div className="lg:hidden flex items-center space-x-2 mb-10">
+        <div className="lg:hidden flex items-center space-x-2 mb-8">
           <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center">
             <Layers className="w-4 h-4 text-white" />
           </div>
@@ -96,10 +157,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
           </span>
         </div>
 
-        <div className="w-full max-w-sm">
-          <div className="mb-8">
+        <div className="w-full max-w-md">
+          <div className="mb-6">
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Sign in</h1>
-            <p className="text-sm text-slate-500 mt-1.5">
+            <p className="text-sm text-slate-500 mt-1">
               Don't have an account?{' '}
               <button onClick={onGoToRegister} className="text-blue-600 font-semibold hover:underline">
                 Create one
@@ -107,19 +168,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email / Username */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700" htmlFor="email">
-                Email address
+                Email address or Username
               </label>
               <input
                 id="email"
-                type="email"
-                autoComplete="email"
+                type="text"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@organization.org"
+                placeholder="e.g. media.head@studentops.org or media.head"
                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs"
               />
             </div>
@@ -169,14 +230,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Continue</span>
+                  <span>Sign in</span>
                   <ChevronRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-200">
+          {/* Quick Demo Accounts Selector */}
+          <div className="mt-6 pt-5 border-t border-slate-200">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs font-bold text-slate-900 tracking-tight">1-Click Demo Accounts</span>
+              <span className="text-[11px] text-slate-400 font-medium">Social Media Committee</span>
+            </div>
+            <div className="space-y-1.5">
+              {DEMO_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => handleDemoLogin(acc)}
+                  disabled={loading}
+                  className="w-full text-left p-2.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/30 transition-all flex items-center justify-between group cursor-pointer shadow-xs"
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-slate-900 truncate">{acc.roleName}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${acc.badgeColor}`}>
+                        {acc.badge}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5 truncate">{acc.email}</div>
+                  </div>
+                  <span className="text-xs text-blue-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pl-2">
+                    Login →
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-slate-100">
             <p className="text-[11px] text-slate-400 text-center leading-relaxed">
               By signing in, you agree to the internal data handling policy. All actions are logged.
             </p>

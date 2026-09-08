@@ -356,7 +356,9 @@ class UserRegisterRequest(BaseModel):
 
 
 class UserLoginRequest(BaseModel):
-    email: EmailStr
+    email: Optional[str] = Field(None, description="Email address or username")
+    username: Optional[str] = Field(None, description="Alternative identifier field (matches username or email)")
+    identifier: Optional[str] = Field(None, description="Generic identifier field")
     password: str = Field(..., min_length=1, max_length=128)
 
 
