@@ -208,3 +208,42 @@ async def test_idempotent_seeding_preserves_and_updates_demo_accounts(test_db_se
         assert user is not None, f"Account {acc['email']} missing after idempotent seed"
         assert user.role == acc["expected_role"]
         assert user.is_active is True
+
+
+@pytest.mark.asyncio
+async def test_database_url_normalization_resolves_relative_sqlite_paths():
+    """Test 7: Verify SQLite relative paths are anchored to canonical backend directory."""
+    from app.core.database import get_normalized_database_url
+    raw = "sqlite+aiosqlite:///./studentops.db"
+    normalized = get_normalized_database_url(raw)
+    assert normalized.startswith("sqlite+aiosqlite:///")
+    assert normalized.endswith("/studentops.db")
+    assert "backend/studentops.db" in normalized.replace("\\", "/")
+
+
+@pytest.mark.asyncio
+async def test_invalid_credentials_properly_rejected_and_bcrypt_verified(client, test_db_session):
+    """Test 8: Verify wrong password produces 401 Incorrect email or password, while true bcrypt hash passes."""
+    # 1. Invalid password
+    bad_res = await client.post("/api/auth/login", json={
+        "email": "region.head@studentops.org",
+        "password": "wrongpassword999"
+    })
+    assert bad_res.status_code == 401
+    assert "Incorrect email or password" in bad_res.json()["detail"]
+
+    # 2. Non-existent user
+    non_res = await client.post("/api/auth/login", json={
+        "email": "ghost.user@studentops.org",
+        "password": "anypassword123"
+    })
+    assert non_res.status_code == 401
+    assert "Incorrect email or password" in non_res.json()["detail"]
+
+    # 3. Direct bcrypt check on stored hash in database
+    from app.core.security import verify_password
+    q = await test_db_session.execute(select(User).where(User.email == "region.head@studentops.org"))
+    u = q.scalar_one()
+    assert verify_password("head123", u.hashed_password) is True
+    assert verify_password("wrongpassword", u.hashed_password) is False
+

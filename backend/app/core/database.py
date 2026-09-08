@@ -2,6 +2,7 @@
 Async Database connection and session management.
 Supports local SQLite and Supabase PostgreSQL with PgBouncer transaction pooling.
 """
+from pathlib import Path
 from typing import AsyncGenerator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -13,12 +14,21 @@ def get_normalized_database_url(raw_url: str) -> str:
     """
     Normalizes database connection string:
     - Converts postgres:// or postgresql:// to postgresql+asyncpg://
+    - Anchors relative SQLite paths to the backend directory so all processes share the exact same DB
     """
     url = raw_url.strip()
     if url.startswith("postgres://"):
         url = "postgresql+asyncpg://" + url[len("postgres://"):]
     elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
         url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    elif "sqlite" in url and ":///" in url and not url.startswith("sqlite+aiosqlite:///:memory:"):
+        prefix = url.split(":///", 1)[0] + ":///"
+        db_path_str = url.split(":///", 1)[1]
+        db_path = Path(db_path_str)
+        if not db_path.is_absolute():
+            backend_dir = Path(__file__).resolve().parent.parent.parent
+            resolved_path = (backend_dir / db_path).resolve().as_posix()
+            url = f"{prefix}{resolved_path}"
     return url
 
 
