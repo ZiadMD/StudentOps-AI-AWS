@@ -201,6 +201,70 @@ class OfficialWhatsAppSendRequest(BaseModel):
     message: str
 
 
+class WhatsAppMessageResponse(BaseModel):
+    id: str
+    openwa_message_id: Optional[str] = None
+    student_id: str
+    assigned_hr_id: Optional[str] = None
+    sender_type: str  # "HR", "STUDENT", "SYSTEM"
+    sender_id: Optional[str] = None
+    sender_phone: str
+    recipient_phone: str
+    message_type: str = "text"
+    content: str
+    media_url: Optional[str] = None
+    media_filename: Optional[str] = None
+    media_mimetype: Optional[str] = None
+    status: str = "pending"
+    ack_status: int = 0
+    reply_to_message_id: Optional[str] = None
+    is_edited: bool = False
+    reactions: list[dict[str, Any]] = []
+    created_at: datetime
+    delivered_at: Optional[datetime] = None
+    read_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WhatsAppSendMessageRequest(BaseModel):
+    content: str = Field(..., min_length=1)
+    reply_to_message_id: Optional[str] = None
+    message_type: str = "text"
+    media_url: Optional[str] = None
+    media_filename: Optional[str] = None
+    media_mimetype: Optional[str] = None
+
+
+class WhatsAppReactionRequest(BaseModel):
+    reaction: str = Field(..., min_length=1, max_length=10)
+
+
+class WhatsAppEditMessageRequest(BaseModel):
+    content: str = Field(..., min_length=1)
+
+
+class WhatsAppThreadSummary(BaseModel):
+    student_id: str
+    student_code: str
+    full_name: str
+    arabic_name: str
+    phone: str
+    team_id: Optional[str] = None
+    assigned_hr_id: Optional[str] = None
+    assigned_hr_name: Optional[str] = None
+    last_message: Optional[WhatsAppMessageResponse] = None
+    unread_count: int = 0
+    status: str = "ACTIVE"
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OpenWAWebhookPayload(BaseModel):
+    event: Optional[str] = None
+    data: Optional[dict[str, Any]] = None
+    sessionId: Optional[str] = None
+    model_config = ConfigDict(extra="allow")
+
+
 # =========================================================
 # Reminder & Action Schemas
 # =========================================================

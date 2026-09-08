@@ -7,6 +7,8 @@ from typing import Optional
 from datetime import datetime, timezone
 import urllib.parse
 import re
+import asyncio
+import random
 import httpx
 
 from app.core.config import settings
@@ -40,6 +42,26 @@ def generate_wa_me_link(phone: str, message_text: str) -> str:
     clean_phone = format_phone_international(phone)
     encoded_text = urllib.parse.quote(message_text)
     return f"https://wa.me/{clean_phone}?text={encoded_text}"
+
+
+_outbound_rate_lock = asyncio.Lock()
+_last_outbound_timestamp = 0.0
+
+
+async def _throttle_outbound(min_interval: float = 1.0, max_jitter: float = 0.5):
+    """Enforces rate limiting and jitter between outgoing OpenWA requests to prevent WhatsApp ban triggers."""
+    global _last_outbound_timestamp
+    try:
+        async with _outbound_rate_lock:
+            loop = asyncio.get_running_loop()
+            now = loop.time()
+            delay_needed = (_last_outbound_timestamp + min_interval) - now
+            if delay_needed > 0:
+                jitter = random.uniform(0.05, max_jitter)
+                await asyncio.sleep(delay_needed + jitter)
+            _last_outbound_timestamp = loop.time()
+    except RuntimeError:
+        pass
 
 
 class OpenWAProvider(MessagingProvider):
@@ -222,6 +244,8 @@ class OpenWAProvider(MessagingProvider):
         now = datetime.now(timezone.utc)
         gateway_error = None
 
+        await _throttle_outbound()
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 # 1. Try OpenWA Gateway
@@ -298,3 +322,120 @@ class OpenWAProvider(MessagingProvider):
             res = await self.send_message(msg)
             results.append(res)
         return results
+
+    async def send_media_message(
+        self,
+        recipient_phone: str,
+        file_base64_or_url: str,
+        filename: str = "file",
+        mimetype: str = "application/octet-stream",
+        caption: Optional[str] = None,
+    ) -> MessageDeliveryResult:
+        """Sends an image, video, audio, or document file via OpenWA Gateway or daemon."""
+        clean_phone = format_phone_international(recipient_phone)
+        chat_id = f"{clean_phone}@c.us"
+        now = datetime.now(timezone.utc)
+        gateway_error = None
+
+        await _throttle_outbound()
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                session = await self._resolve_session(client)
+                if session:
+                    session_id = session.get("id")
+                    send_url = f"{self.base_url}/api/sessions/{session_id}/messages/send-file"
+                    payload = {
+                        "chatId": chat_id,
+                        "file": file_base64_or_url,
+                        "filename": filename,
+                        "caption": caption or "",
+                    }
+                    resp = await client.post(send_url, json=payload, headers=self.headers)
+                    if resp.status_code in (200, 201):
+                        res_data = resp.json() if resp.text else {}
+                        msg_id = res_data.get("id", res_data.get("messageId", f"openwa_{now.timestamp()}"))
+                        return MessageDeliveryResult(
+                            success=True,
+                            message_id=str(msg_id),
+                            recipient_phone=clean_phone,
+                            channel="WHATSAPP_OFFICIAL",
+                            delivered_at=now,
+                        )
+                    gateway_error = f"OpenWA Gateway send-file returned {resp.status_code}: {resp.text}"
+
+                # Fallback to legacy OpenWA daemon (/sendFile)
+                url = f"{self.base_url}/sendFile"
+                legacy_payload = {
+                    "chatId": chat_id,
+                    "file": file_base64_or_url,
+                    "filename": filename,
+                    "caption": caption or "",
+                }
+                resp = await client.post(url, json=legacy_payload, headers=self.headers)
+                if resp.status_code in (200, 201):
+                    msg_id = resp.json().get("id", f"openwa_{now.timestamp()}")
+                    return MessageDeliveryResult(
+                        success=True,
+                        message_id=str(msg_id),
+                        recipient_phone=clean_phone,
+                        channel="WHATSAPP_OFFICIAL",
+                        delivered_at=now,
+                    )
+                return MessageDeliveryResult(
+                    success=False,
+                    message_id=f"err_{now.timestamp()}",
+                    recipient_phone=clean_phone,
+                    channel="WHATSAPP_OFFICIAL",
+                    delivered_at=now,
+                    error_message=gateway_error or f"OpenWA sendFile returned {resp.status_code}: {resp.text}",
+                )
+        except Exception as exc:
+            return MessageDeliveryResult(
+                success=False,
+                message_id=f"err_{now.timestamp()}",
+                recipient_phone=clean_phone,
+                channel="WHATSAPP_OFFICIAL",
+                delivered_at=now,
+                error_message=f"Could not deliver media via OpenWA: {gateway_error or str(exc)}",
+            )
+
+    async def send_reaction(self, message_id: str, reaction: str) -> bool:
+        """Applies or clears an emoji reaction on a message via OpenWA."""
+        await _throttle_outbound(min_interval=0.5)
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                session = await self._resolve_session(client)
+                if session:
+                    session_id = session.get("id")
+                    url = f"{self.base_url}/api/sessions/{session_id}/messages/react"
+                    resp = await client.post(url, json={"messageId": message_id, "reaction": reaction}, headers=self.headers)
+                    if resp.status_code in (200, 201):
+                        return True
+
+                # Legacy fallback
+                url = f"{self.base_url}/react"
+                resp = await client.post(url, json={"messageId": message_id, "reaction": reaction}, headers=self.headers)
+                return resp.status_code in (200, 201)
+        except Exception:
+            return False
+
+    async def edit_message(self, message_id: str, new_text: str) -> bool:
+        """Edits an existing message via OpenWA within allowable time window."""
+        await _throttle_outbound(min_interval=0.5)
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                session = await self._resolve_session(client)
+                if session:
+                    session_id = session.get("id")
+                    url = f"{self.base_url}/api/sessions/{session_id}/messages/edit"
+                    resp = await client.post(url, json={"messageId": message_id, "text": new_text}, headers=self.headers)
+                    if resp.status_code in (200, 201):
+                        return True
+
+                # Legacy fallback
+                url = f"{self.base_url}/editMessage"
+                resp = await client.post(url, json={"messageId": message_id, "text": new_text}, headers=self.headers)
+                return resp.status_code in (200, 201)
+        except Exception:
+            return False

@@ -92,6 +92,7 @@ class Student(Base):
     attendance_records = relationship("AttendanceRecord", back_populates="student", cascade="all, delete-orphan")
     submissions = relationship("Submission", back_populates="student", cascade="all, delete-orphan")
     scores = relationship("ScoreRecord", back_populates="student", cascade="all, delete-orphan")
+    whatsapp_messages = relationship("WhatsAppChatMessage", back_populates="student", cascade="all, delete-orphan")
 
 
 class Meeting(Base):
@@ -284,3 +285,34 @@ class TaskReminder(Base):
 
     task = relationship("Task")
     student = relationship("Student")
+
+
+class WhatsAppChatMessage(Base):
+    """Stores incoming and outgoing WhatsApp messages for individual HR-to-student conversations."""
+    __tablename__ = "whatsapp_chat_messages"
+
+    id = Column(String(36), primary_key=True, index=True)
+    openwa_message_id = Column(String(100), index=True, nullable=True)
+    student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
+    assigned_hr_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    sender_type = Column(String(20), nullable=False)  # "HR", "STUDENT", "SYSTEM"
+    sender_id = Column(String(36), nullable=True)  # user_id if HR, student_id if student
+    sender_phone = Column(String(30), nullable=False)
+    recipient_phone = Column(String(30), nullable=False)
+    message_type = Column(String(30), default="text")  # "text", "image", "video", "document", "audio", "reaction"
+    content = Column(Text, nullable=False)
+    media_url = Column(String(500), nullable=True)
+    media_filename = Column(String(255), nullable=True)
+    media_mimetype = Column(String(100), nullable=True)
+    status = Column(String(20), default="pending")  # "pending", "sent", "delivered", "read", "failed"
+    ack_status = Column(Integer, default=0)  # 0: pending, 1: sent, 2: delivered, 3: read
+    reply_to_message_id = Column(String(100), nullable=True)
+    is_edited = Column(Boolean, default=False)
+    reactions = Column(Text, default="[]")  # JSON-encoded array of {emoji: str, from: str, user_id: str}
+    raw_payload = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    read_at = Column(DateTime(timezone=True), nullable=True)
+
+    student = relationship("Student", back_populates="whatsapp_messages")
+    assigned_hr = relationship("User", foreign_keys=[assigned_hr_id])

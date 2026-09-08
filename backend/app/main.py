@@ -60,7 +60,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "script-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com data:; "
-            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://openrouter.ai https://api.groq.com https://*.supabase.co https://*.vercel.app https://*.ngrok-free.app https://*.ngrok-free.dev; "
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* wss: https://openrouter.ai https://api.groq.com https://*.supabase.co https://*.vercel.app https://*.ngrok-free.app https://*.ngrok-free.dev; "
             "frame-ancestors 'none';"
         )
         if settings.ENVIRONMENT == "production":

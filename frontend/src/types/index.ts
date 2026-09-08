@@ -229,3 +229,60 @@ export interface AuditLogItem {
   status: string;
   timestamp: string;
 }
+
+// =========================================================
+// WhatsApp Chat & Real-Time Types
+// =========================================================
+
+export interface WhatsAppReaction {
+  emoji: string;
+  from: string;
+  user_id?: string;
+}
+
+export interface WhatsAppChatMessage {
+  id: string;
+  openwa_message_id?: string | null;
+  student_id: string;
+  assigned_hr_id?: string | null;
+  sender_type: 'HR' | 'STUDENT' | 'SYSTEM';
+  sender_id?: string | null;
+  sender_phone: string;
+  recipient_phone: string;
+  message_type: 'text' | 'image' | 'video' | 'document' | 'audio' | 'reaction';
+  content: string;
+  media_url?: string | null;
+  media_filename?: string | null;
+  media_mimetype?: string | null;
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  ack_status: number; // 0: pending, 1: sent, 2: delivered, 3: read
+  reply_to_message_id?: string | null;
+  is_edited: boolean;
+  reactions: WhatsAppReaction[];
+  created_at: string;
+  delivered_at?: string | null;
+  read_at?: string | null;
+}
+
+export interface WhatsAppThreadSummary {
+  student_id: string;
+  student_code: string;
+  full_name: string;
+  arabic_name: string;
+  phone: string;
+  team_id?: string | null;
+  assigned_hr_id?: string | null;
+  assigned_hr_name?: string | null;
+  last_message?: WhatsAppChatMessage | null;
+  unread_count: number;
+  status: string;
+}
+
+export interface WhatsAppSendMessagePayload {
+  content: string;
+  reply_to_message_id?: string | null;
+  message_type?: string;
+  media_url?: string | null;
+  media_filename?: string | null;
+  media_mimetype?: string | null;
+}

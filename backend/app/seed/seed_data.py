@@ -9,7 +9,7 @@ from app.core.database import AsyncSessionLocal, init_db
 from app.models.entities import (
     Student, Meeting, ParticipantSession, AttendanceRecord,
     Event, Task, Submission, ScoreRecord, AgentActionAudit,
-    Team, User, MemberFollowupStatus, TaskReminder
+    Team, User, MemberFollowupStatus, TaskReminder, WhatsAppChatMessage
 )
 from app.core.security import get_password_hash
 
@@ -635,6 +635,84 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
     ]
     for rem_item in reminders_data:
         db.add(TaskReminder(**rem_item))
+
+    # 8.1 WhatsApp Chat Messages (Initial sample thread for assigned students)
+    chat_messages = [
+        {
+            "id": "cmsg_seed_001",
+            "openwa_message_id": "true_201012345678@c.us_SEED01",
+            "student_id": "std_ziad",
+            "assigned_hr_id": "usr_hr_member",
+            "sender_type": "HR",
+            "sender_id": "usr_hr_member",
+            "sender_phone": "+201000000000",
+            "recipient_phone": "+201012345678",
+            "message_type": "text",
+            "content": "Hello Ziad, this is Committee HR checking in on your upcoming milestone deliverables.",
+            "status": "read",
+            "ack_status": 3,
+            "reactions": "[]",
+            "created_at": now - timedelta(hours=4),
+            "delivered_at": now - timedelta(hours=4, minutes=-1),
+            "read_at": now - timedelta(hours=3, minutes=50),
+        },
+        {
+            "id": "cmsg_seed_002",
+            "openwa_message_id": "false_201012345678@c.us_SEED02",
+            "student_id": "std_ziad",
+            "assigned_hr_id": "usr_hr_member",
+            "sender_type": "STUDENT",
+            "sender_id": "std_ziad",
+            "sender_phone": "+201012345678",
+            "recipient_phone": "+201000000000",
+            "message_type": "text",
+            "content": "مرحباً، شكراً لمتابعتك. تم الانتهاء من تجهيز المهام وسأقوم برفعها الليلة إن شاء الله.",
+            "status": "read",
+            "ack_status": 3,
+            "reactions": '[{"emoji":"👍","from":"hr","user_id":"usr_hr_member"}]',
+            "created_at": now - timedelta(hours=3, minutes=45),
+            "delivered_at": now - timedelta(hours=3, minutes=44),
+            "read_at": now - timedelta(hours=3, minutes=40),
+        },
+        {
+            "id": "cmsg_seed_003",
+            "openwa_message_id": "true_201012345678@c.us_SEED03",
+            "student_id": "std_ziad",
+            "assigned_hr_id": "usr_hr_member",
+            "sender_type": "HR",
+            "sender_id": "usr_hr_member",
+            "sender_phone": "+201000000000",
+            "recipient_phone": "+201012345678",
+            "message_type": "text",
+            "content": "Great, looking forward to it! Let us know if you need any support.",
+            "status": "delivered",
+            "ack_status": 2,
+            "reactions": "[]",
+            "created_at": now - timedelta(hours=1),
+            "delivered_at": now - timedelta(minutes=59),
+            "read_at": None,
+        },
+        {
+            "id": "cmsg_seed_004",
+            "openwa_message_id": "true_201098765432@c.us_SEED04",
+            "student_id": "std_ali",
+            "assigned_hr_id": "usr_hr_member",
+            "sender_type": "HR",
+            "sender_id": "usr_hr_member",
+            "sender_phone": "+201000000000",
+            "recipient_phone": "+201098765432",
+            "message_type": "text",
+            "content": "Hello Ali, please remember to confirm your attendance for tomorrow's technical sync.",
+            "status": "read",
+            "ack_status": 3,
+            "reactions": "[]",
+            "created_at": now - timedelta(days=1),
+            "delivered_at": now - timedelta(days=1, minutes=-1),
+            "read_at": now - timedelta(hours=22),
+        },
+    ]
+    for c_item in chat_messages:
+        db.add(WhatsAppChatMessage(**c_item))
 
     # 9. Sync Organization Members (if members table exists in Supabase PostgreSQL)
     try:
