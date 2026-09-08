@@ -31,7 +31,7 @@ export const AuditViewer: React.FC = () => {
 
   return (
     <div className="space-y-4 h-full flex flex-col">
-      <div className="flex items-end justify-between pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center">
             <Terminal className="w-5 h-5 mr-2 text-slate-700" />
@@ -40,20 +40,20 @@ export const AuditViewer: React.FC = () => {
           <p className="text-[12px] text-slate-500 mt-1">Immutable record of all agentic operations and HR changes.</p>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <div className="relative">
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
               placeholder="Grep logs..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-md text-[12px] font-mono focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 w-48 shadow-sm"
+              className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-md text-[12px] font-mono focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 w-full sm:w-48 shadow-sm"
             />
           </div>
           <button 
             onClick={load}
-            className="p-1.5 text-slate-500 hover:text-slate-900 bg-white border border-slate-200 rounded-md shadow-sm transition-colors"
+            className="p-1.5 text-slate-500 hover:text-slate-900 bg-white border border-slate-200 rounded-md shadow-sm transition-colors shrink-0"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -69,9 +69,9 @@ export const AuditViewer: React.FC = () => {
           </span>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+        <div className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-1">
           {filteredLogs.map((log) => (
-            <div key={log.id} className="font-mono text-[11px] hover:bg-white/5 px-2 py-1 -mx-2 rounded transition-colors group flex items-start space-x-3">
+            <div key={log.id} className="font-mono text-[11px] hover:bg-white/5 px-2 py-1 -mx-2 rounded transition-colors group flex items-start space-x-3 min-w-[560px]">
               <span className="text-slate-500 shrink-0">
                 {new Date(log.timestamp).toISOString().replace('T', ' ').substring(0, 19)}
               </span>

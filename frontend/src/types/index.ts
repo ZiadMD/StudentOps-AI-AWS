@@ -69,6 +69,9 @@ export interface StudentScoreSummary {
   hierarchy_rules_score: number;
   polite_conduct_score: number;
   total_behavior_score: number;
+  bonus_points: number;
+  total_score?: number | null;
+  total_score_status?: string;
   overall_rating: string;
 }
 
@@ -96,11 +99,57 @@ export interface MeetingDetail {
   duration_minutes: number;
   meet_url: string;
   status: string;
+  session_number?: number | null;
+  team_id?: string | null;
   total_expected: number;
   present_count: number;
   late_count: number;
   absent_count: number;
   attendance: AttendanceRecord[];
+}
+
+export interface MemberFeedbackItem {
+  id: string;
+  student_id: string;
+  student_name?: string;
+  arabic_name?: string;
+  hr_member_id?: string;
+  hr_member_name?: string;
+  category: string;
+  content: string;
+  status: 'SUBMITTED' | 'REVIEWED' | 'ACTIONED';
+  notes?: string;
+  reviewed_by_user_id?: string;
+  reviewed_by_name?: string;
+  submitted_at?: string;
+  created_at?: string;
+  reviewed_at?: string;
+}
+
+export interface MemberQuestionItem {
+  id: string;
+  student_id: string;
+  student_name?: string;
+  arabic_name?: string;
+  team_id: string;
+  title: string;
+  content: string;
+  status: 'OPEN' | 'ANSWERED';
+  answer?: string;
+  answered_by_user_id?: string;
+  asked_at: string;
+  answered_at?: string;
+}
+
+export interface CommitteeReportItem {
+  id: string;
+  team_id: string;
+  submitted_by_user_id: string;
+  submitted_by_name?: string;
+  report_title: string;
+  metrics_summary: string;
+  notes?: string;
+  submitted_at: string;
 }
 
 export interface EventItem {
@@ -121,10 +170,11 @@ export interface TaskItem {
   title: string;
   description: string;
   deadline: string;
-  max_score: number;
-  score_rule: string;
+  max_score?: number | null;
+  score_rule?: string | null;
   submission_count: number;
   pending_count: number;
+  assigned_count?: number;
 }
 
 export interface SubmissionItem {
@@ -228,4 +278,61 @@ export interface AuditLogItem {
   confirmed: boolean;
   status: string;
   timestamp: string;
+}
+
+// =========================================================
+// WhatsApp Chat & Real-Time Types
+// =========================================================
+
+export interface WhatsAppReaction {
+  emoji: string;
+  from: string;
+  user_id?: string;
+}
+
+export interface WhatsAppChatMessage {
+  id: string;
+  openwa_message_id?: string | null;
+  student_id: string;
+  assigned_hr_id?: string | null;
+  sender_type: 'HR' | 'STUDENT' | 'SYSTEM';
+  sender_id?: string | null;
+  sender_phone: string;
+  recipient_phone: string;
+  message_type: 'text' | 'image' | 'video' | 'document' | 'audio' | 'reaction';
+  content: string;
+  media_url?: string | null;
+  media_filename?: string | null;
+  media_mimetype?: string | null;
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  ack_status: number; // 0: pending, 1: sent, 2: delivered, 3: read
+  reply_to_message_id?: string | null;
+  is_edited: boolean;
+  reactions: WhatsAppReaction[];
+  created_at: string;
+  delivered_at?: string | null;
+  read_at?: string | null;
+}
+
+export interface WhatsAppThreadSummary {
+  student_id: string;
+  student_code: string;
+  full_name: string;
+  arabic_name: string;
+  phone: string;
+  team_id?: string | null;
+  assigned_hr_id?: string | null;
+  assigned_hr_name?: string | null;
+  last_message?: WhatsAppChatMessage | null;
+  unread_count: number;
+  status: string;
+}
+
+export interface WhatsAppSendMessagePayload {
+  content: string;
+  reply_to_message_id?: string | null;
+  message_type?: string;
+  media_url?: string | null;
+  media_filename?: string | null;
+  media_mimetype?: string | null;
 }

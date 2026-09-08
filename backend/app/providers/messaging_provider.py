@@ -22,6 +22,8 @@ class MessageDeliveryResult(BaseModel):
     channel: str
     delivered_at: datetime
     error_message: Optional[str] = None
+    delivery_status: str = "DELIVERED"  # "DELIVERED" | "UNKNOWN_PENDING" | "CONFIRMED_FAILED"
+    is_uncertain: bool = False  # True when request timed out or gateway state is ambiguous
 
 
 class MessagingProvider(ABC):

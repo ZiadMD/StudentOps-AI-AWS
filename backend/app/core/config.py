@@ -89,7 +89,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Rate Limiting (Requests per 60 seconds)
-    RATE_LIMIT_LOGIN_PER_MINUTE: int = 15
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 60
     RATE_LIMIT_REGISTER_PER_MINUTE: int = 5
     RATE_LIMIT_REFRESH_PER_MINUTE: int = 30
     RATE_LIMIT_AGENT_PER_MINUTE: int = 25

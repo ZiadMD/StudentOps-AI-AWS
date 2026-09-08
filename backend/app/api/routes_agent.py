@@ -27,7 +27,7 @@ router = APIRouter(prefix="/agent", tags=["Agent"])
 async def chat_with_agent(
     payload: AgentChatMessage,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["hr_admin", "team_lead"]))
+    current_user: User = Depends(require_roles(["region_hr_head", "committee_hr_leader", "committee_head", "committee_hr_member", "hr_admin", "team_lead"]))
 ):
     """Processes a natural language query through the ReAct Agent (full response)."""
     conversation_id = payload.conversation_id or f"conv_{int(datetime.now().timestamp())}"
@@ -45,7 +45,7 @@ async def chat_with_agent(
 async def stream_chat_with_agent(
     payload: AgentChatMessage,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["hr_admin", "team_lead"]))
+    current_user: User = Depends(require_roles(["region_hr_head", "committee_hr_leader", "committee_head", "committee_hr_member", "hr_admin", "team_lead"]))
 ):
     """
     Streams the agent response as Server-Sent Events (SSE).
@@ -168,7 +168,7 @@ async def stream_chat_with_agent(
 async def confirm_action(
     payload: ActionConfirmationRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["hr_admin", "team_lead"]))
+    current_user: User = Depends(require_roles(["region_hr_head", "committee_hr_leader", "committee_head", "committee_hr_member", "hr_admin", "team_lead"]))
 ):
     """
     Confirms or cancels a pending sensitive agent action.
@@ -188,23 +188,23 @@ async def confirm_action(
             detail=f"Action '{payload.action_id}' is not pending confirmation (current status: {audit_entry.status})."
         )
 
-    # Scoping check: If team lead, verify ownership or team membership of targets
+    # Scoping check: verify ownership or team membership of targets
     params = json.loads(audit_entry.parameters) if audit_entry.parameters else {}
     target_student_ids = params.get("student_ids", [])
-    if current_user.role == "team_lead" and target_student_ids:
-        # Verify all target students belong to the team lead's team
-        invalid_res = await db.execute(
-            select(Student.id).where(
-                Student.id.in_(target_student_ids),
-                Student.team_id != current_user.team_id
+    if current_user.role in ("committee_head", "team_lead", "committee_hr_member", "committee_hr_leader") and target_student_ids:
+        # Verify all target students belong to the user's committee
+        if current_user.team_id:
+            invalid_res = await db.execute(
+                select(Student.id).where(
+                    Student.id.in_(target_student_ids),
+                    Student.team_id != current_user.team_id
+                )
             )
-        )
-        invalid_ids = invalid_res.scalars().all()
-        if invalid_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access forbidden: cannot confirm actions targeting students outside your assigned team."
-            )
+            if invalid_res.scalars().first():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cannot confirm actions targeting members outside your assigned team or committee."
+                )
 
     if not payload.confirmed:
         audit_entry.status = "REJECTED"

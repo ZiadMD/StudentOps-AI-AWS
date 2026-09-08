@@ -7,6 +7,8 @@ from typing import Optional
 from datetime import datetime, timezone
 import urllib.parse
 import re
+import asyncio
+import random
 import httpx
 
 from app.core.config import settings
@@ -42,6 +44,37 @@ def generate_wa_me_link(phone: str, message_text: str) -> str:
     return f"https://wa.me/{clean_phone}?text={encoded_text}"
 
 
+_outbound_rate_lock = asyncio.Lock()
+_last_outbound_timestamp = 0.0
+
+
+async def _throttle_outbound(min_interval: float = 1.0, max_jitter: float = 0.5):
+    """Enforces rate limiting and jitter between outgoing OpenWA requests to prevent WhatsApp ban triggers."""
+    global _last_outbound_timestamp
+    try:
+        async with _outbound_rate_lock:
+            loop = asyncio.get_running_loop()
+            now = loop.time()
+            delay_needed = (_last_outbound_timestamp + min_interval) - now
+            if delay_needed > 0:
+                jitter = random.uniform(0.05, max_jitter)
+                await asyncio.sleep(delay_needed + jitter)
+            _last_outbound_timestamp = loop.time()
+    except RuntimeError:
+        pass
+
+
+def normalize_qr_payload(qr: Optional[str]) -> Optional[str]:
+    """Ensures QR payload is a valid browser-renderable image data URL or URL."""
+    if not qr:
+        return None
+    qr = qr.strip()
+    if qr.startswith("data:image") or qr.startswith("http://") or qr.startswith("https://"):
+        return qr
+    # If raw base64 string, prepend standard PNG data URI
+    return f"data:image/png;base64,{qr}"
+
+
 class OpenWAProvider(MessagingProvider):
     """
     HTTP Client interacting with OpenWA Gateway (NestJS) or headless container for official org broadcasts.
@@ -64,26 +97,38 @@ class OpenWAProvider(MessagingProvider):
             self.headers["Authorization"] = f"Bearer {self.api_key}"
             self.headers["api_key"] = self.api_key
 
-    async def _resolve_session(self, client: httpx.AsyncClient) -> Optional[dict]:
+    async def _resolve_session(self, client: httpx.AsyncClient, session_name: Optional[str] = None) -> Optional[dict]:
         """
         Resolves the active OpenWA session from OpenWA Gateway /api/sessions.
         Selects preferred session by ID or name, falls back to first ready session.
-        Auto-creates a session if no sessions exist.
+        Auto-creates a session if requested session does not exist.
         """
         url = f"{self.base_url}/api/sessions"
+        pref = session_name or self.session_id_preference
         try:
             resp = await client.get(url, headers=self.headers, timeout=4.0)
             if resp.status_code == 200:
                 sessions = resp.json()
                 if isinstance(sessions, list) and len(sessions) > 0:
-                    pref = self.session_id_preference
                     if pref:
                         # Exact ID or name match
                         for s in sessions:
                             if s.get("id") == pref or s.get("name") == pref:
                                 return s
 
-                    # Prefer any ready session
+                    # If specific session was requested but not found, create it
+                    if session_name:
+                        create_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", session_name)[:40]
+                        create_resp = await client.post(
+                            url,
+                            json={"name": create_name},
+                            headers=self.headers,
+                            timeout=5.0,
+                        )
+                        if create_resp.status_code in (200, 201):
+                            return create_resp.json()
+
+                    # Otherwise prefer any ready session
                     for s in sessions:
                         if s.get("status") == "ready":
                             return s
@@ -91,10 +136,9 @@ class OpenWAProvider(MessagingProvider):
                     # Return the first session
                     return sessions[0]
 
-                # List is empty: auto-create ops-official session
-                create_name = re.sub(r"[^a-zA-Z0-9\-]", "-", self.session_id_preference or "ops-official").strip("-")
-                if len(create_name) < 3:
-                    create_name = "ops-official"
+                # List is empty: auto-create ops-official or requested session
+                target_name = pref or "ops-official"
+                create_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", target_name)[:40]
                 create_resp = await client.post(
                     url,
                     json={"name": create_name},
@@ -107,7 +151,7 @@ class OpenWAProvider(MessagingProvider):
             pass
         return None
 
-    async def get_status(self) -> dict:
+    async def get_status(self, session_name: Optional[str] = None) -> dict:
         """
         Polls OpenWA status endpoint to inspect daemon connectivity, QR state, or live session.
         Works seamlessly with both OpenWA Gateway (/api/sessions) and legacy endpoints.
@@ -115,12 +159,14 @@ class OpenWAProvider(MessagingProvider):
         try:
             async with httpx.AsyncClient(timeout=4.0) as client:
                 # 1. Try OpenWA Gateway (/api/sessions)
-                session = await self._resolve_session(client)
+                session = await self._resolve_session(client, session_name=session_name)
                 if session:
                     raw_status = (session.get("status") or "disconnected").lower()
                     if raw_status == "ready":
                         status_str = "CONNECTED"
-                    elif raw_status in ("qr_ready", "authenticating", "initializing", "created", "action_required"):
+                    elif raw_status == "authenticating":
+                        status_str = "AUTHENTICATING"
+                    elif raw_status in ("qr_ready", "action_required", "created", "initializing"):
                         status_str = "SCAN_QR_CODE"
                     else:
                         status_str = "DISCONNECTED"
@@ -140,7 +186,8 @@ class OpenWAProvider(MessagingProvider):
                                 timeout=3.0,
                             )
                             if qr_res.status_code == 200:
-                                qr_code = qr_res.json().get("qrCode")
+                                raw_qr = qr_res.json().get("qrCode") or qr_res.json().get("qr")
+                                qr_code = normalize_qr_payload(raw_qr)
                         except Exception:
                             pass
 
@@ -175,8 +222,24 @@ class OpenWAProvider(MessagingProvider):
                         "battery": 100,
                         "qr_code": None,
                     }
-        except Exception:
-            pass
+        except httpx.ConnectError:
+            return {
+                "configured": bool(settings.OPENWA_OFFICIAL_PHONE or settings.OPENWA_API_URL),
+                "status": "GATEWAY_UNAVAILABLE",
+                "phone_number": settings.OPENWA_OFFICIAL_PHONE,
+                "battery": None,
+                "qr_code": None,
+                "error": "Cannot connect to OpenWA container at " + self.base_url,
+            }
+        except Exception as e:
+            return {
+                "configured": bool(settings.OPENWA_OFFICIAL_PHONE or settings.OPENWA_API_URL),
+                "status": "DISCONNECTED",
+                "phone_number": settings.OPENWA_OFFICIAL_PHONE,
+                "battery": None,
+                "qr_code": None,
+                "error": str(e),
+            }
 
         return {
             "configured": bool(settings.OPENWA_OFFICIAL_PHONE or settings.OPENWA_API_URL),
@@ -186,12 +249,12 @@ class OpenWAProvider(MessagingProvider):
             "qr_code": None,
         }
 
-    async def get_qr(self) -> Optional[str]:
+    async def get_qr(self, session_name: Optional[str] = None) -> Optional[str]:
         """Fetches current QR string / data URL image if session requires authentication."""
         try:
             async with httpx.AsyncClient(timeout=4.0) as client:
                 # 1. OpenWA Gateway (/api/sessions/:id/qr)
-                session = await self._resolve_session(client)
+                session = await self._resolve_session(client, session_name=session_name)
                 if session:
                     if session.get("status") == "ready":
                         return None
@@ -201,31 +264,35 @@ class OpenWAProvider(MessagingProvider):
                         timeout=3.0,
                     )
                     if qr_res.status_code == 200:
-                        return qr_res.json().get("qrCode")
+                        raw_qr = qr_res.json().get("qrCode") or qr_res.json().get("qr")
+                        return normalize_qr_payload(raw_qr)
                     return None
 
                 # 2. Legacy OpenWA daemon (/getQrCode)
                 resp = await client.get(f"{self.base_url}/getQrCode", headers=self.headers)
                 if resp.status_code == 200:
-                    return resp.json().get("qr")
+                    raw_qr = resp.json().get("qr")
+                    return normalize_qr_payload(raw_qr)
         except Exception:
             pass
         return None
 
-    async def send_message(self, message: OutgoingMessage) -> MessageDeliveryResult:
+    async def send_message(self, message: OutgoingMessage, session_name: Optional[str] = None) -> MessageDeliveryResult:
         """
         Sends an official message via OpenWA Gateway or legacy daemon.
-        Falls back cleanly if container is disconnected.
+        Safely isolates timeouts to prevent dangerous duplicate retry loops.
         """
         clean_phone = format_phone_international(message.recipient_phone)
         chat_id = f"{clean_phone}@c.us"
         now = datetime.now(timezone.utc)
         gateway_error = None
 
+        await _throttle_outbound()
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 # 1. Try OpenWA Gateway
-                session = await self._resolve_session(client)
+                session = await self._resolve_session(client, session_name=session_name)
                 if session:
                     session_id = session.get("id")
                     send_url = f"{self.base_url}/api/sessions/{session_id}/messages/send-text"
@@ -243,6 +310,8 @@ class OpenWAProvider(MessagingProvider):
                             recipient_phone=clean_phone,
                             channel="WHATSAPP_OFFICIAL",
                             delivered_at=now,
+                            delivery_status="DELIVERED",
+                            is_uncertain=False,
                         )
                     elif resp.status_code == 409:
                         return MessageDeliveryResult(
@@ -252,6 +321,8 @@ class OpenWAProvider(MessagingProvider):
                             channel="WHATSAPP_OFFICIAL",
                             delivered_at=now,
                             error_message="WhatsApp session is reloading or reconnecting. Please retry shortly.",
+                            delivery_status="CONFIRMED_FAILED",
+                            is_uncertain=False,
                         )
                     else:
                         gateway_error = f"OpenWA Gateway returned {resp.status_code}: {resp.text}"
@@ -271,6 +342,8 @@ class OpenWAProvider(MessagingProvider):
                         recipient_phone=clean_phone,
                         channel="WHATSAPP_OFFICIAL",
                         delivered_at=now,
+                        delivery_status="DELIVERED",
+                        is_uncertain=False,
                     )
                 else:
                     err = gateway_error or f"OpenWA returned {resp.status_code}: {resp.text}"
@@ -281,7 +354,22 @@ class OpenWAProvider(MessagingProvider):
                         channel="WHATSAPP_OFFICIAL",
                         delivered_at=now,
                         error_message=err,
+                        delivery_status="CONFIRMED_FAILED",
+                        is_uncertain=False,
                     )
+        except httpx.TimeoutException as exc:
+            # Dangerous condition: message may have been delivered by WhatsApp before HTTP response returned.
+            # Mark delivery status as UNKNOWN_PENDING to prevent automated duplicate sends.
+            return MessageDeliveryResult(
+                success=False,
+                message_id=f"timeout_{now.timestamp()}",
+                recipient_phone=clean_phone,
+                channel="WHATSAPP_OFFICIAL",
+                delivered_at=now,
+                error_message="Gateway request timed out. Message delivery state is UNCERTAIN. Do NOT retry automatically.",
+                delivery_status="UNKNOWN_PENDING",
+                is_uncertain=True,
+            )
         except Exception as exc:
             return MessageDeliveryResult(
                 success=False,
@@ -290,11 +378,130 @@ class OpenWAProvider(MessagingProvider):
                 channel="WHATSAPP_OFFICIAL",
                 delivered_at=now,
                 error_message=f"Could not reach OpenWA service: {gateway_error or str(exc)}",
+                delivery_status="CONFIRMED_FAILED",
+                is_uncertain=False,
             )
 
-    async def send_batch(self, messages: list[OutgoingMessage]) -> list[MessageDeliveryResult]:
+    async def send_batch(self, messages: list[OutgoingMessage], session_name: Optional[str] = None) -> list[MessageDeliveryResult]:
         results = []
         for msg in messages:
-            res = await self.send_message(msg)
+            res = await self.send_message(msg, session_name=session_name)
             results.append(res)
         return results
+
+    async def send_media_message(
+        self,
+        recipient_phone: str,
+        file_base64_or_url: str,
+        filename: str = "file",
+        mimetype: str = "application/octet-stream",
+        caption: Optional[str] = None,
+    ) -> MessageDeliveryResult:
+        """Sends an image, video, audio, or document file via OpenWA Gateway or daemon."""
+        clean_phone = format_phone_international(recipient_phone)
+        chat_id = f"{clean_phone}@c.us"
+        now = datetime.now(timezone.utc)
+        gateway_error = None
+
+        await _throttle_outbound()
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                session = await self._resolve_session(client)
+                if session:
+                    session_id = session.get("id")
+                    send_url = f"{self.base_url}/api/sessions/{session_id}/messages/send-file"
+                    payload = {
+                        "chatId": chat_id,
+                        "file": file_base64_or_url,
+                        "filename": filename,
+                        "caption": caption or "",
+                    }
+                    resp = await client.post(send_url, json=payload, headers=self.headers)
+                    if resp.status_code in (200, 201):
+                        res_data = resp.json() if resp.text else {}
+                        msg_id = res_data.get("id", res_data.get("messageId", f"openwa_{now.timestamp()}"))
+                        return MessageDeliveryResult(
+                            success=True,
+                            message_id=str(msg_id),
+                            recipient_phone=clean_phone,
+                            channel="WHATSAPP_OFFICIAL",
+                            delivered_at=now,
+                        )
+                    gateway_error = f"OpenWA Gateway send-file returned {resp.status_code}: {resp.text}"
+
+                # Fallback to legacy OpenWA daemon (/sendFile)
+                url = f"{self.base_url}/sendFile"
+                legacy_payload = {
+                    "chatId": chat_id,
+                    "file": file_base64_or_url,
+                    "filename": filename,
+                    "caption": caption or "",
+                }
+                resp = await client.post(url, json=legacy_payload, headers=self.headers)
+                if resp.status_code in (200, 201):
+                    msg_id = resp.json().get("id", f"openwa_{now.timestamp()}")
+                    return MessageDeliveryResult(
+                        success=True,
+                        message_id=str(msg_id),
+                        recipient_phone=clean_phone,
+                        channel="WHATSAPP_OFFICIAL",
+                        delivered_at=now,
+                    )
+                return MessageDeliveryResult(
+                    success=False,
+                    message_id=f"err_{now.timestamp()}",
+                    recipient_phone=clean_phone,
+                    channel="WHATSAPP_OFFICIAL",
+                    delivered_at=now,
+                    error_message=gateway_error or f"OpenWA sendFile returned {resp.status_code}: {resp.text}",
+                )
+        except Exception as exc:
+            return MessageDeliveryResult(
+                success=False,
+                message_id=f"err_{now.timestamp()}",
+                recipient_phone=clean_phone,
+                channel="WHATSAPP_OFFICIAL",
+                delivered_at=now,
+                error_message=f"Could not deliver media via OpenWA: {gateway_error or str(exc)}",
+            )
+
+    async def send_reaction(self, message_id: str, reaction: str) -> bool:
+        """Applies or clears an emoji reaction on a message via OpenWA."""
+        await _throttle_outbound(min_interval=0.5)
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                session = await self._resolve_session(client)
+                if session:
+                    session_id = session.get("id")
+                    url = f"{self.base_url}/api/sessions/{session_id}/messages/react"
+                    resp = await client.post(url, json={"messageId": message_id, "reaction": reaction}, headers=self.headers)
+                    if resp.status_code in (200, 201):
+                        return True
+
+                # Legacy fallback
+                url = f"{self.base_url}/react"
+                resp = await client.post(url, json={"messageId": message_id, "reaction": reaction}, headers=self.headers)
+                return resp.status_code in (200, 201)
+        except Exception:
+            return False
+
+    async def edit_message(self, message_id: str, new_text: str) -> bool:
+        """Edits an existing message via OpenWA within allowable time window."""
+        await _throttle_outbound(min_interval=0.5)
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                session = await self._resolve_session(client)
+                if session:
+                    session_id = session.get("id")
+                    url = f"{self.base_url}/api/sessions/{session_id}/messages/edit"
+                    resp = await client.post(url, json={"messageId": message_id, "text": new_text}, headers=self.headers)
+                    if resp.status_code in (200, 201):
+                        return True
+
+                # Legacy fallback
+                url = f"{self.base_url}/editMessage"
+                resp = await client.post(url, json={"messageId": message_id, "text": new_text}, headers=self.headers)
+                return resp.status_code in (200, 201)
+        except Exception:
+            return False

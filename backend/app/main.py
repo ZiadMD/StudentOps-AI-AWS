@@ -20,6 +20,11 @@ from app.api.routes_tasks import router as tasks_router
 from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_audit import router as audit_router
 from app.api.routes_whatsapp import router as whatsapp_router
+from app.api.routes_automation import router as automation_router
+from app.api.routes_feedback import router as feedback_router
+from app.api.routes_questions import router as questions_router
+from app.api.routes_reports import router as reports_router
+from app.services.automation_service import scheduler
 
 logger = logging.getLogger("studentops.security")
 
@@ -32,10 +37,12 @@ async def lifespan(app: FastAPI):
         if settings.ENVIRONMENT == "development" and "sqlite" in settings.DATABASE_URL:
             async with AsyncSessionLocal() as session:
                 await seed_all(session)
+        scheduler.start()
     except Exception as e:
         logger.warning(f"Database startup notice: {e}")
     yield
     # Shutdown
+    scheduler.stop()
 
 
 app = FastAPI(
@@ -60,7 +67,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "script-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com data:; "
-            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://openrouter.ai https://api.groq.com https://*.supabase.co https://*.vercel.app https://*.ngrok-free.app https://*.ngrok-free.dev; "
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* wss: https://openrouter.ai https://api.groq.com https://*.supabase.co https://*.vercel.app https://*.ngrok-free.app https://*.ngrok-free.dev; "
             "frame-ancestors 'none';"
         )
         if settings.ENVIRONMENT == "production":
@@ -106,6 +113,10 @@ app.include_router(calendar_router, prefix=settings.API_V1_STR)
 app.include_router(tasks_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
 app.include_router(whatsapp_router, prefix=settings.API_V1_STR)
+app.include_router(automation_router, prefix=settings.API_V1_STR)
+app.include_router(feedback_router, prefix=settings.API_V1_STR)
+app.include_router(questions_router, prefix=settings.API_V1_STR)
+app.include_router(reports_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

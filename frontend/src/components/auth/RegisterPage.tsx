@@ -165,7 +165,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLo
                   dir="rtl"
                   value={arabicName}
                   onChange={(e) => setArabicName(e.target.value)}
-                  placeholder="مورين مجدي"
+                  placeholder="زياد محمد"
                   className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs font-cairo"
                   style={{ fontFamily: 'Cairo, sans-serif' }}
                 />
