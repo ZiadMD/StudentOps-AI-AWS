@@ -230,7 +230,7 @@ async def test_option_a_reassignment_history_transfer(client, test_db_session):
     When Committee HR Leader reassigns std_ziad to another HR Member (usr_ali_lead or newly created HR),
     the new HR Member sees the complete chat history, and the previous HR Member loses access.
     """
-    leader_token = await get_token(client, "hr.leader@studentops.org", "leader123")
+    leader_token = await get_token(client, "region.head@studentops.org", "head123")
     leader_headers = {"Authorization": f"Bearer {leader_token}"}
 
     # Create second HR member account in same committee
