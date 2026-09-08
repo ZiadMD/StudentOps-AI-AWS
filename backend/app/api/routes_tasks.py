@@ -2,16 +2,76 @@
 Tasks and Submissions Endpoints.
 """
 from typing import Optional
+from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, require_roles
-from app.models.entities import Task, Submission, Student, User, utcnow
-from app.models.schemas import TaskSchema, SubmissionSchema, TechnicalScoreUpdate
+import uuid
+from sqlalchemy import func
+from app.models.entities import Task, Submission, Student, User, TaskAssignment, utcnow
+from app.models.schemas import (
+    TaskSchema,
+    SubmissionSchema,
+    TechnicalScoreUpdate,
+    TaskCreateRequest,
+    TaskAssignRequest,
+)
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
+
+
+async def get_task_reminder_candidates(
+    task_id: str,
+    db: AsyncSession,
+    pre_deadline: bool = True
+) -> list[Student]:
+    """
+    Finds students eligible for task reminders with strict fail-closed semantics.
+    For HR-created tasks: empty assignments FAIL CLOSED (returns []).
+    Pre-deadline: only non-submitters (status == 'PENDING') among assigned members.
+    Post-deadline: re-checks latest submission, only still-missing members.
+    """
+    task_res = await db.execute(select(Task).where(Task.id == task_id))
+    task = task_res.scalar_one_or_none()
+    if not task:
+        return []
+
+    # Query explicit assignments
+    assign_res = await db.execute(
+        select(TaskAssignment.student_id).where(TaskAssignment.task_id == task_id)
+    )
+    assigned_ids = list(assign_res.scalars().all())
+
+    # Fail closed: if HR-created task has no assignments, return empty list
+    if task.created_by_user_id is not None and not assigned_ids:
+        return []
+
+    # If legacy seeded task has no explicit assignments, fallback to all active students
+    if not assigned_ids and task.created_by_user_id is None:
+        std_res = await db.execute(select(Student.id).where(Student.status == "ACTIVE"))
+        assigned_ids = list(std_res.scalars().all())
+
+    if not assigned_ids:
+        return []
+
+    # Find members who still have PENDING status or no submission
+    sub_res = await db.execute(
+        select(Submission.student_id).where(
+            Submission.task_id == task_id,
+            Submission.status.in_(["ON_TIME", "LATE"])
+        )
+    )
+    submitted_ids = set(sub_res.scalars().all())
+    missing_ids = [sid for sid in assigned_ids if sid not in submitted_ids]
+
+    if not missing_ids:
+        return []
+
+    students_res = await db.execute(select(Student).where(Student.id.in_(missing_ids)))
+    return list(students_res.scalars().all())
 
 
 @router.get("", response_model=list[TaskSchema])
@@ -27,6 +87,12 @@ async def list_tasks(
             select(Submission).where(Submission.task_id == t.id)
         )
         submissions = sub_res.scalars().all()
+
+        assign_res = await db.execute(
+            select(func.count(TaskAssignment.id)).where(TaskAssignment.task_id == t.id)
+        )
+        assigned_count = assign_res.scalar() or 0
+
         results.append(TaskSchema(
             id=t.id,
             task_number=t.task_number,
@@ -36,9 +102,118 @@ async def list_tasks(
             max_score=t.max_score,
             score_rule=t.score_rule,
             submission_count=sum(1 for s in submissions if s.status != "PENDING"),
-            pending_count=sum(1 for s in submissions if s.status == "PENDING")
+            pending_count=sum(1 for s in submissions if s.status == "PENDING"),
+            assigned_count=assigned_count
         ))
     return results
+
+
+@router.post("", response_model=TaskSchema, status_code=status.HTTP_201_CREATED)
+async def create_task(
+    body: TaskCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_head", "team_lead", "hr_admin"]))
+):
+    """
+    Creates a new task with optional explicit student assignments.
+    Social Media Committee Head responsibility.
+    Follows fail-closed rule: empty assignments will not trigger reminders.
+    """
+    max_num_res = await db.execute(select(func.max(Task.task_number)))
+    current_max = max_num_res.scalar() or 0
+    next_task_num = current_max + 1
+
+    task_id = f"task_{uuid.uuid4().hex[:12]}"
+    new_task = Task(
+        id=task_id,
+        task_number=next_task_num,
+        title=body.title.strip(),
+        description=body.description or "",
+        deadline=body.deadline,
+        max_score=body.max_score,
+        score_rule=body.score_rule or "Out of 10 points based on quality and punctuality",
+        created_by_user_id=current_user.id,
+        team_id=current_user.team_id,
+    )
+    db.add(new_task)
+
+    # If students explicitly assigned, create assignments and pending submissions
+    if body.assigned_student_ids:
+        for sid in set(body.assigned_student_ids):
+            db.add(TaskAssignment(
+                id=f"ta_{uuid.uuid4().hex[:12]}",
+                task_id=task_id,
+                student_id=sid,
+            ))
+            db.add(Submission(
+                id=f"sub_{uuid.uuid4().hex[:12]}",
+                task_id=task_id,
+                student_id=sid,
+                status="PENDING",
+            ))
+
+    await db.commit()
+    await db.refresh(new_task)
+
+    return TaskSchema(
+        id=new_task.id,
+        task_number=new_task.task_number,
+        title=new_task.title,
+        description=new_task.description,
+        deadline=new_task.deadline,
+        max_score=new_task.max_score,
+        score_rule=new_task.score_rule,
+        submission_count=0,
+        pending_count=len(body.assigned_student_ids),
+        assigned_count=len(body.assigned_student_ids),
+    )
+
+
+@router.post("/{task_id}/assign")
+async def assign_students_to_task(
+    task_id: str,
+    body: TaskAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_head", "team_lead", "hr_admin"]))
+):
+    """Explicitly assigns students to a task."""
+    task_res = await db.execute(select(Task).where(Task.id == task_id))
+    task = task_res.scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    added_count = 0
+    for sid in set(body.student_ids):
+        existing = await db.execute(
+            select(TaskAssignment).where(
+                TaskAssignment.task_id == task_id,
+                TaskAssignment.student_id == sid
+            )
+        )
+        if not existing.scalar_one_or_none():
+            db.add(TaskAssignment(
+                id=f"ta_{uuid.uuid4().hex[:12]}",
+                task_id=task_id,
+                student_id=sid,
+            ))
+            # Also ensure a pending submission exists
+            sub_exist = await db.execute(
+                select(Submission).where(
+                    Submission.task_id == task_id,
+                    Submission.student_id == sid
+                )
+            )
+            if not sub_exist.scalar_one_or_none():
+                db.add(Submission(
+                    id=f"sub_{uuid.uuid4().hex[:12]}",
+                    task_id=task_id,
+                    student_id=sid,
+                    status="PENDING",
+                ))
+            added_count += 1
+
+    await db.commit()
+    return {"status": "success", "task_id": task_id, "assigned_new": added_count}
 
 
 @router.get("/{task_id}/submissions", response_model=list[SubmissionSchema])
@@ -175,7 +350,15 @@ async def submit_task(
     submission = sub_res.scalar_one_or_none()
 
     now = utcnow()
-    status_str = "ON_TIME" if now <= task.deadline else "LATE"
+    deadline = task.deadline
+    if deadline is not None:
+        if deadline.tzinfo is None and now.tzinfo is not None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        elif deadline.tzinfo is not None and now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        status_str = "ON_TIME" if now <= deadline else "LATE"
+    else:
+        status_str = "ON_TIME"
 
     import uuid
     if not submission:

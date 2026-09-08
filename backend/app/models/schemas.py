@@ -44,12 +44,15 @@ class StudentScoreSummary(BaseModel):
     on_time_task_count: int
     late_task_count: int
     pending_task_count: int
-    average_task_quality: float  # out of 10.0
-    group_interaction_score: float  # /5
+    average_task_quality: float  # out of 10.0 (graded by Committee Head)
+    group_interaction_score: float  # /5 (graded by HR Member)
     social_media_score: float  # /5
     hierarchy_rules_score: float  # /5
     polite_conduct_score: float  # /8
-    total_behavior_score: float  # /23
+    total_behavior_score: float  # /23 (graded by HR Member)
+    bonus_points: float = 0.0  # awarded by HR Leader
+    total_score: Optional[float] = None  # Kept separate without invented arithmetic weights
+    total_score_status: str = "PENDING_FORMULA_DEFINITION"
     overall_rating: str  # "Outstanding", "Good", "Needs Improvement"
 
 
@@ -91,11 +94,24 @@ class MeetingDetailResponse(BaseModel):
     duration_minutes: int
     meet_url: str
     status: str
+    session_number: int = 1
+    team_id: Optional[str] = None
     total_expected: int
     present_count: int
     late_count: int
     absent_count: int
     attendance: list[AttendanceRecordSchema] = []
+
+
+class MeetingCreateRequest(BaseModel):
+    title: str = Field(..., min_length=2, max_length=150)
+    topic: Optional[str] = ""
+    start_time: datetime
+    duration_minutes: int = Field(default=60, ge=15, le=360)
+    session_number: int = Field(default=1, ge=1)
+    meet_url: Optional[str] = "https://meet.google.com/social-media-sync"
+    assigned_student_ids: Optional[list[str]] = None
+    team_id: Optional[str] = None
 
 
 # =========================================================
@@ -139,6 +155,33 @@ class TaskSchema(BaseModel):
     score_rule: str
     submission_count: int = 0
     pending_count: int = 0
+    assigned_count: int = 0
+
+
+class TaskCreateRequest(BaseModel):
+    title: str = Field(..., min_length=2, max_length=150)
+    description: Optional[str] = ""
+    deadline: datetime
+    max_score: float = 10.0
+    score_rule: Optional[str] = "Out of 10 points based on quality and punctuality"
+    assigned_student_ids: list[str] = Field(default_factory=list)
+
+
+class TaskAssignRequest(BaseModel):
+    student_ids: list[str] = Field(..., min_length=1)
+
+
+class AutomationSettingsSchema(BaseModel):
+    attendance_enabled: bool = True
+    attendance_grace_minutes: int = 10
+    attendance_message: Optional[str] = None
+    task_pre_enabled: bool = True
+    task_pre_hours: int = 24
+    task_pre_message: Optional[str] = None
+    task_post_enabled: bool = True
+    task_post_delay_hours: int = 2
+    task_post_message: Optional[str] = None
+    whatsapp_enabled: bool = True
 
 
 class SubmissionSchema(BaseModel):
@@ -190,10 +233,12 @@ class WhatsAppDirectLinkResponse(BaseModel):
 
 class OfficialWhatsAppStatus(BaseModel):
     configured: bool
-    status: str  # "CONNECTED", "SCAN_QR_CODE", "STARTING", "DISCONNECTED"
+    status: str  # "CONNECTED", "SCAN_QR_CODE", "AUTHENTICATING", "DISCONNECTED", "GATEWAY_UNAVAILABLE"
     phone_number: Optional[str] = None
     battery: Optional[int] = None
     qr_code: Optional[str] = None
+    session_name: Optional[str] = None
+    error: Optional[str] = None
 
 
 class OfficialWhatsAppSendRequest(BaseModel):
@@ -358,4 +403,79 @@ class TokenResponse(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(..., min_length=10, max_length=1000)
+
+
+# =========================================================
+# Social Media Committee Workflows (Bonus, Q&A, Feedback, Reports)
+# =========================================================
+
+class BonusAwardRequest(BaseModel):
+    points: float = Field(..., ge=0.5, le=10.0, description="Bonus points to award (e.g. +2.0)")
+    notes: Optional[str] = ""
+
+
+class FeedbackCreateRequest(BaseModel):
+    hr_member_id: Optional[str] = None
+    hr_member_name: Optional[str] = None
+    category: str = "HR_INTERACTION"  # "HR_INTERACTION", "COMMUNICATION", "ATTENDANCE_SUPPORT", "BEHAVIOR_EVALUATION", "CONDUCT", "GENERAL_HR"
+    content: str = Field(..., min_length=3, max_length=2000)
+
+
+class FeedbackResponse(BaseModel):
+    id: str
+    student_id: str
+    student_name: Optional[str] = None
+    hr_member_id: Optional[str] = None
+    hr_member_name: Optional[str] = None
+    category: str
+    content: str
+    submitted_at: datetime
+    reviewed_at: Optional[datetime] = None
+    reviewed_by_name: Optional[str] = None
+    status: str
+    notes: Optional[str] = ""
+
+
+class FeedbackStatusUpdate(BaseModel):
+    status: str = "REVIEWED"  # "REVIEWED", "ACTIONED"
+    notes: Optional[str] = ""
+
+
+class QuestionCreateRequest(BaseModel):
+    title: str = Field(..., min_length=2, max_length=150)
+    content: str = Field(..., min_length=3, max_length=2000)
+
+
+class QuestionAnswerRequest(BaseModel):
+    answer: str = Field(..., min_length=1, max_length=3000)
+
+
+class QuestionResponse(BaseModel):
+    id: str
+    student_id: str
+    student_name: Optional[str] = None
+    title: str
+    content: str
+    status: str
+    asked_at: datetime
+    answered_by_name: Optional[str] = None
+    answer: Optional[str] = ""
+    answered_at: Optional[datetime] = None
+
+
+class CommitteeReportCreateRequest(BaseModel):
+    report_title: str = Field(..., min_length=3, max_length=150)
+    notes: Optional[str] = ""
+
+
+class CommitteeReportResponse(BaseModel):
+    id: str
+    team_id: str
+    team_name: Optional[str] = None
+    submitted_by_name: str
+    report_title: str
+    metrics_summary: dict[str, Any]
+    notes: str
+    submitted_at: datetime
+    acknowledged_at: Optional[datetime] = None
 

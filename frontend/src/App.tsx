@@ -9,6 +9,9 @@ import { StudentScoreboard }  from './components/StudentScoreboard';
 import { CalendarView }       from './components/CalendarView';
 import { TaskManagement }     from './components/TaskManagement';
 import { TaskReviewsPage }    from './components/TaskReviewsPage';
+import { CommitteeQnA }       from './components/CommitteeQnA';
+import { MemberFeedbackView } from './components/MemberFeedbackView';
+import { CommitteeReportsView } from './components/CommitteeReportsView';
 import { StudentsPage }       from './components/StudentsPage';
 import { NotificationsPage }  from './components/NotificationsPage';
 import { AuditViewer }        from './components/AuditViewer';
@@ -107,11 +110,14 @@ export function App() {
             {activeTab === 'dashboard'     && <Dashboard onNavigateToTab={(t) => setActiveTab(t as Tab)} onSendChatQuery={handleSendChatQuery} />}
             {activeTab === 'chat'          && <AgentChat initialQuery={chatInitialQuery} onClearInitialQuery={() => setChatInitialQuery(undefined)} />}
             {activeTab === 'students'      && <StudentsPage />}
-            {activeTab === 'attendance'    && <AttendanceView />}
+            {activeTab === 'attendance'    && <AttendanceView currentUser={currentUser} />}
             {activeTab === 'scoreboard'    && <StudentScoreboard currentUser={currentUser} />}
             {activeTab === 'calendar'      && <CalendarView />}
-            {activeTab === 'tasks'         && <TaskManagement />}
+            {activeTab === 'tasks'         && <TaskManagement currentUser={currentUser} />}
             {activeTab === 'task-reviews'  && <TaskReviewsPage />}
+            {activeTab === 'qna'           && <CommitteeQnA currentUser={currentUser} />}
+            {activeTab === 'feedback'      && <MemberFeedbackView currentUser={currentUser} />}
+            {activeTab === 'reports'       && <CommitteeReportsView currentUser={currentUser} />}
             {activeTab === 'whatsapp'      && currentUser && <WhatsAppAgentPage currentUser={currentUser} />}
             {activeTab === 'notifications' && <NotificationsPage />}
             {activeTab === 'audit'         && <AuditViewer />}

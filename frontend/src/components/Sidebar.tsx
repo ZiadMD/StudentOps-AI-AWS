@@ -16,6 +16,9 @@ import {
   ClipboardList,
   LogOut,
   MessageSquare,
+  MessageCircleQuestion,
+  MessageSquareHeart,
+  FileText,
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 
@@ -27,6 +30,9 @@ export type Tab =
   | 'calendar'
   | 'tasks'
   | 'task-reviews'
+  | 'qna'
+  | 'feedback'
+  | 'reports'
   | 'students'
   | 'notifications'
   | 'audit'
@@ -63,7 +69,7 @@ const NAV_ITEMS: {
     id: 'chat',
     label: 'AI Agent Console',
     icon: Bot,
-    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead'],
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'hr_admin', 'team_lead'],
     isAgent: true,
   },
   {
@@ -103,6 +109,24 @@ const NAV_ITEMS: {
     icon: ClipboardList,
     // Restricted to technical committee heads
     roles: ['committee_head', 'hr_admin', 'team_lead'],
+  },
+  {
+    id: 'qna',
+    label: 'Committee Q&A',
+    icon: MessageCircleQuestion,
+    roles: ['committee_head', 'committee_member', 'member', 'committee_hr_leader', 'hr_admin', 'team_lead'],
+  },
+  {
+    id: 'feedback',
+    label: 'Member Feedback',
+    icon: MessageSquareHeart,
+    roles: ['committee_member', 'member', 'committee_hr_leader', 'region_hr_head', 'hr_admin'],
+  },
+  {
+    id: 'reports',
+    label: 'Executive Reports',
+    icon: FileText,
+    roles: ['committee_hr_leader', 'region_hr_head', 'hr_admin'],
   },
   {
     id: 'whatsapp',

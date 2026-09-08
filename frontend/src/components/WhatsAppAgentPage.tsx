@@ -375,13 +375,15 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               onChange={(e) => setTemplateType(e.target.value)}
               className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
             >
-              <option value="OVERDUE_TASK">Overdue Task Reminder (Bilingual)</option>
-              <option value="ATTENDANCE_WARNING">Attendance & Absence Check-in</option>
+              <option value="MEETING_REMINDER">Meeting Approaching Reminder (Social Media)</option>
+              <option value="TASK_DEADLINE_REMINDER">Task Deadline Approaching Reminder</option>
+              <option value="OVERDUE_TASK">Overdue Task Escalation (Bilingual)</option>
+              <option value="ATTENDANCE_WARNING">Attendance & Absence Follow-up</option>
               <option value="GENERAL">General Operational Follow-Up</option>
             </select>
           </div>
 
-          {templateType === 'OVERDUE_TASK' && (
+          {(templateType === 'OVERDUE_TASK' || templateType === 'TASK_DEADLINE_REMINDER') && (
             <div>
               <label className="block text-[11px] font-medium text-slate-600 mb-1">Select Task</label>
               <select

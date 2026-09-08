@@ -114,8 +114,8 @@ async def get_current_active_user(
 
 
 ROLE_EQUIVALENTS: dict[str, set[str]] = {
-    "region_hr_head": {"region_hr_head", "hr_admin"},
-    "hr_admin": {"region_hr_head", "hr_admin"},
+    "region_hr_head": {"region_hr_head"},
+    "hr_admin": {"hr_admin"},
     "committee_hr_leader": {"committee_hr_leader"},
     "committee_head": {"committee_head", "team_lead"},
     "committee_hr_member": {"committee_hr_member"},
