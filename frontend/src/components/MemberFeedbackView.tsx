@@ -8,16 +8,17 @@ import {
   ShieldCheck,
   Edit2,
   Shield,
-  UserCheck,
-  X,
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
+import { Modal } from './ui/Modal';
+import { useToast } from '../context/ToastContext';
 
 interface MemberFeedbackViewProps {
   currentUser?: UserProfile | null;
 }
 
 export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentUser }) => {
+  const toast = useToast();
   const [feedbacks, setFeedbacks] = useState<MemberFeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -91,8 +92,9 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
       setContent('');
       setShowSubmitModal(false);
       await loadFeedbacks();
+      toast.success('Feedback submitted confidentially to HR Leader.');
     } catch (err: any) {
-      alert(err.message || 'Failed to submit feedback');
+      toast.error(err.message || 'Failed to submit feedback');
     } finally {
       setSubmittingFeedback(false);
     }
@@ -110,8 +112,9 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
       setReviewingItem(null);
       setLeaderNotes('');
       await loadFeedbacks();
+      toast.success('Feedback status updated successfully.');
     } catch (err: any) {
-      alert(err.message || 'Failed to update feedback status');
+      toast.error(err.message || 'Failed to update feedback status');
     } finally {
       setSavingStatus(false);
     }
@@ -306,98 +309,80 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
       )}
 
       {/* Modal: Submit Feedback */}
-      {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-emerald-600" />
-                <h3 className="font-bold text-slate-900 text-sm">Feedback for HR Member</h3>
-              </div>
-              <button
-                onClick={() => setShowSubmitModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitFeedback} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">HR Member</label>
-                <input
-                  type="text"
-                  value={hrMemberName}
-                  onChange={(e) => setHrMemberName(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 focus:outline-none"
-                  placeholder="Target HR Member"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Feedback Topic</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600"
-                >
-                  <option value="COMMUNICATION">Communication &amp; Response Promptness</option>
-                  <option value="ATTENDANCE_SUPPORT">Attendance Tracking &amp; Excuses Support</option>
-                  <option value="BEHAVIOR_EVALUATION">Behavior &amp; Interaction Scoring</option>
-                  <option value="CONDUCT">Professional Conduct &amp; Respect</option>
-                  <option value="GENERAL_HR">General HR Guidance &amp; Mentorship</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Feedback Details</label>
-                <textarea
-                  rows={4}
-                  placeholder="Share your experience, observations, or suggestions regarding the HR Member..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowSubmitModal(false)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingFeedback}
-                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
-                >
-                  {submittingFeedback ? 'Sending...' : 'Submit to HR Leader'}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showSubmitModal}
+        onClose={() => setShowSubmitModal(false)}
+        title="Feedback for HR Member"
+        description="Share confidential feedback regarding communication, support, or conduct."
+        size="md"
+      >
+        <form onSubmit={handleSubmitFeedback} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">HR Member</label>
+            <input
+              type="text"
+              value={hrMemberName}
+              onChange={(e) => setHrMemberName(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 focus:outline-none"
+              placeholder="Target HR Member"
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Feedback Topic</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600"
+            >
+              <option value="COMMUNICATION">Communication &amp; Response Promptness</option>
+              <option value="ATTENDANCE_SUPPORT">Attendance Tracking &amp; Excuses Support</option>
+              <option value="BEHAVIOR_EVALUATION">Behavior &amp; Interaction Scoring</option>
+              <option value="CONDUCT">Professional Conduct &amp; Respect</option>
+              <option value="GENERAL_HR">General HR Guidance &amp; Mentorship</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Feedback Details</label>
+            <textarea
+              rows={4}
+              placeholder="Share your experience, observations, or suggestions regarding the HR Member..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowSubmitModal(false)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submittingFeedback}
+              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+            >
+              {submittingFeedback ? 'Sending...' : 'Submit to HR Leader'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal: Process Feedback (HR Leader) */}
-      {reviewingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm">Process Member HR Feedback</h3>
-              <button
-                onClick={() => setReviewingItem(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
+      <Modal
+        isOpen={!!reviewingItem}
+        onClose={() => setReviewingItem(null)}
+        title="Process Member HR Feedback"
+        size="md"
+      >
+        {reviewingItem && (
+          <div className="space-y-4">
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs text-slate-700">
               <p className="font-semibold text-slate-900 mb-1">
                 From {reviewingItem.arabic_name || reviewingItem.student_name} regarding {reviewingItem.hr_member_name || 'HR Member'}:
@@ -405,7 +390,7 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
               <p>{reviewingItem.content}</p>
             </div>
 
-            <form onSubmit={handleSaveStatus} className="space-y-3">
+            <form onSubmit={handleSaveStatus} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Status Update</label>
                 <select
@@ -431,7 +416,7 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setReviewingItem(null)}
@@ -449,8 +434,8 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
               </div>
             </form>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 };

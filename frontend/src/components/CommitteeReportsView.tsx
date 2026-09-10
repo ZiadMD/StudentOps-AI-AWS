@@ -9,17 +9,30 @@ import {
   Award,
   Users,
   Calendar,
-  X,
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
+import { Modal } from './ui/Modal';
+import { useToast } from '../context/ToastContext';
+
+export interface ReportMetrics {
+  total_members?: number;
+  avg_total_score?: number | string;
+  avg_task_quality?: number | string;
+  avg_attendance_rate?: number | string;
+  overall_attendance_rate?: number | string;
+  top_performers_count?: number;
+  critical_followups_count?: number;
+  [key: string]: unknown;
+}
 
 interface CommitteeReportsViewProps {
   currentUser?: UserProfile | null;
 }
 
 export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ currentUser }) => {
+  const toast = useToast();
   const [reports, setReports] = useState<CommitteeReportItem[]>([]);
-  const [summary, setSummary] = useState<any | null>(null);
+  const [summary, setSummary] = useState<ReportMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Submit Report Modal (HR Leader)
@@ -63,8 +76,9 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
       setReportNotes('');
       setShowSubmitModal(false);
       await loadData();
+      toast.success('Executive report dispatched to Region HR Head successfully.');
     } catch (err: any) {
-      alert(err.message || 'Failed to submit report');
+      toast.error(err.message || 'Failed to submit report');
     } finally {
       setSubmitting(false);
     }
@@ -163,7 +177,7 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
         ) : (
           <div className="space-y-4">
             {reports.map((rep) => {
-              let metrics: any = null;
+              let metrics: ReportMetrics | null = null;
               if (typeof rep.metrics_summary === 'string') {
                 try {
                   metrics = JSON.parse(rep.metrics_summary);
@@ -238,71 +252,58 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
       </div>
 
       {/* Modal: Submit Report to Head */}
-      {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm">Submit Report to HR Head (Region)</h3>
-              <button
-                onClick={() => setShowSubmitModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500">
-              This compiles current Social Media Committee scores, attendance stats, and member feedback metrics into a formal briefing for the Region HR Head.
-            </p>
-
-            <form onSubmit={handleSubmitReport} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Report Title</label>
-                <input
-                  type="text"
-                  value={reportTitle}
-                  onChange={(e) => setReportTitle(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Executive Notes &amp; Observations
-                </label>
-                <textarea
-                  rows={4}
-                  placeholder="Detail committee progress, campaign highlights, member retention, or operational challenges..."
-                  value={reportNotes}
-                  onChange={(e) => setReportNotes(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowSubmitModal(false)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  <Send className="w-3 h-3" />
-                  <span>{submitting ? 'Transmitting...' : 'Dispatch Report to Region Head'}</span>
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showSubmitModal}
+        onClose={() => setShowSubmitModal(false)}
+        title="Submit Report to HR Head (Region)"
+        description="This compiles current Social Media Committee scores, attendance stats, and member feedback metrics into a formal briefing for the Region HR Head."
+        size="md"
+      >
+        <form onSubmit={handleSubmitReport} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Report Title</label>
+            <input
+              type="text"
+              value={reportTitle}
+              onChange={(e) => setReportTitle(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              required
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              Executive Notes &amp; Observations
+            </label>
+            <textarea
+              rows={4}
+              placeholder="Detail committee progress, campaign highlights, member retention, or operational challenges..."
+              value={reportNotes}
+              onChange={(e) => setReportNotes(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowSubmitModal(false)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <Send className="w-3 h-3" />
+              <span>{submitting ? 'Transmitting...' : 'Dispatch Report to Region Head'}</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
