@@ -118,9 +118,9 @@ ROLE_EQUIVALENTS: dict[str, set[str]] = {
     "hr_admin": {"hr_admin"},
     "committee_hr_leader": {"committee_hr_leader"},
     "committee_head": {"committee_head", "team_lead"},
+    "team_lead": {"team_lead", "committee_head"},
     "committee_hr_member": {"committee_hr_member"},
     "committee_member": {"committee_member", "member"},
-    "team_lead": {"team_lead", "committee_head"},
     "member": {"committee_member", "member"},
 }
 
@@ -166,14 +166,20 @@ async def get_optional_user(
 async def verify_student_access(
     student_id: str,
     current_user: User,
-    db: AsyncSession
+    db: AsyncSession,
+    mode: str = "read",  # "read" | "write" | "chat"
 ) -> Student:
     """
-    Verifies that the current user has permission to access the target student record:
-    - region_hr_head / hr_admin: full access to any student.
+    Verifies that the current user has permission to access the target student record.
+    Centralized authorization boundary across the API:
+    - region_hr_head / hr_admin: full organization access across all modes.
     - committee_head / committee_hr_leader / team_lead: allowed if student.team_id == current_user.team_id.
-    - committee_hr_member: allowed if student is assigned to this HR member or in their committee.
-    - committee_member / member: allowed only if student.id == current_user.student_id.
+    - committee_hr_member:
+        - mode == "chat" or "write": allowed ONLY if student is explicitly assigned to this HR member.
+        - mode == "read": allowed if student is assigned to this HR member OR in their committee.
+    - committee_member / member:
+        - mode == "chat": forbidden (HR chat privileges required).
+        - mode == "read" / "write": allowed only if student.id == current_user.student_id.
     """
     res = await db.execute(select(Student).where(Student.id == student_id))
     student = res.scalar_one_or_none()
@@ -185,25 +191,57 @@ async def verify_student_access(
 
     if current_user.role in ("region_hr_head", "hr_admin"):
         return student
-    elif current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
+
+    if mode == "chat":
+        if current_user.role in ("committee_hr_leader", "committee_head", "team_lead"):
+            if student.team_id != current_user.team_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access forbidden: this member belongs to another committee."
+                )
+            return student
+        elif current_user.role == "committee_hr_member":
+            if student.assigned_hr_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access forbidden: you are not assigned to this member."
+                )
+            return student
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: HR chat privileges required."
+            )
+
+    if current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
         if student.team_id != current_user.team_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access forbidden: this student belongs to a different team."
             )
         return student
-    elif current_user.role == "committee_hr_member":
+
+    if current_user.role == "committee_hr_member":
+        if mode == "write":
+            if student.assigned_hr_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access forbidden: you are not assigned to this member."
+                )
+            return student
+        # read mode
         if student.assigned_hr_id != current_user.id and student.team_id != current_user.team_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access forbidden: this student belongs to a different team or cohort."
             )
         return student
-    else:  # member or committee_member
-        if student.id != current_user.student_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access forbidden: you may only view your own student profile."
-            )
-        return student
+
+    # member or committee_member
+    if student.id != current_user.student_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: you may only view your own student profile."
+        )
+    return student
 

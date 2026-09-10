@@ -214,36 +214,10 @@ class WhatsAppService:
     ) -> Student:
         """
         Hard security boundary:
-        Enforces that HR Member can ONLY access threads for students currently assigned to them.
+        Delegates to centralized verify_student_access with mode='chat'.
         """
-        student = await db.get(Student, student_id)
-        if not student:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student member not found",
-            )
-
-        if current_user.role in ("region_hr_head", "hr_admin"):
-            return student
-        elif current_user.role in ("committee_hr_leader", "committee_head", "team_lead"):
-            if student.team_id != current_user.team_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access forbidden: this member belongs to another committee.",
-                )
-            return student
-        elif current_user.role == "committee_hr_member":
-            if student.assigned_hr_id != current_user.id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access forbidden: you are not assigned to this member.",
-                )
-            return student
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access forbidden: HR chat privileges required.",
-            )
+        from app.core.dependencies import verify_student_access
+        return await verify_student_access(student_id, current_user, db, mode="chat")
 
     @classmethod
     async def get_thread_messages(
