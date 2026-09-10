@@ -26,6 +26,27 @@ import {
   WhatsAppThreadSummary,
 } from '../types';
 
+const isSafeMediaUrl = (url?: string | null): boolean => {
+  if (!url) return false;
+  const clean = url.trim().toLowerCase();
+  if (
+    clean.startsWith('javascript:') ||
+    clean.startsWith('vbscript:') ||
+    clean.startsWith('file:')
+  ) {
+    return false;
+  }
+  return (
+    clean.startsWith('http://') ||
+    clean.startsWith('https://') ||
+    clean.startsWith('data:image/') ||
+    clean.startsWith('data:video/') ||
+    clean.startsWith('data:audio/') ||
+    clean.startsWith('data:application/pdf') ||
+    clean.startsWith('/')
+  );
+};
+
 interface WhatsAppChatWindowProps {
   currentUser: UserProfile;
 }
@@ -563,7 +584,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                           )}
 
                           {/* Media preview */}
-                          {msg.message_type === 'image' && msg.media_url && (
+                          {msg.message_type === 'image' && msg.media_url && isSafeMediaUrl(msg.media_url) && (
                             <div className="mb-2 rounded-lg overflow-hidden border border-black/10 cursor-pointer">
                               <img
                                 src={msg.media_url}
@@ -574,13 +595,13 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                             </div>
                           )}
 
-                          {msg.message_type === 'video' && msg.media_url && (
+                          {msg.message_type === 'video' && msg.media_url && isSafeMediaUrl(msg.media_url) && (
                             <div className="mb-2 rounded-lg overflow-hidden border border-black/10">
                               <video src={msg.media_url} controls className="max-h-60 w-full" />
                             </div>
                           )}
 
-                          {msg.message_type === 'audio' && msg.media_url && (
+                          {msg.message_type === 'audio' && msg.media_url && isSafeMediaUrl(msg.media_url) && (
                             <div className="mb-2 flex items-center gap-2 bg-black/5 p-2 rounded-lg">
                               <Volume2 className="w-4 h-4 text-slate-600" />
                               <audio src={msg.media_url} controls className="h-8 w-full" />
@@ -589,10 +610,15 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
                           {msg.message_type === 'document' && (
                             <a
-                              href={msg.media_url || '#'}
+                              href={isSafeMediaUrl(msg.media_url) ? (msg.media_url || '#') : '#'}
                               download={msg.media_filename || 'document'}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
+                              onClick={(e) => {
+                                if (!isSafeMediaUrl(msg.media_url)) {
+                                  e.preventDefault();
+                                }
+                              }}
                               className="mb-2 flex items-center gap-2 p-2.5 rounded-lg bg-black/5 hover:bg-black/10 transition-colors border border-black/5 text-slate-800"
                             >
                               <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
