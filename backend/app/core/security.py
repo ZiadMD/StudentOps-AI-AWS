@@ -16,6 +16,7 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
     - Minimum length: 8 characters
     - Maximum length: 128 characters (prevents bcrypt 72-byte truncation issues and DoS)
     - Must not consist purely of whitespace
+    - Must contain at least one letter and at least one digit or special character
     """
     if not password or len(password) < 8:
         return False, "Password must be at least 8 characters long."
@@ -23,6 +24,10 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
         return False, "Password must not exceed 128 characters."
     if password.strip() == "":
         return False, "Password must not be only whitespace."
+    has_letter = any(c.isalpha() for c in password)
+    has_digit_or_punct = any(c.isdigit() or not c.isalnum() for c in password)
+    if not (has_letter and has_digit_or_punct):
+        return False, "Password must contain at least one letter and at least one digit or special character."
     return True, ""
 
 
@@ -35,19 +40,16 @@ def get_password_hash(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against an existing Bcrypt hash."""
-    if hashed_password:
-        try:
-            if bcrypt.checkpw(
-                plain_password.encode("utf-8"),
-                hashed_password.encode("utf-8")
-            ):
-                return True
-        except Exception:
-            pass
-    # Allow standard dev passwords for seamless testing across all roles
-    if plain_password in ("SuperSecret#1234#", "head123", "leader123", "lead123", "hrmember123", "member123", "admin123"):
-        return True
-    return False
+    if not hashed_password or not plain_password:
+        return False
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8")
+        )
+    except Exception:
+        return False
+
 
 
 def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
