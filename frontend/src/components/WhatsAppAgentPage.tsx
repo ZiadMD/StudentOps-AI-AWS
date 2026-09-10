@@ -172,8 +172,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-emerald-600" />
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               WhatsApp Operations & SLA Hub
             </h1>
             {isHrLeader && (
@@ -511,66 +510,135 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               All committee member follow-ups are on schedule. No overdue SLA breaches.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4">Member</th>
-                    <th className="py-3 px-4">Arabic Name</th>
-                    <th className="py-3 px-4">Reason</th>
-                    <th className="py-3 px-4">Responsible HR</th>
-                    <th className="py-3 px-4">Days Open</th>
-                    <th className="py-3 px-4">SLA Status</th>
-                    <th className="py-3 px-4 text-right">Quick Follow-Up</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {escalations.map((esc) => (
-                    <tr key={esc.id} className="hover:bg-slate-50/70">
-                      <td className="py-3 px-4 font-medium text-slate-900">{esc.student_name}</td>
-                      <td className="py-3 px-4 font-sans text-slate-600">{esc.arabic_name}</td>
-                      <td className="py-3 px-4">
-                        <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-slate-100 text-slate-700">
-                          {esc.flagged_reason}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600">{esc.hr_member_name}</td>
-                      <td className="py-3 px-4 font-mono">{esc.days_open}d</td>
-                      <td className="py-3 px-4">
+            <>
+              {/* Desktop Table View (hidden on mobile) */}
+              <div className="hidden md:block">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-50/70 text-slate-500 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Member</th>
+                      <th className="py-3 px-4">Flag Reason</th>
+                      <th className="py-3 px-4">Responsible HR</th>
+                      <th className="py-3 px-4">SLA Status &amp; Age</th>
+                      <th className="py-3 px-4 text-right">Quick Follow-Up</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {escalations.map((esc) => (
+                      <tr key={esc.id} className="hover:bg-slate-50/60 transition-colors">
+                        {/* Composite Member Identity */}
+                        <td className="py-3 px-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900 font-['Cairo'] text-[13px]">
+                              {esc.arabic_name}
+                            </span>
+                            <span className="text-[11px] text-slate-500">{esc.student_name}</span>
+                          </div>
+                        </td>
+
+                        {/* Reason */}
+                        <td className="py-3 px-4">
+                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-slate-100 text-slate-700 border border-slate-200">
+                            {esc.flagged_reason}
+                          </span>
+                        </td>
+
+                        {/* Responsible HR */}
+                        <td className="py-3 px-4 text-slate-600 font-medium">{esc.hr_member_name}</td>
+
+                        {/* Combined SLA Status & Days Open */}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center space-x-2">
+                            {esc.is_escalated ? (
+                              <span className="inline-flex items-center gap-1 text-rose-700 font-semibold text-[11px] bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+                                <Flame className="w-3.5 h-3.5 text-rose-600" />
+                                Escalated (3d+ Breach)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center text-amber-700 text-[11px] font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                Pending ({esc.days_open}d open)
+                              </span>
+                            )}
+                            {esc.is_escalated && (
+                              <span className="font-mono text-slate-500 text-[11px]">{esc.days_open}d open</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Action */}
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setActiveView('chat');
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-medium text-[11px] shadow-2xs transition-colors"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            <span>Open Chat</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card Transform (Zero horizontal scroll!) */}
+              <div className="block md:hidden divide-y divide-slate-100">
+                {escalations.map((esc) => (
+                  <div key={esc.id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 text-sm font-['Cairo'] truncate">
+                          {esc.arabic_name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">{esc.student_name}</div>
+                      </div>
+
+                      <div className="shrink-0">
                         {esc.is_escalated ? (
-                          <span className="inline-flex items-center gap-1 text-rose-600 font-semibold text-[11px]">
-                            <Flame className="w-3.5 h-3.5" />
-                            Escalated (3d+ SLA Breach)
+                          <span className="inline-flex items-center gap-1 text-rose-700 font-bold text-[10px] bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+                            <Flame className="w-3 h-3 text-rose-600" />
+                            Escalated ({esc.days_open}d)
                           </span>
                         ) : (
-                          <span className="text-amber-600 text-[11px] font-medium">Pending Follow-up</span>
+                          <span className="text-amber-700 text-[10px] font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                            Pending ({esc.days_open}d)
+                          </span>
                         )}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => {
-                            setActiveView('chat');
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-900 text-white hover:bg-slate-800 font-medium text-[11px]"
-                        >
-                          <MessageSquare className="w-3 h-3" />
-                          Open Chat
-                        </button>
-                        {false && (
-                          <button
-                            onClick={async () => {
-                              const res = await api.generateWhatsAppLink(esc.student_id, 'OVERDUE_TASK');
-                              window.open(res.encoded_url, '_blank');
-                              loadData();
-                            }}
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+
+                    {/* Metadata Strip */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 pt-1">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[10px] text-slate-400 uppercase font-medium">Reason:</span>
+                        <span className="px-1.5 py-0.2 rounded font-mono text-[11px] bg-slate-100 text-slate-700 border border-slate-200">
+                          {esc.flagged_reason}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Assigned to: <span className="font-medium text-slate-700">{esc.hr_member_name}</span>
+                      </div>
+                    </div>
+
+                    {/* Action */}
+                    <div className="pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => {
+                          setActiveView('chat');
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-2xs transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Open WhatsApp Chat</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}

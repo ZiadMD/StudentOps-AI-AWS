@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { AuditLogItem } from '../types';
-import { Search, Terminal, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw } from 'lucide-react';
 
 export const AuditViewer: React.FC = () => {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
@@ -33,8 +33,7 @@ export const AuditViewer: React.FC = () => {
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center">
-            <Terminal className="w-5 h-5 mr-2 text-slate-700" />
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
             Audit & System Logs
           </h2>
           <p className="text-[12px] text-slate-500 mt-1">Immutable record of all agentic operations and HR changes.</p>
@@ -69,25 +68,27 @@ export const AuditViewer: React.FC = () => {
           </span>
         </div>
         
-        <div className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-1">
+        <div className="flex-1 overflow-y-auto p-4 space-y-1.5 md:space-y-1">
           {filteredLogs.map((log) => (
-            <div key={log.id} className="font-mono text-[11px] hover:bg-white/5 px-2 py-1 -mx-2 rounded transition-colors group flex items-start space-x-3 min-w-[560px]">
-              <span className="text-slate-500 shrink-0">
-                {new Date(log.timestamp).toISOString().replace('T', ' ').substring(0, 19)}
-              </span>
+            <div key={log.id} className="font-mono text-[11px] hover:bg-white/5 px-2 py-1.5 -mx-2 rounded transition-colors group flex flex-col md:flex-row md:items-start md:space-x-3 gap-1 md:gap-0">
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-slate-500 shrink-0 text-[10px] md:text-[11px]">
+                  {new Date(log.timestamp).toISOString().replace('T', ' ').substring(0, 19)}
+                </span>
+                
+                <span className={`shrink-0 text-[10px] md:text-[11px] ${
+                  log.status.includes('error') ? 'text-rose-400' :
+                  log.requires_confirmation && !log.confirmed ? 'text-amber-400' : 'text-blue-400'
+                }`}>
+                  [{log.status.toUpperCase()}]
+                </span>
+                
+                <span className="text-slate-400 shrink-0 truncate max-w-[120px] md:max-w-none md:w-28 text-[10px] md:text-[11px]">
+                  {log.tool_name}
+                </span>
+              </div>
               
-              <span className={`shrink-0 w-24 ${
-                log.status.includes('error') ? 'text-rose-400' :
-                log.requires_confirmation && !log.confirmed ? 'text-amber-400' : 'text-blue-400'
-              }`}>
-                [{log.status.toUpperCase()}]
-              </span>
-              
-              <span className="text-slate-400 shrink-0 w-24 truncate">
-                {log.tool_name}
-              </span>
-              
-              <span className="text-slate-300 break-all">
+              <span className="text-slate-300 break-words flex-1 text-[11px]">
                 {log.intent}
               </span>
             </div>

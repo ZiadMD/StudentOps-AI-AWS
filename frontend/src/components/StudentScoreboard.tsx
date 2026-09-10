@@ -4,7 +4,6 @@ import { StudentScoreSummary, UserProfile } from '../types';
 import {
   Search,
   SlidersHorizontal,
-  ChevronDown,
   Shield,
   Edit3,
   Check,
@@ -175,117 +174,215 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
+      <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-slate-500 text-sm">Loading evaluations…</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[640px]">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  <th className="px-6 py-4 font-medium flex items-center space-x-1">
-                    <span>Rank</span>
-                    <ChevronDown className="w-3 h-3" />
-                  </th>
-                  <th className="px-6 py-4 font-medium">Member</th>
-                  <th className="px-6 py-4 font-medium text-right">Attendance</th>
-                  <th className="px-6 py-4 font-medium text-right">Task Quality (/10)</th>
-                  <th className="px-6 py-4 font-medium text-right">Behavior (/23)</th>
-                  <th className="px-6 py-4 font-medium text-right">Interaction (/5)</th>
-                  <th className="px-6 py-4 font-medium text-right">Bonus</th>
-                  <th className="px-6 py-4 font-medium text-right font-bold text-slate-800" title="Composite score across behavior, tasks, and bonus points">Total Score</th>
-                  <th className="px-6 py-4 font-medium text-right">Final Status</th>
-                  {(canEditBehavior || isHrLeader) && <th className="px-6 py-4 font-medium text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="text-sm divide-y divide-slate-100">
-                {filteredData.map((student, idx) => (
-                  <tr key={student.student_id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        {idx < 3 ? (
-                          <div
-                            className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${
-                              idx === 0
-                                ? 'bg-amber-100 text-amber-700'
-                                : idx === 1
-                                ? 'bg-slate-200 text-slate-700'
-                                : 'bg-amber-50 text-amber-800'
-                            }`}
-                          >
-                            {idx + 1}
-                          </div>
-                        ) : (
-                          <div className="w-6 h-6 rounded flex items-center justify-center text-xs font-medium text-slate-400 bg-slate-50">
-                            {idx + 1}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                          {student.arabic_name}
-                        </span>
-                        <span className="text-[11px] text-slate-500">{student.student_name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-slate-700">
-                      {student.on_time_attendance_count + student.late_attendance_count}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-slate-700">
-                      {student.average_task_quality.toFixed(1)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono">
-                      <span
-                        className={
-                          student.total_behavior_score >= 20 ? 'text-emerald-600 font-bold' : 'text-slate-700'
-                        }
-                      >
-                        {student.total_behavior_score} / 23
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-slate-700">
-                      {student.group_interaction_score ?? 5.0} / 5
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-xs">
-                      {student.bonus_points && student.bonus_points > 0 ? (
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
-                          +{student.bonus_points}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 font-mono">0</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono font-bold text-indigo-700">
-                      {student.total_score !== undefined && student.total_score !== null ? (
-                        student.total_score
-                      ) : (
-                        <span
-                          className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200"
-                          title="Score components are kept separate. Total score formula is pending organization definition."
+          <>
+            {/* Desktop Table View (hidden on mobile) */}
+            <div className="hidden md:block">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3.5 w-16">Rank</th>
+                    <th className="px-5 py-3.5">Member</th>
+                    <th className="px-5 py-3.5 text-right">Attendance</th>
+                    <th className="px-5 py-3.5 text-right">Task Quality</th>
+                    <th className="px-5 py-3.5 text-right">Behavior Score</th>
+                    <th className="px-5 py-3.5 text-right">Bonus</th>
+                    <th className="px-5 py-3.5 text-center">Rating Tier</th>
+                    {(canEditBehavior || isHrLeader) && <th className="px-5 py-3.5 text-right">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody className="text-sm divide-y divide-slate-100">
+                  {filteredData.map((student, idx) => (
+                    <tr key={student.student_id} className="hover:bg-slate-50/60 transition-colors group">
+                      {/* Rank */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <div
+                          className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${
+                            idx === 0
+                              ? 'bg-amber-100 text-amber-800'
+                              : idx === 1
+                              ? 'bg-slate-200 text-slate-800'
+                              : idx === 2
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'text-slate-400 bg-slate-50 font-medium'
+                          }`}
                         >
-                          Separate Components
+                          {idx + 1}
+                        </div>
+                      </td>
+
+                      {/* Member Identity */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900 font-['Cairo'] text-sm group-hover:text-blue-700 transition-colors">
+                            {student.arabic_name}
+                          </span>
+                          <span className="text-[11px] text-slate-500">{student.student_name}</span>
+                        </div>
+                      </td>
+
+                      {/* Attendance */}
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-slate-700 text-xs">
+                        <span>{student.on_time_attendance_count + student.late_attendance_count}</span>
+                        <span className="text-slate-400 text-[10px] ml-1">sessions</span>
+                      </td>
+
+                      {/* Task Quality */}
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-slate-800 text-xs font-semibold">
+                        <span>{student.average_task_quality.toFixed(1)}</span>
+                        <span className="text-slate-400 text-[10px] ml-0.5">/10</span>
+                      </td>
+
+                      {/* Behavior (/23) */}
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-xs">
+                        <span
+                          className={
+                            student.total_behavior_score >= 20 
+                              ? 'text-emerald-700 font-bold' 
+                              : student.total_behavior_score >= 15 
+                              ? 'text-slate-800 font-medium' 
+                              : 'text-amber-700 font-medium'
+                          }
+                        >
+                          {student.total_behavior_score}
                         </span>
+                        <span className="text-slate-400 text-[10px] ml-0.5">/23</span>
+                      </td>
+
+                      {/* Bonus */}
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-xs">
+                        {student.bonus_points && student.bonus_points > 0 ? (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+                            +{student.bonus_points}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Rating Tier */}
+                      <td className="px-5 py-3.5 whitespace-nowrap text-center">
+                        {student.overall_rating === 'Outstanding' ? (
+                          <Badge variant="success" size="sm">Outstanding</Badge>
+                        ) : student.overall_rating === 'Good' ? (
+                          <Badge variant="info" size="sm">Good</Badge>
+                        ) : (
+                          <Badge variant="warning" size="sm">Needs Review</Badge>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      {(canEditBehavior || isHrLeader) && (
+                        <td className="px-5 py-3.5 whitespace-nowrap text-right space-x-1.5">
+                          {canEditBehavior && (
+                            <button
+                              onClick={() => handleOpenEdit(student)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-md transition-colors"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Grade</span>
+                            </button>
+                          )}
+                          {isHrLeader && (
+                            <button
+                              onClick={() => {
+                                setBonusStudent(student);
+                                setBonusPoints(2.0);
+                                setBonusReason('');
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:text-blue-900 bg-blue-50/70 hover:bg-blue-100 border border-blue-200/80 rounded-md transition-colors"
+                            >
+                              <Award className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Bonus</span>
+                            </button>
+                          )}
+                        </td>
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Evaluation Card Transform (Zero horizontal scroll!) */}
+            <div className="block md:hidden divide-y divide-slate-100">
+              {filteredData.map((student, idx) => (
+                <div key={student.student_id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
+                  {/* Card Header: Rank + Bilingual Identity + Rating Badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <div
+                        className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
+                          idx === 0
+                            ? 'bg-amber-100 text-amber-800'
+                            : idx === 1
+                            ? 'bg-slate-200 text-slate-800'
+                            : idx === 2
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'text-slate-400 bg-slate-50 font-medium'
+                        }`}
+                      >
+                        #{idx + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 text-sm font-['Cairo'] truncate">
+                          {student.arabic_name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {student.student_name}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
                       {student.overall_rating === 'Outstanding' ? (
-                        <Badge variant="success">Outstanding</Badge>
+                        <Badge variant="success" size="sm">Outstanding</Badge>
                       ) : student.overall_rating === 'Good' ? (
-                        <Badge variant="info">Good</Badge>
+                        <Badge variant="info" size="sm">Good</Badge>
                       ) : (
-                        <Badge variant="warning">Needs Review</Badge>
+                        <Badge variant="warning" size="sm">Needs Review</Badge>
                       )}
-                    </td>
+                    </div>
+                  </div>
+
+                  {/* 3-Metric Key-Value Strip */}
+                  <div className="grid grid-cols-3 gap-2 p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-center font-mono">
+                    <div>
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-sans font-medium">Behavior</div>
+                      <div className="text-xs font-bold text-slate-800 mt-0.5">{student.total_behavior_score}/23</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-sans font-medium">Task Qual</div>
+                      <div className="text-xs font-bold text-slate-800 mt-0.5">{student.average_task_quality.toFixed(1)}/10</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-sans font-medium">Attendance</div>
+                      <div className="text-xs font-bold text-slate-800 mt-0.5">{student.on_time_attendance_count + student.late_attendance_count} ses</div>
+                    </div>
+                  </div>
+
+                  {/* Optional Bonus Chip & Action Buttons */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <div>
+                      {student.bonus_points && student.bonus_points > 0 ? (
+                        <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-100">
+                          +{student.bonus_points} Bonus Pts
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">No bonus points</span>
+                      )}
+                    </div>
+
                     {(canEditBehavior || isHrLeader) && (
-                      <td className="px-6 py-4 whitespace-nowrap text-right space-x-1.5">
+                      <div className="flex items-center space-x-2">
                         {canEditBehavior && (
                           <button
                             onClick={() => handleOpenEdit(student)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                            className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
                             Grade /23
                           </button>
                         )}
@@ -296,19 +393,24 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                               setBonusPoints(2.0);
                               setBonusReason('');
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md border border-indigo-100 transition-colors"
+                            className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
                           >
-                            <Award className="w-3.5 h-3.5" />
                             Bonus
                           </button>
                         )}
-                      </td>
+                      </div>
                     )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {filteredData.length === 0 && (
+              <div className="py-16 text-center text-slate-400 text-sm">
+                No evaluation records found matching your query.
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -213,9 +213,9 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
                       </div>
 
                       {/* Grading row */}
-                      <div className="flex items-center space-x-3 pl-11">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 pl-0 sm:pl-11">
                         {/* Score chips */}
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-1 shrink-0">
                           {[...Array(selectedTask.max_score)].map((_, i) => (
                             <button
                               key={i}
@@ -231,41 +231,41 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
                               {i + 1}
                             </button>
                           ))}
+                          <span className="text-xs text-slate-400 pl-1">/ {selectedTask.max_score}</span>
                         </div>
 
-                        <span className="text-xs text-slate-400">/ {selectedTask.max_score}</span>
+                        {/* Notes & Save button */}
+                        <div className="flex items-center space-x-2 flex-1 w-full">
+                          <input
+                            type="text"
+                            placeholder="Reviewer note…"
+                            value={local.note}
+                            onChange={e => setGrades(g => ({ ...g, [sub.id]: { ...local, note: e.target.value } }))}
+                            className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs focus:outline-none focus:border-blue-500 transition-all"
+                          />
 
-                        {/* Notes */}
-                        <input
-                          type="text"
-                          placeholder="Reviewer note…"
-                          value={local.note}
-                          onChange={e => setGrades(g => ({ ...g, [sub.id]: { ...local, note: e.target.value } }))}
-                          className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs focus:outline-none focus:border-blue-500 transition-all"
-                        />
-
-                        {/* Save */}
-                        <button
-                          disabled={!local.score || savingSubId === sub.id}
-                          onClick={async () => {
-                            try {
-                              setSavingSubId(sub.id);
-                              await api.reviewTaskSubmission(sub.id, {
-                                score: Number(local.score),
-                                reviewer_notes: local.note,
-                              });
-                              toast.success('Review saved successfully');
-                              if (selectedTask) selectTask(selectedTask);
-                            } catch (err: any) {
-                              toast.error(err.message || 'Failed to save review');
-                            } finally {
-                              setSavingSubId(null);
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          {savingSubId === sub.id ? 'Saving…' : 'Save'}
-                        </button>
+                          <button
+                            disabled={!local.score || savingSubId === sub.id}
+                            onClick={async () => {
+                              try {
+                                setSavingSubId(sub.id);
+                                await api.reviewTaskSubmission(sub.id, {
+                                  score: Number(local.score),
+                                  reviewer_notes: local.note,
+                                });
+                                toast.success('Review saved successfully');
+                                if (selectedTask) selectTask(selectedTask);
+                              } catch (err: any) {
+                                toast.error(err.message || 'Failed to save review');
+                              } finally {
+                                setSavingSubId(null);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                          >
+                            {savingSubId === sub.id ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

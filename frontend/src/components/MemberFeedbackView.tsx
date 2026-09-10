@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { MemberFeedbackItem, UserProfile } from '../types';
 import {
-  MessageSquareHeart,
   Plus,
   Search,
   ShieldCheck,
   Edit2,
   Shield,
+  MessageSquareHeart,
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { Modal } from './ui/Modal';
@@ -137,25 +137,20 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded bg-emerald-600 flex items-center justify-center shadow-sm">
-            <MessageSquareHeart className="w-4 h-4 text-white" />
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+              Member Feedback for HR Members
+            </h2>
+            {isHrHead && (
+              <span className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+                Oversight View (HR Region Head)
+              </span>
+            )}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                Member Feedback for HR Members
-              </h2>
-              {isHrHead && (
-                <span className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
-                  Oversight View (HR Region Head)
-                </span>
-              )}
-            </div>
-            <p className="text-[12px] text-slate-500">
-              Members submit feedback regarding HR Members. Reviewed and actioned by the HR Committee Leader.
-            </p>
-          </div>
+          <p className="text-[12px] text-slate-500 mt-0.5">
+            Members submit feedback regarding HR Members. Reviewed and actioned by the HR Committee Leader.
+          </p>
         </div>
 
         <div className="flex items-center space-x-2">
