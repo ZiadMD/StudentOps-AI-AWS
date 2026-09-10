@@ -4,6 +4,7 @@ Configuration settings for StudentOps AI Backend.
 from typing import Optional
 from pathlib import Path
 from dotenv import load_dotenv
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Always load the project directory .env with override=True
@@ -25,11 +26,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./studentops.db"
     
-    # Supabase PostgreSQL & Cloud Configuration
-    SUPABASE_URL: Optional[str] = "https://xziwgwtavxzmeuzoxwqp.supabase.co"
-    SUPABASE_PUBLISHABLE_KEY: Optional[str] = "sb_publishable_2Ha1ris_9Z5SPkIQRGFwCQ_2DofYfqx"
+    # Supabase PostgreSQL & Cloud Configuration (configured via environment)
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_PUBLISHABLE_KEY: Optional[str] = None
     SUPABASE_SECRET_KEY: Optional[str] = None
-    SUPABASE_JWKS_URL: Optional[str] = "https://xziwgwtavxzmeuzoxwqp.supabase.co/auth/v1/.well-known/jwks.json"
+    SUPABASE_JWKS_URL: Optional[str] = None
 
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
@@ -101,6 +102,16 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            default_secret = "studentops-super-secret-jwt-key-for-dev-only-change-in-prod-12345"
+            if not self.JWT_SECRET_KEY or self.JWT_SECRET_KEY == default_secret:
+                raise ValueError("JWT_SECRET_KEY must be securely configured in production.")
+            if "sqlite" in self.DATABASE_URL:
+                raise ValueError("Production environment must configure a production DATABASE_URL (e.g. PostgreSQL), not SQLite.")
+        return self
 
 
 settings = Settings()

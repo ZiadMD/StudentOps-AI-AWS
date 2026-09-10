@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import init_db, AsyncSessionLocal
@@ -77,11 +78,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CORS middleware with explicit trusted origins, LAN dev, ngrok tunnels, and Vercel preview support
+# CORS middleware with explicit trusted origins, LAN dev, and local development IP ranges
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_origin_regex=r"^(https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?|https:\/\/.*(\.vercel\.app|\.ngrok-free\.app|\.ngrok-free\.dev|\.ngrok\.io))$",
+    allow_origin_regex=r"^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -121,8 +122,16 @@ app.include_router(reports_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
+    db_status = "healthy"
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
+
     return {
-        "status": "healthy",
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "database": db_status,
         "app": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "docs": "/docs"
