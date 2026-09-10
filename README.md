@@ -159,11 +159,15 @@ StudentOps AI uses [OpenRouter](https://openrouter.ai/) as its primary LLM gatew
    ```bash
    uv sync
    ```
-2. Initialize and seed the SQLite database with baseline member records, attendance logs, and tasks:
+2. Apply database migrations:
+   ```bash
+   uv run alembic upgrade head
+   ```
+3. Initialize and seed the SQLite database with baseline member records, attendance logs, and tasks:
    ```bash
    uv run python -m app.seed.seed_data
    ```
-3. Start the FastAPI backend server:
+4. Start the FastAPI backend server:
    ```bash
    uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
    ```
@@ -233,12 +237,13 @@ Test coverage includes:
 - `tests/integration/test_agent_tools.py`: Tool execution sandbox and sensitive confirmation interception.
 - `tests/evals/test_demo_workflow.py`: Multi-turn conversational evaluation of the complete HR workflow.
 
-### Frontend TypeScript Verification
-Ensure all TypeScript definitions and JSX components compile with zero errors:
+### Frontend Testing & Verification
+Run the Vitest unit test suite and ensure all TypeScript definitions and JSX components compile with zero errors:
 
 ```bash
 cd frontend
-npm run build
+npm run test     # Run Vitest unit tests (Modal, Toast, Sidebar gating)
+npm run build    # Strict TypeScript typecheck + production build
 ```
 
 ---

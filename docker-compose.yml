@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  # OpenWA Headless WhatsApp Gateway
+  openwa:
+    image: openwa/wa-automate:latest
+    container_name: studentops-openwa
+    restart: unless-stopped
+    ports:
+      - "2785:2785"
+    environment:
+      - PORT=2785
+      - AUTH_KEY=${OPENWA_API_KEY:-dev_openwa_key_change_in_prod}
+    volumes:
+      - openwa_data:/home/node/app/session
+
   # Cloudflare Tunnel for zero-cost secure HTTPS access without port forwarding
   tunnel:
     image: cloudflare/cloudflared:latest
@@ -10,4 +23,7 @@ services:
     command: tunnel run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+
+volumes:
+  openwa_data:
 
