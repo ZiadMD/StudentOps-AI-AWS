@@ -25,6 +25,7 @@ import {
   WhatsAppChatMessage,
   WhatsAppThreadSummary,
 } from '../types';
+import { useToast } from '../context/ToastContext';
 
 const isSafeMediaUrl = (url?: string | null): boolean => {
   if (!url) return false;
@@ -54,6 +55,7 @@ interface WhatsAppChatWindowProps {
 const QUICK_REACTIONS = ['👍', '❤️', '✅', '🙏', '👏', '👀'];
 
 export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentUser }) => {
+  const toast = useToast();
   const isLeader =
     currentUser.role === 'committee_hr_leader' ||
     currentUser.role === 'region_hr_head' ||
@@ -274,7 +276,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
       setInputText('');
       setReplyToMsg(null);
     } catch (err: any) {
-      alert(`Message dispatch failed: ${err.message || 'Check connection'}`);
+      toast.error(`Message dispatch failed: ${err.message || 'Check connection'}`);
     } finally {
       setSending(false);
     }

@@ -8,15 +8,17 @@ import {
   Send,
   Plus,
   Search,
-  X,
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
+import { Modal } from './ui/Modal';
+import { useToast } from '../context/ToastContext';
 
 interface CommitteeQnAProps {
   currentUser?: UserProfile | null;
 }
 
 export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
+  const toast = useToast();
   const [questions, setQuestions] = useState<MemberQuestionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -65,8 +67,9 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
       setNewContent('');
       setShowAskModal(false);
       await loadQuestions();
+      toast.success('Inquiry submitted to Committee Head successfully.');
     } catch (err: any) {
-      alert(err.message || 'Failed to submit question');
+      toast.error(err.message || 'Failed to submit question');
     } finally {
       setSubmittingAsk(false);
     }
@@ -81,8 +84,9 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
       setAnsweringQuestion(null);
       setAnswerText('');
       await loadQuestions();
+      toast.success('Guidance and answer published successfully.');
     } catch (err: any) {
-      alert(err.message || 'Failed to answer question');
+      toast.error(err.message || 'Failed to answer question');
     } finally {
       setSubmittingAnswer(false);
     }
@@ -248,89 +252,72 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
       )}
 
       {/* Modal: Ask Question */}
-      {showAskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm">Ask Committee Head</h3>
-              <button
-                onClick={() => setShowAskModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAskSubmit} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Subject / Topic</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Target Aspect Ratio for Reel Submission"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Question Details</label>
-                <textarea
-                  rows={4}
-                  placeholder="Describe your technical or workflow question in detail..."
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAskModal(false)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingAsk}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
-                >
-                  {submittingAsk ? 'Submitting...' : 'Send Inquiry'}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showAskModal}
+        onClose={() => setShowAskModal(false)}
+        title="Ask Committee Head"
+        description="Submit a question regarding deliverables, workflow, or tools."
+        size="md"
+      >
+        <form onSubmit={handleAskSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Subject / Topic</label>
+            <input
+              type="text"
+              placeholder="e.g., Target Aspect Ratio for Reel Submission"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              required
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Question Details</label>
+            <textarea
+              rows={4}
+              placeholder="Describe your technical or workflow question in detail..."
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowAskModal(false)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submittingAsk}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+            >
+              {submittingAsk ? 'Submitting...' : 'Send Inquiry'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal: Answer Question */}
-      {answeringQuestion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm">
-                Answer Question: {answeringQuestion.title}
-              </h3>
-              <button
-                onClick={() => setAnsweringQuestion(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
+      <Modal
+        isOpen={!!answeringQuestion}
+        onClose={() => setAnsweringQuestion(null)}
+        title={answeringQuestion ? `Answer Question: ${answeringQuestion.title}` : "Answer Question"}
+        size="md"
+      >
+        {answeringQuestion && (
+          <div className="space-y-4">
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs text-slate-700">
               <p className="font-semibold text-slate-900 mb-1">Member Inquired:</p>
               <p>{answeringQuestion.content}</p>
             </div>
 
-            <form onSubmit={handleAnswerSubmit} className="space-y-3">
+            <form onSubmit={handleAnswerSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Official Guidance / Answer
@@ -345,7 +332,7 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setAnsweringQuestion(null)}
@@ -363,8 +350,8 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
               </div>
             </form>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 };

@@ -5,12 +5,14 @@ import {
   ChevronRight, CheckCircle2, Circle, Clock, Search,
   ExternalLink, Shield
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface TaskReviewsPageProps {
   currentUser?: UserProfile | null;
 }
 
 export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser }) => {
+  const toast = useToast();
   const [tasks, setTasks]               = useState<TaskItem[]>([]);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [subs, setSubs]                 = useState<SubmissionItem[]>([]);
@@ -252,9 +254,10 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
                                 score: Number(local.score),
                                 reviewer_notes: local.note,
                               });
+                              toast.success('Review saved successfully');
                               if (selectedTask) selectTask(selectedTask);
                             } catch (err: any) {
-                              alert(err.message);
+                              toast.error(err.message || 'Failed to save review');
                             } finally {
                               setSavingSubId(null);
                             }
