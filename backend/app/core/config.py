@@ -7,12 +7,12 @@ from dotenv import load_dotenv
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Always load the project directory .env with override=True
+# Load the project directory .env without overriding explicitly set environment variables
 _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 if _env_path.exists():
-    load_dotenv(_env_path, override=True)
+    load_dotenv(_env_path, override=False)
 else:
-    load_dotenv(override=True)
+    load_dotenv(override=False)
 
 
 class Settings(BaseSettings):

@@ -77,44 +77,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-POSTGRES_SAFE_MIGRATIONS = [
-    "ALTER TABLE students ADD COLUMN IF NOT EXISTS assigned_hr_id VARCHAR(36) REFERENCES users(id);",
-    "CREATE INDEX IF NOT EXISTS ix_students_assigned_hr_id ON students(assigned_hr_id);",
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS technical_score FLOAT;",
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS graded_by_user_id VARCHAR(36) REFERENCES users(id);",
-    "CREATE INDEX IF NOT EXISTS ix_submissions_graded_by_user_id ON submissions(graded_by_user_id);",
-    "ALTER TABLE score_records ADD COLUMN IF NOT EXISTS month VARCHAR(7);",
-    "ALTER TABLE score_records ADD COLUMN IF NOT EXISTS graded_by_user_id VARCHAR(36) REFERENCES users(id);",
-    "CREATE INDEX IF NOT EXISTS ix_score_records_month ON score_records(month);",
-    "CREATE INDEX IF NOT EXISTS ix_score_records_graded_by_user_id ON score_records(graded_by_user_id);",
-    "ALTER TABLE meetings ADD COLUMN IF NOT EXISTS session_number INTEGER DEFAULT 1;",
-    "ALTER TABLE member_feedbacks ADD COLUMN IF NOT EXISTS hr_member_id VARCHAR(36) REFERENCES users(id);",
-    "ALTER TABLE member_feedbacks ADD COLUMN IF NOT EXISTS hr_member_name VARCHAR(100);",
-]
-
-
 async def init_db():
-    """Initializes the database schema and verifies required incremental columns."""
+    """Initializes the database schema."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        if engine.dialect.name == "postgresql":
-            for stmt in POSTGRES_SAFE_MIGRATIONS:
-                await conn.execute(text(stmt))
-        elif engine.dialect.name == "sqlite":
-            # Incremental safe migrations for SQLite
-            res = await conn.execute(text("PRAGMA table_info(meetings)"))
-            cols = [r[1] for r in res.fetchall()]
-            if cols and "responsible_user_id" not in cols:
-                await conn.execute(text("ALTER TABLE meetings ADD COLUMN responsible_user_id VARCHAR(36) REFERENCES users(id)"))
-            if cols and "team_id" not in cols:
-                await conn.execute(text("ALTER TABLE meetings ADD COLUMN team_id VARCHAR(36) REFERENCES teams(id)"))
-            if cols and "session_number" not in cols:
-                await conn.execute(text("ALTER TABLE meetings ADD COLUMN session_number INTEGER DEFAULT 1"))
-
-            res_fb = await conn.execute(text("PRAGMA table_info(member_feedbacks)"))
-            cols_fb = [r[1] for r in res_fb.fetchall()]
-            if cols_fb and "hr_member_id" not in cols_fb:
-                await conn.execute(text("ALTER TABLE member_feedbacks ADD COLUMN hr_member_id VARCHAR(36) REFERENCES users(id)"))
-            if cols_fb and "hr_member_name" not in cols_fb:
-                await conn.execute(text("ALTER TABLE member_feedbacks ADD COLUMN hr_member_name VARCHAR(100)"))
 
