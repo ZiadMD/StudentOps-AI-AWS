@@ -932,41 +932,48 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
             org_id = org_res.scalar()
             if not org_id:
                 org_id = "a6bbd5c1-354a-4b4a-8459-0911e1bc086f"
-                await db.execute(text(
-                    f"INSERT INTO organizations (id, name) VALUES ('{org_id}', 'EYE / IEEE Student Activity') ON CONFLICT DO NOTHING;"
-                ))
+                await db.execute(
+                    text("INSERT INTO organizations (id, name) VALUES (:org_id, 'EYE / IEEE Student Activity') ON CONFLICT DO NOTHING;"),
+                    {"org_id": org_id}
+                )
 
-            await db.execute(text(f"""
-                INSERT INTO members (id, organization_id, name, email, role, phone_number, created_at)
-                SELECT 
-                    gen_random_uuid(),
-                    '{org_id}'::uuid,
-                    s.full_name,
-                    s.email,
-                    s.role,
-                    s.phone,
-                    s.created_at
-                FROM students s
-                ON CONFLICT (email) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    role = EXCLUDED.role,
-                    phone_number = EXCLUDED.phone_number;
-            """))
-            await db.execute(text(f"""
-                INSERT INTO members (id, organization_id, name, email, role, phone_number, created_at)
-                SELECT 
-                    gen_random_uuid(),
-                    '{org_id}'::uuid,
-                    u.full_name,
-                    u.email,
-                    u.role,
-                    NULL,
-                    u.created_at
-                FROM users u
-                ON CONFLICT (email) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    role = EXCLUDED.role;
-            """))
+            await db.execute(
+                text("""
+                    INSERT INTO members (id, organization_id, name, email, role, phone_number, created_at)
+                    SELECT 
+                        gen_random_uuid(),
+                        :org_id::uuid,
+                        s.full_name,
+                        s.email,
+                        s.role,
+                        s.phone,
+                        s.created_at
+                    FROM students s
+                    ON CONFLICT (email) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        role = EXCLUDED.role,
+                        phone_number = EXCLUDED.phone_number;
+                """),
+                {"org_id": org_id}
+            )
+            await db.execute(
+                text("""
+                    INSERT INTO members (id, organization_id, name, email, role, phone_number, created_at)
+                    SELECT 
+                        gen_random_uuid(),
+                        :org_id::uuid,
+                        u.full_name,
+                        u.email,
+                        u.role,
+                        NULL,
+                        u.created_at
+                    FROM users u
+                    ON CONFLICT (email) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        role = EXCLUDED.role;
+                """),
+                {"org_id": org_id}
+            )
     except Exception:
         pass
 

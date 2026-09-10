@@ -91,7 +91,7 @@ async def get_dashboard_stats(
         sub_res = await db.execute(sub_query)
         pending_submissions = sub_res.scalar() or 0
     else:
-        pending_submissions = 0
+        pending_submissions = None
 
     # 5. Recent Agent Actions Count
     act_res = await db.execute(select(func.count(AgentActionAudit.id)))
