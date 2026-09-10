@@ -31,6 +31,42 @@ class IdentityMatcher:
         return t
 
     @classmethod
+    def _get_tokens(cls, normalized_text: str) -> set[str]:
+        """Extract meaningful tokens (length >= 3)."""
+        return {tok for tok in normalized_text.split() if len(tok) >= 3}
+
+    @classmethod
+    def _match_name_tokens(cls, query_norm: str, target_norm: str) -> tuple[bool, float]:
+        """
+        Evaluate token similarity between query name and target student name.
+        Avoids false positives from short substrings (e.g., 'ali' in 'khalid').
+        Returns (is_match, confidence).
+        """
+        if not query_norm or not target_norm:
+            return False, 0.0
+
+        if query_norm == target_norm:
+            return True, 0.95
+
+        tokens_q = cls._get_tokens(query_norm)
+        tokens_t = cls._get_tokens(target_norm)
+
+        if not tokens_q or not tokens_t:
+            return False, 0.0
+
+        if tokens_q == tokens_t:
+            return True, 0.95
+
+        common = tokens_q & tokens_t
+        # Require at least 2 tokens matched, or all tokens if query is specific
+        if len(common) >= 2 or (len(common) == len(tokens_q) and len(tokens_q) >= 1 and len(tokens_t) <= 2):
+            jaccard = len(common) / len(tokens_q | tokens_t)
+            confidence = round(0.70 + (0.25 * jaccard), 2)
+            return True, confidence
+
+        return False, 0.0
+
+    @classmethod
     def match_participant(
         cls,
         display_name: str,
@@ -55,11 +91,14 @@ class IdentityMatcher:
         if norm_name:
             for s in students:
                 norm_arabic = cls.normalize_text(s.get("arabic_name", ""))
-                if norm_arabic and (norm_name == norm_arabic or norm_name in norm_arabic or norm_arabic in norm_name):
-                    return MatchResult(student_id=s["id"], confidence=0.95, matched_by="ARABIC_NAME")
+                matched, conf = cls._match_name_tokens(norm_name, norm_arabic)
+                if matched:
+                    return MatchResult(student_id=s["id"], confidence=conf, matched_by="ARABIC_NAME")
                 
                 norm_full = cls.normalize_text(s.get("full_name", ""))
-                if norm_full and (norm_name == norm_full or norm_name in norm_full or norm_full in norm_name):
-                    return MatchResult(student_id=s["id"], confidence=0.90, matched_by="LATIN_NAME")
+                matched, conf = cls._match_name_tokens(norm_name, norm_full)
+                if matched:
+                    return MatchResult(student_id=s["id"], confidence=conf, matched_by="LATIN_NAME")
 
         return MatchResult(student_id=None, confidence=0.0, matched_by="NONE")
+
