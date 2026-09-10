@@ -214,6 +214,10 @@ class ScoreRecord(Base):
     """Behavior and overall engagement scores according to 8.xlsx standards."""
     __tablename__ = "score_records"
 
+    __table_args__ = (
+        UniqueConstraint("student_id", "category", "month", name="uq_score_records_student_category_month"),
+    )
+
     id = Column(String(36), primary_key=True, index=True)
     student_id = Column(String(36), ForeignKey("students.id"), nullable=False, index=True)
     category = Column(String(50), nullable=False)  # "GROUP_INTERACTION", "SOCIAL_MEDIA", "HIERARCHY_RULES", "POLITE_CONDUCT", "TASK_AVERAGE"
@@ -310,7 +314,7 @@ class WhatsAppChatMessage(Base):
     recipient_phone = Column(String(30), nullable=False)
     message_type = Column(String(30), default="text")  # "text", "image", "video", "document", "audio", "reaction"
     content = Column(Text, nullable=False)
-    media_url = Column(String(500), nullable=True)
+    media_url = Column(Text, nullable=True)
     media_filename = Column(String(255), nullable=True)
     media_mimetype = Column(String(100), nullable=True)
     status = Column(String(20), default="pending")  # "pending", "sent", "delivered", "read", "failed"

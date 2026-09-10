@@ -228,8 +228,9 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   submitTask: (taskId: string, fileUrl: string) =>
-    fetchJson<SubmissionItem>(`/tasks/${taskId}/submit?file_url=${encodeURIComponent(fileUrl)}`, {
+    fetchJson<SubmissionItem>(`/tasks/${taskId}/submit`, {
       method: 'POST',
+      body: JSON.stringify({ file_url: fileUrl }),
     }),
 
   // Member Feedback (Flows to HR Leader)

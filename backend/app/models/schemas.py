@@ -199,8 +199,12 @@ class SubmissionSchema(BaseModel):
     graded_by_user_id: Optional[str] = None
 
 
+class TaskSubmitRequest(BaseModel):
+    file_url: str = Field(..., min_length=1, description="Deliverable or file URL for task submission")
+
+
 class TechnicalScoreUpdate(BaseModel):
-    score: float = Field(..., ge=0.0, le=10.0, description="Technical score out of 10")
+    score: float = Field(..., ge=0.0, description="Technical score evaluated against task max_score")
     reviewer_notes: Optional[str] = ""
 
 
@@ -381,7 +385,7 @@ class DashboardStats(BaseModel):
     absent_today: int
     attendance_rate_today: float
     upcoming_meetings_count: int
-    pending_submissions_count: int
+    pending_submissions_count: Optional[int] = None
     recent_actions_count: int
 
 
