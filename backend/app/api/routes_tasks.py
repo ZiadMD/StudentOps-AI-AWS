@@ -3,7 +3,7 @@ Tasks and Submissions Endpoints.
 """
 from typing import Optional
 from datetime import timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -18,6 +18,7 @@ from app.models.schemas import (
     TechnicalScoreUpdate,
     TaskCreateRequest,
     TaskAssignRequest,
+    TaskSubmitRequest,
 )
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -399,6 +400,12 @@ async def review_submission(
                 detail="Access forbidden: this student belongs to a different committee."
             )
 
+    if body.score > task.max_score:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Score {body.score} exceeds maximum score of {task.max_score} for this task."
+        )
+
     submission.score = body.score
     submission.technical_score = body.score
     submission.reviewer_notes = body.reviewer_notes or ""
@@ -429,11 +436,16 @@ async def review_submission(
 @router.post("/{task_id}/submit", response_model=SubmissionSchema)
 async def submit_task(
     task_id: str,
-    file_url: str,
+    body: Optional[TaskSubmitRequest] = None,
+    file_url: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["committee_member", "member"]))
 ):
     """Allows a committee member student to submit work for a task."""
+    resolved_file_url = (body.file_url if body and body.file_url else file_url)
+    if not resolved_file_url:
+        raise HTTPException(status_code=400, detail="file_url is required")
+
     if not current_user.student_id:
         raise HTTPException(status_code=400, detail="User is not linked to a student record")
 
@@ -457,7 +469,7 @@ async def submit_task(
             deadline = deadline.replace(tzinfo=timezone.utc)
         elif deadline.tzinfo is not None and now.tzinfo is None:
             now = now.replace(tzinfo=timezone.utc)
-        status_str = "ON_TIME" if now <= deadline else "LATE"
+        status_str = "LATE" if now > deadline else "ON_TIME"
     else:
         status_str = "ON_TIME"
 
@@ -469,13 +481,13 @@ async def submit_task(
             student_id=current_user.student_id,
             submitted_at=now,
             status=status_str,
-            file_url=file_url,
+            file_url=resolved_file_url,
         )
         db.add(submission)
     else:
         submission.submitted_at = now
         submission.status = status_str
-        submission.file_url = file_url
+        submission.file_url = resolved_file_url
 
     await db.commit()
     await db.refresh(submission)
