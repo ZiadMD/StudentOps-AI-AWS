@@ -20,17 +20,23 @@ from app.providers.messaging_provider import (
 
 
 def format_phone_international(phone: str) -> str:
-    """Sanitizes phone numbers into international digits-only format (defaults to Egypt +20)."""
-    digits = re.sub(r"\D", "", phone)
+    """Sanitizes phone numbers into international digits-only format (defaults to Egypt +20 for domestic numbers)."""
+    raw = phone.strip()
+    if not raw:
+        return ""
+    is_explicit_intl = raw.startswith("+") or raw.startswith("00")
+    digits = re.sub(r"\D", "", raw)
     if not digits:
         return ""
-    if digits.startswith("00"):
+    if raw.startswith("00"):
         digits = digits[2:]
-    elif digits.startswith("0") and len(digits) == 11:
-        # Egyptian mobile format: 010..., 011..., 012..., 015...
-        digits = "20" + digits[1:]
-    elif len(digits) == 10 and digits.startswith("1"):
-        digits = "20" + digits
+    elif not is_explicit_intl:
+        if digits.startswith("0") and len(digits) == 11:
+            # Egyptian local mobile format: 010..., 011..., 012..., 015...
+            digits = "20" + digits[1:]
+        elif len(digits) == 10 and digits.startswith("1"):
+            # Egyptian local without 0: 10..., 11..., 12..., 15...
+            digits = "20" + digits
     return digits
 
 

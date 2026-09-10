@@ -53,3 +53,19 @@ def test_unmatched_fallback():
     assert match.student_id is None
     assert match.matched_by == "NONE"
     assert match.confidence == 0.0
+
+
+def test_false_substring_match_prevented():
+    """
+    Ensure that a name containing a short substring of another student (e.g. 'Khalid' containing 'ali')
+    is NOT incorrectly matched to that student.
+    """
+    match = IdentityMatcher.match_participant(
+        display_name="Khalid",
+        email=None,
+        students=STUDENTS
+    )
+    assert match.student_id is None
+    assert match.matched_by == "NONE"
+    assert match.confidence == 0.0
+

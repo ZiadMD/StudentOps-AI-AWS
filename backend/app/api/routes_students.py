@@ -15,6 +15,7 @@ from app.models.schemas import (
     BonusAwardRequest,
 )
 from app.services.scoring_service import ScoringService
+from app.agent.tools import escape_like
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -50,7 +51,7 @@ async def list_students(
         query = query.where(Student.id == current_user.student_id)
 
     if role:
-        query = query.where(Student.role.ilike(f"%{role}%"))
+        query = query.where(Student.role.ilike(f"%{escape_like(role.strip())}%"))
     if status_filter:
         query = query.where(Student.status == status_filter.upper())
 
