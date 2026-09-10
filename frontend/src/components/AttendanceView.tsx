@@ -143,107 +143,199 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
+      <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 text-sm">Ingesting Meet records...</div>
+          <div className="p-12 text-center text-slate-500 text-sm">Loading attendance sessions…</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[640px]">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  <th className="px-6 py-4 font-medium">Session / Event</th>
-                  <th className="px-6 py-4 font-medium">Date &amp; Duration</th>
-                  <th className="px-6 py-4 font-medium">Attendance Ratio</th>
-                  <th className="px-6 py-4 font-medium text-right">Metrics (P / L / A)</th>
-                  <th className="px-6 py-4 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm divide-y divide-slate-100">
-                {filteredMeetings.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-3">
+          <>
+            {/* Desktop Table View (hidden on mobile) */}
+            <div className="hidden md:block">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3.5">Session / Event</th>
+                    <th className="px-5 py-3.5">Date &amp; Duration</th>
+                    <th className="px-5 py-3.5 w-72">Attendance Health</th>
+                    <th className="px-5 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm divide-y divide-slate-100">
+                  {filteredMeetings.map((m) => {
+                    const totalRecorded = (m.present_count || 0) + (m.late_count || 0) + (m.absent_count || 0);
+                    const totalExpected = m.total_expected > 0 ? m.total_expected : totalRecorded;
+                    const calculatedMax = totalExpected > 0 ? totalExpected : 1;
+                    const ratio = Math.round(((m.present_count || 0) / calculatedMax) * 100);
+
+                    return (
+                      <tr key={m.id} className="hover:bg-slate-50/60 transition-colors group">
+                        {/* Session Identity */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                              <Video className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-900">{m.title}</div>
+                              <div className="text-[11px] font-mono text-slate-500">{m.meeting_code}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Date & Duration */}
+                        <td className="px-5 py-3.5 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className="text-slate-800 text-xs font-medium">
+                              {new Date(m.start_time).toLocaleDateString([], {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            <span className="text-[11px] text-slate-500">{m.duration_minutes} minutes</span>
+                          </div>
+                        </td>
+
+                        {/* Unified Attendance Health (Merged Progress Bar + P/L/A Metrics) */}
+                        <td className="px-5 py-3.5">
+                          <div className="space-y-1.5">
+                            <ProgressBar
+                              value={m.present_count}
+                              max={calculatedMax}
+                              color={ratio >= 70 ? 'emerald' : 'amber'}
+                              showPercentage={false}
+                            />
+                            <div className="flex items-center justify-between text-[11px] font-mono">
+                              <span className="text-slate-500 font-sans font-medium">{ratio}% Present</span>
+                              <div className="space-x-1.5">
+                                <span className="text-emerald-700 font-bold">{m.present_count} P</span>
+                                <span className="text-slate-300">·</span>
+                                <span className="text-amber-700 font-bold">{m.late_count} L</span>
+                                <span className="text-slate-300">·</span>
+                                <span className="text-rose-700 font-bold">{m.absent_count} A</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-5 py-3.5 whitespace-nowrap text-right space-x-2">
+                          {isHrMember && (
+                            <button
+                              onClick={() => handleProcessAttendance(m.id)}
+                              disabled={processingId === m.id}
+                              className="inline-flex items-center space-x-1 text-slate-700 hover:text-slate-900 font-semibold text-xs border border-slate-200 px-2.5 py-1 rounded-md bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
+                              title="Take/re-process attendance and update absence follow-up flags"
+                            >
+                              <RefreshCw className={`w-3 h-3 ${processingId === m.id ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+                              <span>Process</span>
+                            </button>
+                          )}
+
+                          {m.meet_url ? (
+                            <a
+                              href={m.meet_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold text-xs transition-colors"
+                            >
+                              <span>Join</span>
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Ended</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Session Card Transform (Zero horizontal scroll!) */}
+            <div className="block md:hidden divide-y divide-slate-100">
+              {filteredMeetings.map((m) => {
+                const totalRecorded = (m.present_count || 0) + (m.late_count || 0) + (m.absent_count || 0);
+                const totalExpected = m.total_expected > 0 ? m.total_expected : totalRecorded;
+                const calculatedMax = totalExpected > 0 ? totalExpected : 1;
+                const ratio = Math.round(((m.present_count || 0) / calculatedMax) * 100);
+
+                return (
+                  <div key={m.id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
+                    {/* Session Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center space-x-2.5 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
                           <Video className="w-4 h-4 text-blue-600" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-900">{m.title}</span>
-                            {m.session_number && (
-                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                                Session #{m.session_number}
-                              </span>
-                            )}
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-900 text-sm truncate">{m.title}</div>
+                          <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1.5 mt-0.5">
+                            <span>{m.meeting_code}</span>
+                            <span>·</span>
+                            <span>{new Date(m.start_time).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                           </div>
-                          <div className="text-[11px] font-mono text-slate-500">{m.meeting_code}</div>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="text-slate-700">
-                          {new Date(m.start_time).toLocaleDateString([], {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </span>
-                        <span className="text-[11px] text-slate-500">{m.duration_minutes} minutes</span>
+                    </div>
+
+                    {/* Attendance Health Meter */}
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-slate-700">Attendance: {ratio}%</span>
+                        <div className="font-mono text-[11px] space-x-1.5">
+                          <span className="text-emerald-700 font-bold">{m.present_count} P</span>
+                          <span className="text-slate-300">·</span>
+                          <span className="text-amber-700 font-bold">{m.late_count} L</span>
+                          <span className="text-slate-300">·</span>
+                          <span className="text-rose-700 font-bold">{m.absent_count} A</span>
+                        </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 w-64">
                       <ProgressBar
                         value={m.present_count}
-                        max={m.total_expected || 1}
-                        color={m.present_count / (m.total_expected || 1) > 0.8 ? 'emerald' : 'amber'}
-                        label="Ratio"
+                        max={calculatedMax}
+                        color={ratio >= 70 ? 'emerald' : 'amber'}
+                        showPercentage={false}
                       />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end space-x-2 font-mono text-xs">
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          {m.present_count} P
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100">
-                          {m.late_count} L
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-100">
-                          {m.absent_count} A
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                    </div>
+
+                    {/* Actions Strip */}
+                    <div className="flex items-center justify-end space-x-2 pt-1">
                       {isHrMember && (
                         <button
                           onClick={() => handleProcessAttendance(m.id)}
                           disabled={processingId === m.id}
-                          className="inline-flex items-center space-x-1 text-slate-600 hover:text-slate-900 font-medium text-xs border border-slate-200 px-2 py-1 rounded bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
-                          title="Take/re-process attendance and update absence follow-up flags"
+                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs transition-colors"
                         >
-                          <RefreshCw className={`w-3 h-3 ${processingId === m.id ? 'animate-spin' : ''}`} />
-                          <span>Process</span>
+                          <RefreshCw className={`w-3 h-3 ${processingId === m.id ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+                          <span>Process Roster</span>
                         </button>
                       )}
-
                       {m.meet_url ? (
                         <a
                           href={m.meet_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-medium text-xs transition-colors"
+                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-2xs transition-colors"
                         >
-                          <span>Join Room</span>
+                          <span>Join Meet</span>
                           <ArrowUpRight className="w-3.5 h-3.5" />
                         </a>
                       ) : (
-                        <span className="text-slate-400 text-xs italic">Ended</span>
+                        <span className="text-xs text-slate-400 italic">Session Concluded</span>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {filteredMeetings.length === 0 && (
+              <div className="py-16 text-center text-slate-400 text-sm">
+                No meeting records match your filter.
+              </div>
+            )}
+          </>
         )}
       </div>
 

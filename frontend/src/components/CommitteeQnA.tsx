@@ -3,7 +3,6 @@ import { api } from '../api/client';
 import { MemberQuestionItem, UserProfile } from '../types';
 import {
   HelpCircle,
-  MessageCircleQuestion,
   CheckCircle2,
   Send,
   Plus,
@@ -108,18 +107,13 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center shadow-sm">
-            <MessageCircleQuestion className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-              Social Media Committee Q&amp;A
-            </h2>
-            <p className="text-[12px] text-slate-500">
-              Members ask technical &amp; workflow questions; Committee Head provides authoritative answers.
-            </p>
-          </div>
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            Social Media Committee Q&amp;A
+          </h2>
+          <p className="text-[12px] text-slate-500 mt-0.5">
+            Members ask technical &amp; workflow questions; Committee Head provides authoritative answers.
+          </p>
         </div>
 
         <div className="flex items-center space-x-2">

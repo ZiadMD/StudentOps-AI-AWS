@@ -55,6 +55,7 @@ Frontend (App.tsx) → FastAPI (/api) → ReAct Agent (/agent) → Policy Engine
 - **Bilingual** — English + Arabic (`arabic_name`, Cairo font)
 - **Strict TypeScript** — `npm run build` must pass with 0 errors
 - **Async everywhere** — DB (AsyncSession), HTTP (httpx.AsyncClient)
+- **Zero AI Slop & Data Honesty** — Never fabricate trends/deltas, never use sci-fi/cockpit cosplay, never display ghost shortcuts without key listeners, and never drop fetched API data. Enforce `.agents/skills/anti-ai-slop-design/SKILL.md`.
 
 ## Team Git & Collaboration Workflow (5-Person Model)
 
@@ -99,6 +100,7 @@ To prevent merge conflicts, broken builds, and duplicate work in a 5-developer t
 - [ ] No hardcoded secrets in source
 - [ ] No emoji slop in new code
 - [ ] Bilingual strings preserved
+- [ ] Anti-AI-slop audit passed (no fake trends, no ghost shortcuts, grounded domain terminology)
 
 ## Reference Files
 

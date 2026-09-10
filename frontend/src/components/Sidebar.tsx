@@ -8,8 +8,6 @@ import {
   ShieldCheck,
   Video,
   Layers,
-  Search,
-  Command,
   Settings,
   Bell,
   ClipboardList,
@@ -186,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [isMobileOpen]);
 
-  // Handle ESC key to close mobile menu & desktop keyboard shortcut
+  // Handle ESC key to close mobile menu & desktop keyboard shortcuts (Cmd+B to collapse, Cmd+K to search/chat)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isMobileOpen) {
@@ -224,86 +222,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Top Section */}
       <div className="flex flex-col flex-1 min-h-0">
         {/* Header & Brand */}
-        <div className="h-16 md:h-14 flex items-center justify-between px-4 md:px-3 border-b border-slate-200/60 shrink-0">
-          {/* Logo / Workspace Info */}
-          <div className={`flex items-center space-x-2.5 overflow-hidden ${isDesktopCollapsed ? 'md:justify-center md:w-full' : ''}`}>
-            <div
-              className="w-8 h-8 md:w-6 md:h-6 rounded-lg md:rounded-md bg-slate-900 flex items-center justify-center shrink-0 shadow-xs"
-              title="StudentOps.AI"
-            >
-              <Layers className="w-4 h-4 md:w-3.5 md:h-3.5 text-white" />
-            </div>
-            <div className={`flex flex-col min-w-0 ${isDesktopCollapsed ? 'md:hidden' : 'block'}`}>
-              <span className="font-bold text-sm md:text-[13px] text-slate-900 truncate leading-tight">StudentOps.AI</span>
-              <span className="text-[11px] md:text-[10px] text-slate-500 truncate">Engineering Branch</span>
-            </div>
-          </div>
+        <div className={`h-16 md:h-14 flex items-center border-b border-slate-200/60 shrink-0 ${
+          isDesktopCollapsed ? 'md:justify-center px-2' : 'justify-between px-4 md:px-3'
+        }`}>
+          {!isDesktopCollapsed ? (
+            <>
+              {/* Logo / Workspace Info */}
+              <div className="flex items-center space-x-2.5 overflow-hidden">
+                <div
+                  className="w-8 h-8 md:w-6 md:h-6 rounded-lg md:rounded-md bg-slate-900 flex items-center justify-center shrink-0 shadow-xs"
+                  title="StudentOps.AI"
+                >
+                  <Layers className="w-4 h-4 md:w-3.5 md:h-3.5 text-white" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-bold text-sm md:text-[13px] text-slate-900 truncate leading-tight">StudentOps.AI</span>
+                  <span className="text-[11px] md:text-[10px] text-slate-500 truncate">Engineering Branch</span>
+                </div>
+              </div>
 
-          {/* Mobile Close Button (Native App Style) */}
-          <button
-            onClick={() => setIsMobileOpen(false)}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 transition-colors md:hidden focus:outline-none focus:ring-2 focus:ring-slate-300"
-            aria-label="Close navigation menu"
-          >
-            <X className="w-6 h-6" />
-          </button>
+              {/* Mobile Close Button (Native App Style) */}
+              <button
+                onClick={() => setIsMobileOpen(false)}
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 transition-colors md:hidden focus:outline-none focus:ring-2 focus:ring-slate-300"
+                aria-label="Close navigation menu"
+              >
+                <X className="w-6 h-6" />
+              </button>
 
-          {/* Desktop Collapse / Expand Toggle Button */}
-          {setIsDesktopCollapsed && (
-            <button
-              onClick={() => setIsDesktopCollapsed(prev => !prev)}
-              className={`hidden md:flex p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300 ${
-                isDesktopCollapsed ? 'hidden' : ''
-              }`}
-              title="Collapse sidebar (⌘B)"
-              aria-label="Collapse sidebar"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </button>
+              {/* Desktop Collapse Toggle Button */}
+              {setIsDesktopCollapsed && (
+                <button
+                  onClick={() => setIsDesktopCollapsed(true)}
+                  className="hidden md:flex p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300"
+                  title="Collapse sidebar (⌘B)"
+                  aria-label="Collapse sidebar"
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </button>
+              )}
+            </>
+          ) : (
+            /* Desktop Collapsed State: Single Centered Expand Button */
+            setIsDesktopCollapsed && (
+              <button
+                onClick={() => setIsDesktopCollapsed(false)}
+                className="hidden md:flex w-9 h-9 items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300"
+                title="Expand sidebar (⌘B)"
+                aria-label="Expand sidebar"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+            )
           )}
-        </div>
-
-        {/* Desktop Expanded Re-open Button when collapsed */}
-        {isDesktopCollapsed && setIsDesktopCollapsed && (
-          <div className="hidden md:flex justify-center py-2 border-b border-slate-100">
-            <button
-              onClick={() => setIsDesktopCollapsed(false)}
-              className="p-1.5 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
-              title="Expand sidebar (⌘B)"
-              aria-label="Expand sidebar"
-            >
-              <PanelLeftOpen className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Search Button */}
-        <div className={`p-4 md:px-3 md:pt-3 md:pb-2 shrink-0 ${isDesktopCollapsed ? 'md:px-2' : ''}`}>
-          {isDesktopCollapsed ? (
-            <button
-              onClick={() => handleSelectTab('chat')}
-              className="hidden md:flex w-full items-center justify-center p-2 rounded-md bg-slate-100/60 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
-              title="Search or ask AI (⌘K)"
-              aria-label="Search or ask AI"
-            >
-              <Search className="w-4 h-4" />
-            </button>
-          ) : null}
-
-          <div className={isDesktopCollapsed ? 'md:hidden' : 'block'}>
-            <button
-              onClick={() => handleSelectTab('chat')}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 md:px-2.5 md:py-1.5 rounded-xl md:rounded-md bg-slate-100/70 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200/50 hover:border-slate-300 text-sm md:text-xs transition-all"
-            >
-              <div className="flex items-center space-x-2.5 md:space-x-2">
-                <Search className="w-4 h-4 md:w-3.5 md:h-3.5 text-slate-400" />
-                <span className="text-slate-500">Search or ask AI…</span>
-              </div>
-              <div className="flex items-center text-[11px] md:text-[10px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-500">
-                <Command className="w-3 h-3 mr-0.5" />K
-              </div>
-            </button>
-          </div>
         </div>
 
         {/* Navigation Items */}

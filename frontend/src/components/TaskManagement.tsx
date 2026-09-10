@@ -4,7 +4,6 @@ import {
   Circle,
   Plus,
   Search,
-  CheckSquare,
   Upload,
   Calendar,
   ExternalLink,
@@ -138,18 +137,13 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center shadow-sm">
-            <CheckSquare className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Tasks &amp; Deliverables</h2>
-            <p className="text-[12px] text-slate-500">
-              {isMember
-                ? 'Your assigned Social Media Committee deliverables and deadlines.'
-                : 'Social Media Committee deliverables, deadlines, and member submissions.'}
-            </p>
-          </div>
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Tasks &amp; Deliverables</h2>
+          <p className="text-[12px] text-slate-500 mt-0.5">
+            {isMember
+              ? 'Your assigned Social Media Committee deliverables and deadlines.'
+              : 'Social Media Committee deliverables, deadlines, and member submissions.'}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 sm:flex-initial">

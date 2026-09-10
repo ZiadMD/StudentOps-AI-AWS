@@ -168,7 +168,13 @@ function AppContent() {
         {/* Scrollable Page View Container */}
         <div className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
           <div className="max-w-5xl mx-auto w-full">
-            {activeTab === 'dashboard'     && <Dashboard onNavigateToTab={(t) => setActiveTab(t as Tab)} onSendChatQuery={handleSendChatQuery} />}
+            {activeTab === 'dashboard'     && (
+              <Dashboard
+                currentUser={currentUser}
+                onNavigateToTab={(t) => setActiveTab(t as Tab)}
+                onSendChatQuery={handleSendChatQuery}
+              />
+            )}
             {activeTab === 'chat'          && (
               <AgentChat
                 initialQuery={chatInitialQuery}
