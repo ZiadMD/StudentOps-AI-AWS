@@ -28,6 +28,27 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def sanitize_media_url(url: Optional[str]) -> Optional[str]:
+    """Sanitize media URL to prevent stored XSS (e.g. javascript: schemes)."""
+    if not url:
+        return None
+    trimmed = str(url).strip()
+    lower = trimmed.lower()
+    if lower.startswith("javascript:") or lower.startswith("vbscript:") or lower.startswith("file:"):
+        return None
+    if (
+        lower.startswith("http://")
+        or lower.startswith("https://")
+        or lower.startswith("data:image/")
+        or lower.startswith("data:video/")
+        or lower.startswith("data:audio/")
+        or lower.startswith("data:application/pdf")
+        or trimmed.startswith("/")
+    ):
+        return trimmed
+    return None
+
+
 class WhatsAppService:
 
     @staticmethod
@@ -471,7 +492,7 @@ class WhatsAppService:
                 recipient_phone=settings.OPENWA_OFFICIAL_PHONE or "+201000000000",
                 message_type=msg_type if msg_type in ("image", "video", "document", "audio") else "text",
                 content=content,
-                media_url=media_url,
+                media_url=sanitize_media_url(media_url),
                 media_filename=filename,
                 media_mimetype=mimetype,
                 status="delivered",
