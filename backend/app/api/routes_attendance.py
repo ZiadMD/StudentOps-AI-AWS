@@ -4,6 +4,7 @@ Meeting and Attendance Endpoints for Social Media Committee.
 from typing import Optional
 import uuid
 from datetime import timedelta
+from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -40,17 +41,29 @@ async def list_meetings(
 
     res = await db.execute(query)
     meetings = res.scalars().all()
+    if not meetings:
+        return []
+
+    meeting_ids = [m.id for m in meetings]
+
+    att_res = await db.execute(
+        select(AttendanceRecord).where(AttendanceRecord.meeting_id.in_(meeting_ids))
+    )
+    records_by_meeting = defaultdict(list)
+    for r in att_res.scalars().all():
+        records_by_meeting[r.meeting_id].append(r)
+
+    assign_res = await db.execute(
+        select(MeetingAssignment).where(MeetingAssignment.meeting_id.in_(meeting_ids))
+    )
+    assignments_by_meeting = defaultdict(list)
+    for a in assign_res.scalars().all():
+        assignments_by_meeting[a.meeting_id].append(a)
+
     results = []
     for m in meetings:
-        att_res = await db.execute(
-            select(AttendanceRecord).where(AttendanceRecord.meeting_id == m.id)
-        )
-        records = att_res.scalars().all()
-
-        assign_res = await db.execute(
-            select(MeetingAssignment).where(MeetingAssignment.meeting_id == m.id)
-        )
-        assignments = assign_res.scalars().all()
+        records = records_by_meeting[m.id]
+        assignments = assignments_by_meeting[m.id]
 
         results.append({
             "id": m.id,

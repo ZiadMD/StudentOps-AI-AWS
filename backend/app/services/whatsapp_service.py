@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_, desc
+from sqlalchemy import select, or_, and_, desc, func
 
 from app.models.entities import Student, User, WhatsAppChatMessage, utcnow
 from app.models.schemas import (
@@ -26,6 +26,27 @@ from app.services.whatsapp_connection_manager import ws_manager
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_media_url(url: Optional[str]) -> Optional[str]:
+    """Sanitize media URL to prevent stored XSS (e.g. javascript: schemes)."""
+    if not url:
+        return None
+    trimmed = str(url).strip()
+    lower = trimmed.lower()
+    if lower.startswith("javascript:") or lower.startswith("vbscript:") or lower.startswith("file:"):
+        return None
+    if (
+        lower.startswith("http://")
+        or lower.startswith("https://")
+        or lower.startswith("data:image/")
+        or lower.startswith("data:video/")
+        or lower.startswith("data:audio/")
+        or lower.startswith("data:application/pdf")
+        or trimmed.startswith("/")
+    ):
+        return trimmed
+    return None
 
 
 class WhatsAppService:
@@ -108,35 +129,56 @@ class WhatsAppService:
 
         students_res = await db.execute(query.order_by(Student.full_name))
         students = students_res.scalars().all()
+        if not students:
+            return []
+
+        student_ids = [s.id for s in students]
+
+        # 1. Batch fetch latest message for each student using window function
+        subq = (
+            select(
+                WhatsAppChatMessage.id,
+                func.row_number().over(
+                    partition_by=WhatsAppChatMessage.student_id,
+                    order_by=desc(WhatsAppChatMessage.created_at)
+                ).label("rn")
+            )
+            .where(WhatsAppChatMessage.student_id.in_(student_ids))
+            .subquery()
+        )
+        latest_msgs_res = await db.execute(
+            select(WhatsAppChatMessage)
+            .join(subq, WhatsAppChatMessage.id == subq.c.id)
+            .where(subq.c.rn == 1)
+        )
+        latest_messages = {m.student_id: m for m in latest_msgs_res.scalars().all()}
+
+        # 2. Batch fetch unread counts grouped by student
+        unread_res = await db.execute(
+            select(WhatsAppChatMessage.student_id, func.count(WhatsAppChatMessage.id))
+            .where(
+                WhatsAppChatMessage.student_id.in_(student_ids),
+                WhatsAppChatMessage.sender_type == "STUDENT",
+                WhatsAppChatMessage.status != "read"
+            )
+            .group_by(WhatsAppChatMessage.student_id)
+        )
+        unread_counts = dict(unread_res.all())
+
+        # 3. Batch resolve assigned HR names
+        assigned_hr_ids = list({s.assigned_hr_id for s in students if s.assigned_hr_id})
+        hr_names: dict[str, str] = {}
+        if assigned_hr_ids:
+            hr_users_res = await db.execute(
+                select(User.id, User.full_name).where(User.id.in_(assigned_hr_ids))
+            )
+            hr_names = dict(hr_users_res.all())
 
         threads = []
         for s in students:
-            # Fetch latest message
-            last_msg_res = await db.execute(
-                select(WhatsAppChatMessage)
-                .where(WhatsAppChatMessage.student_id == s.id)
-                .order_by(desc(WhatsAppChatMessage.created_at))
-                .limit(1)
-            )
-            last_msg = last_msg_res.scalar_one_or_none()
-
-            # Calculate unread count (incoming student messages that are unread)
-            unread_res = await db.execute(
-                select(WhatsAppChatMessage)
-                .where(
-                    WhatsAppChatMessage.student_id == s.id,
-                    WhatsAppChatMessage.sender_type == "STUDENT",
-                    WhatsAppChatMessage.status != "read"
-                )
-            )
-            unread_count = len(unread_res.scalars().all())
-
-            # Resolve assigned HR name if assigned
-            hr_name = None
-            if s.assigned_hr_id:
-                hr_user = await db.get(User, s.assigned_hr_id)
-                if hr_user:
-                    hr_name = hr_user.full_name
+            last_msg = latest_messages.get(s.id)
+            unread_count = unread_counts.get(s.id, 0)
+            hr_name = hr_names.get(s.assigned_hr_id)
 
             threads.append(
                 WhatsAppThreadSummary(
@@ -172,36 +214,10 @@ class WhatsAppService:
     ) -> Student:
         """
         Hard security boundary:
-        Enforces that HR Member can ONLY access threads for students currently assigned to them.
+        Delegates to centralized verify_student_access with mode='chat'.
         """
-        student = await db.get(Student, student_id)
-        if not student:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student member not found",
-            )
-
-        if current_user.role in ("region_hr_head", "hr_admin"):
-            return student
-        elif current_user.role in ("committee_hr_leader", "committee_head", "team_lead"):
-            if student.team_id != current_user.team_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access forbidden: this member belongs to another committee.",
-                )
-            return student
-        elif current_user.role == "committee_hr_member":
-            if student.assigned_hr_id != current_user.id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access forbidden: you are not assigned to this member.",
-                )
-            return student
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access forbidden: HR chat privileges required.",
-            )
+        from app.core.dependencies import verify_student_access
+        return await verify_student_access(student_id, current_user, db, mode="chat")
 
     @classmethod
     async def get_thread_messages(
@@ -471,7 +487,7 @@ class WhatsAppService:
                 recipient_phone=settings.OPENWA_OFFICIAL_PHONE or "+201000000000",
                 message_type=msg_type if msg_type in ("image", "video", "document", "audio") else "text",
                 content=content,
-                media_url=media_url,
+                media_url=sanitize_media_url(media_url),
                 media_filename=filename,
                 media_mimetype=mimetype,
                 status="delivered",

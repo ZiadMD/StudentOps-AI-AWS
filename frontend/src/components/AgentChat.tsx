@@ -112,70 +112,104 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
       const decoder = new TextDecoder();
       let buffer = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      let tokenBuffer = '';
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const raw = line.slice(6).trim();
-          if (!raw) continue;
-
-          let event: any;
-          try { event = JSON.parse(raw); } catch { continue; }
-
-          if (event.type === 'token') {
-            setMessages(prev => {
-              const next = [...prev];
-              next[assistantIdx] = {
-                ...next[assistantIdx],
-                content: next[assistantIdx].content + event.content,
-              };
-              return next;
-            });
-          } else if (event.type === 'tool') {
-            const trace: ToolCallExecution = {
-              tool_name: event.tool_name,
-              parameters: event.result?.params ?? {},
-              result: event.result,
-              status: event.status,
-              reasoning_summary: event.reasoning_summary,
+      const flushTokens = () => {
+        if (!tokenBuffer) return;
+        const chunk = tokenBuffer;
+        tokenBuffer = '';
+        setMessages(prev => {
+          const next = [...prev];
+          if (next[assistantIdx]) {
+            next[assistantIdx] = {
+              ...next[assistantIdx],
+              content: next[assistantIdx].content + chunk,
             };
-            setMessages(prev => {
-              const next = [...prev];
-              next[assistantIdx] = {
-                ...next[assistantIdx],
-                tool_traces: [...(next[assistantIdx].tool_traces ?? []), trace],
-              };
-              return next;
-            });
-          } else if (event.type === 'done') {
-            setMessages(prev => {
-              const next = [...prev];
-              next[assistantIdx] = {
-                ...next[assistantIdx],
-                streaming: false,
-                needs_confirmation: event.requires_confirmation,
-                pending_action: event.pending_confirmation ?? undefined,
-              };
-              return next;
-            });
-          } else if (event.type === 'error') {
-            setMessages(prev => {
-              const next = [...prev];
-              next[assistantIdx] = {
-                ...next[assistantIdx],
-                content: `**Error:** ${event.message}`,
-                streaming: false,
-              };
-              return next;
-            });
+          }
+          return next;
+        });
+      };
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (!raw) continue;
+
+            let event: any;
+            try { event = JSON.parse(raw); } catch { continue; }
+
+            if (event.type === 'token') {
+              tokenBuffer += event.content;
+              if (!flushTimer) {
+                flushTimer = setTimeout(() => {
+                  flushTimer = null;
+                  flushTokens();
+                }, 40);
+              }
+            } else {
+              if (flushTimer) {
+                clearTimeout(flushTimer);
+                flushTimer = null;
+              }
+              flushTokens();
+
+              if (event.type === 'tool') {
+                const trace: ToolCallExecution = {
+                  tool_name: event.tool_name,
+                  parameters: event.result?.params ?? {},
+                  result: event.result,
+                  status: event.status,
+                  reasoning_summary: event.reasoning_summary,
+                };
+                setMessages(prev => {
+                  const next = [...prev];
+                  next[assistantIdx] = {
+                    ...next[assistantIdx],
+                    tool_traces: [...(next[assistantIdx].tool_traces ?? []), trace],
+                  };
+                  return next;
+                });
+              } else if (event.type === 'done') {
+                setMessages(prev => {
+                  const next = [...prev];
+                  next[assistantIdx] = {
+                    ...next[assistantIdx],
+                    streaming: false,
+                    needs_confirmation: event.requires_confirmation,
+                    pending_action: event.pending_confirmation ?? undefined,
+                  };
+                  return next;
+                });
+              } else if (event.type === 'error') {
+                setMessages(prev => {
+                  const next = [...prev];
+                  next[assistantIdx] = {
+                    ...next[assistantIdx],
+                    content: `**Error:** ${event.message}`,
+                    streaming: false,
+                  };
+                  return next;
+                });
+              }
+            }
           }
         }
+      } finally {
+        if (flushTimer) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        flushTokens();
       }
     } catch (err: any) {
       if (err?.name === 'AbortError') return;

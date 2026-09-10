@@ -34,6 +34,11 @@ calendar_service = CalendarService(mock_cal_provider)
 reminder_service = ReminderService(mock_msg_provider)
 
 
+def escape_like(val: str) -> str:
+    """Escapes SQL LIKE/ILIKE wildcards (%, _, \\) from user input."""
+    return val.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 # =========================================================
 # Tool Implementation Handlers
 # =========================================================
@@ -41,12 +46,13 @@ reminder_service = ReminderService(mock_msg_provider)
 async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
     """Retrieve full student profile by ID, email, or name."""
     query = student_id_or_name.strip().lower()
+    escaped = escape_like(query)
     res = await db.execute(
         select(Student).where(
             (Student.id == student_id_or_name) |
-            (Student.email.ilike(f"%{query}%")) |
-            (Student.full_name.ilike(f"%{query}%")) |
-            (Student.arabic_name.ilike(f"%{query}%"))
+            (Student.email.ilike(f"%{escaped}%")) |
+            (Student.full_name.ilike(f"%{escaped}%")) |
+            (Student.arabic_name.ilike(f"%{escaped}%"))
         )
     )
     student = res.scalar_one_or_none()
@@ -70,7 +76,8 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
 
 async def tool_search_students(db: AsyncSession, query: str) -> dict:
     """Search active members across names, roles, and emails."""
-    q = f"%{query.strip()}%"
+    escaped = escape_like(query.strip())
+    q = f"%{escaped}%"
     res = await db.execute(
         select(Student).where(
             (Student.full_name.ilike(q)) |
@@ -93,7 +100,8 @@ async def tool_list_students(db: AsyncSession, role: Optional[str] = None, statu
     """List students with optional role or status filters."""
     query = select(Student)
     if role:
-        query = query.where(Student.role.ilike(f"%{role}%"))
+        escaped_role = escape_like(role.strip())
+        query = query.where(Student.role.ilike(f"%{escaped_role}%"))
     if status:
         query = query.where(Student.status == status.upper())
     res = await db.execute(query)

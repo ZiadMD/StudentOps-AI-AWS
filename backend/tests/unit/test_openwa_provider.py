@@ -8,6 +8,8 @@ def test_format_phone_international():
     assert format_phone_international("+201012345678") == "201012345678"
     assert format_phone_international("00201012345678") == "201012345678"
     assert format_phone_international("1012345678") == "201012345678"
+    assert format_phone_international("+14155552671") == "14155552671"
+    assert format_phone_international("+966501234567") == "966501234567"
     assert format_phone_international("") == ""
 
 def test_generate_wa_me_link():

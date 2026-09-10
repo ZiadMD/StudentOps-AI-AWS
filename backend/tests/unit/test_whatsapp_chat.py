@@ -270,3 +270,56 @@ async def test_option_a_reassignment_history_transfer(client, test_db_session):
     assert res_new.status_code == 200
     messages = res_new.json()
     assert len(messages) >= 3  # All seed messages transferred
+
+
+@pytest.mark.asyncio
+async def test_webhook_authentication_and_secret_enforcement(client, monkeypatch):
+    """
+    SECURITY TEST (§1.2): Enforce that webhook requires valid shared secret when configured.
+    """
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "OPENWA_WEBHOOK_SECRET", "super-secret-openwa-token")
+
+    payload = {
+        "event": "onMessage",
+        "data": {
+            "id": "openwa_auth_test_1",
+            "from": "201011112222",
+            "body": "Hello",
+            "type": "text"
+        }
+    }
+
+    # 1. Missing secret header
+    res_missing = await client.post("/api/whatsapp/webhook", json=payload)
+    assert res_missing.status_code == 403
+
+    # 2. Invalid secret header
+    res_invalid = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "wrong-secret"},
+        json=payload
+    )
+    assert res_invalid.status_code == 403
+
+    # 3. Valid secret header
+    res_valid = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "super-secret-openwa-token"},
+        json=payload
+    )
+    assert res_valid.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_webhook_media_url_sanitization(client, monkeypatch):
+    """
+    SECURITY TEST (§1.2): Verify that dangerous media URLs (javascript: schemes) are sanitized.
+    """
+    from app.services.whatsapp_service import sanitize_media_url
+    assert sanitize_media_url("javascript:alert('XSS')") is None
+    assert sanitize_media_url("vbscript:msgbox('XSS')") is None
+    assert sanitize_media_url("file:///etc/passwd") is None
+    assert sanitize_media_url("https://example.com/safe.jpg") == "https://example.com/safe.jpg"
+    assert sanitize_media_url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==") == "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
+

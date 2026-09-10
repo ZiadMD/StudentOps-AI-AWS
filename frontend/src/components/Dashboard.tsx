@@ -128,7 +128,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab, onSendCha
           { title: 'Total Registry', value: stats?.total_students || 0, delta: '+100% verified', icon: Users, color: 'text-blue-600' },
           { title: 'Today\'s Attendance', value: `${stats?.attendance_rate_today || 0}%`, delta: `${stats?.absent_today} absent`, icon: UserCheck, color: 'text-emerald-600' },
           { title: 'Synced Events', value: stats?.upcoming_meetings_count || 0, delta: 'next in 2 days', icon: Calendar, color: 'text-slate-700' },
-          { title: 'Pending Tasks', value: stats?.pending_submissions_count || 0, delta: 'requires review', icon: Clock, color: 'text-amber-600' },
+          {
+            title: 'Pending Tasks',
+            value: stats?.pending_submissions_count !== null && stats?.pending_submissions_count !== undefined
+              ? stats.pending_submissions_count
+              : 'N/A',
+            delta: stats?.pending_submissions_count !== null && stats?.pending_submissions_count !== undefined
+              ? 'requires review'
+              : 'Technical (Head only)',
+            icon: Clock,
+            color: 'text-amber-600',
+          },
         ].map((stat, i) => (
           <div key={i} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-slate-300 transition-colors">
             <div className="flex justify-between items-start mb-2">

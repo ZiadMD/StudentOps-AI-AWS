@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Layers, Eye, EyeOff, ChevronRight } from 'lucide-react';
 import { api } from '../../api/client';
 import { UserProfile } from '../../types';
+import { Modal } from '../ui/Modal';
 
 const DEMO_ACCOUNTS = [
   {
@@ -57,6 +58,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
   const [showPass, setShowPass]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,7 +193,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
                 <label className="text-xs font-semibold text-slate-700" htmlFor="password">
                   Password
                 </label>
-                <button type="button" className="text-[11px] text-blue-600 hover:underline font-medium">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(true)}
+                  className="text-[11px] text-blue-600 hover:underline font-medium"
+                >
                   Forgot password?
                 </button>
               </div>
@@ -240,7 +246,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
           {/* Quick Demo Accounts Selector */}
           <div className="mt-6 pt-5 border-t border-slate-200">
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-bold text-slate-900 tracking-tight">1-Click Demo Accounts</span>
+              <span className="text-xs font-bold text-slate-900 tracking-tight">1-Click Demo Accounts (Sandbox)</span>
               <span className="text-[11px] text-slate-400 font-medium">Social Media Committee</span>
             </div>
             <div className="space-y-1.5">
@@ -276,6 +282,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoToRegister })
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        title="Password Reset Request"
+        size="sm"
+      >
+        <div className="space-y-3 text-xs text-slate-600">
+          <p>
+            Self-service password recovery is disabled in StudentOps AI to preserve organization security and role isolation.
+          </p>
+          <p>
+            Please contact your organization <strong>HR Administrator</strong> (<code className="text-slate-800 bg-slate-100 px-1 py-0.5 rounded font-mono">hr.leader@studentops.org</code>) or <strong>Committee Head</strong> to reset your password.
+          </p>
+          <div className="pt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

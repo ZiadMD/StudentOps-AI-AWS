@@ -11,12 +11,15 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { TaskItem, SubmissionItem, UserProfile } from '../types';
+import { Modal } from './ui/Modal';
+import { useToast } from '../context/ToastContext';
 
 interface TaskManagementProps {
   currentUser?: UserProfile | null;
 }
 
 export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) => {
+  const toast = useToast();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [memberSubmissions, setMemberSubmissions] = useState<Record<string, SubmissionItem>>({});
   const [loading, setLoading] = useState(true);
@@ -101,8 +104,9 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
       setTaskDesc('');
       setTaskDeadline('');
       await loadTasks();
+      toast.success('Task created successfully');
     } catch (err: any) {
-      alert(err.message || 'Failed to create task');
+      toast.error(err.message || 'Failed to create task');
     } finally {
       setCreating(false);
     }
@@ -117,9 +121,9 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
       setSubmitTaskTarget(null);
       setFileUrl('');
       await loadTasks();
-      alert('Deliverable submitted successfully! Your Committee Head will review your work.');
+      toast.success('Deliverable submitted successfully! Your Committee Head will review your work.');
     } catch (err: any) {
-      alert(err.message || 'Failed to submit work');
+      toast.error(err.message || 'Failed to submit work');
     } finally {
       setSubmitting(false);
     }
@@ -301,156 +305,136 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
       )}
 
       {/* Modal: Create Task (Committee Head) */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm">Create Committee Task</h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
-              >
-                ✕
-              </button>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create Committee Task"
+        size="lg"
+      >
+        <form onSubmit={handleCreateTask} className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-slate-700 mb-1">Task Title</label>
+              <input
+                type="text"
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+                placeholder="e.g. Task 6: Reel Script & Storyboard"
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                required
+              />
             </div>
-
-            <form onSubmit={handleCreateTask} className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Task Title</label>
-                  <input
-                    type="text"
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                    placeholder="e.g. Task 6: Reel Script & Storyboard"
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Task #</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={taskNumber}
-                    onChange={(e) => setTaskNumber(parseInt(e.target.value) || 1)}
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Brief Description</label>
-                <textarea
-                  rows={3}
-                  value={taskDesc}
-                  onChange={(e) => setTaskDesc(e.target.value)}
-                  placeholder="Task instructions, delivery criteria, or templates..."
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Deadline</label>
-                  <input
-                    type="datetime-local"
-                    value={taskDeadline}
-                    onChange={(e) => setTaskDeadline(e.target.value)}
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Max Score</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={maxScore}
-                    onChange={(e) => setMaxScore(parseFloat(e.target.value) || 10.0)}
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium disabled:opacity-50"
-                >
-                  {creating ? 'Publishing...' : 'Publish Task'}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Task #</label>
+              <input
+                type="number"
+                min={1}
+                value={taskNumber}
+                onChange={(e) => setTaskNumber(parseInt(e.target.value) || 1)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                required
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Brief Description</label>
+            <textarea
+              rows={3}
+              value={taskDesc}
+              onChange={(e) => setTaskDesc(e.target.value)}
+              placeholder="Task instructions, delivery criteria, or templates..."
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Deadline</label>
+              <input
+                type="datetime-local"
+                value={taskDeadline}
+                onChange={(e) => setTaskDeadline(e.target.value)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Max Score</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={maxScore}
+                onChange={(e) => setMaxScore(parseFloat(e.target.value) || 10.0)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={creating}
+              className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+            >
+              {creating ? 'Publishing...' : 'Publish Task'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal: Submit Deliverable (Member) */}
-      {submitTaskTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm">
-                Submit Deliverable: {submitTaskTarget.title}
-              </h3>
-              <button
-                onClick={() => setSubmitTaskTarget(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
-              >
-                ✕
-              </button>
-            </div>
+      <Modal
+        isOpen={Boolean(submitTaskTarget)}
+        onClose={() => setSubmitTaskTarget(null)}
+        title={submitTaskTarget ? `Submit Deliverable: ${submitTaskTarget.title}` : 'Submit Deliverable'}
+        size="md"
+      >
+        <p className="text-xs text-slate-500 mb-3">
+          Provide the direct link to your deliverable (Google Drive, Figma, Canva, or GitHub).
+        </p>
 
-            <p className="text-xs text-slate-500">
-              Provide the direct link to your deliverable (Google Drive, Figma, Canva, or GitHub).
-            </p>
-
-            <form onSubmit={handleSubmitWork} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Deliverable URL</label>
-                <input
-                  type="url"
-                  placeholder="https://drive.google.com/your-work"
-                  value={fileUrl}
-                  onChange={(e) => setFileUrl(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setSubmitTaskTarget(null)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 flex items-center gap-1"
-                >
-                  <Upload className="w-3 h-3" />
-                  <span>{submitting ? 'Submitting...' : 'Confirm Submission'}</span>
-                </button>
-              </div>
-            </form>
+        <form onSubmit={handleSubmitWork} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Deliverable URL</label>
+            <input
+              type="url"
+              placeholder="https://drive.google.com/your-work"
+              value={fileUrl}
+              onChange={(e) => setFileUrl(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              required
+            />
           </div>
-        </div>
-      )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setSubmitTaskTarget(null)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 flex items-center gap-1"
+            >
+              <Upload className="w-3 h-3" />
+              <span>{submitting ? 'Submitting...' : 'Confirm Submission'}</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

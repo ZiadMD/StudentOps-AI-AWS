@@ -3,12 +3,15 @@ import { api } from '../api/client';
 import { MeetingDetail, UserProfile } from '../types';
 import { Video, ArrowUpRight, Search, Plus, RefreshCw } from 'lucide-react';
 import { ProgressBar } from './ui/ProgressBar';
+import { Modal } from './ui/Modal';
+import { useToast } from '../context/ToastContext';
 
 interface AttendanceViewProps {
   currentUser?: UserProfile | null;
 }
 
 export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) => {
+  const toast = useToast();
   const [meetings, setMeetings] = useState<MeetingDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -75,8 +78,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
       setStartTime('');
       setMeetUrl('');
       await loadMeetings();
+      toast.success('Committee session scheduled successfully.');
     } catch (err: any) {
-      alert(err.message || 'Failed to schedule meeting session');
+      toast.error(err.message || 'Failed to schedule meeting session');
     } finally {
       setScheduling(false);
     }
@@ -87,9 +91,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
       setProcessingId(meetingId);
       await api.reprocessAttendance(meetingId);
       await loadMeetings();
-      alert('Attendance processed successfully. Any absences have been flagged for HR follow-up.');
+      toast.success('Attendance processed successfully. Any absences have been flagged for HR follow-up.');
     } catch (err: any) {
-      alert(err.message || 'Failed to process attendance');
+      toast.error(err.message || 'Failed to process attendance');
     } finally {
       setProcessingId(null);
     }
@@ -244,112 +248,104 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
       </div>
 
       {/* Modal: Schedule Session (Committee Head) */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm">Schedule Committee Session</h3>
-              <button
-                onClick={() => setShowScheduleModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
-              >
-                ✕
-              </button>
+      <Modal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        title="Schedule Committee Session"
+        description="Configure meeting details and session number for the committee."
+        size="md"
+      >
+        <form onSubmit={handleScheduleSubmit} className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-slate-700 mb-1">Session Title</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                placeholder="e.g. Session 7: TikTok Virality"
+                required
+              />
             </div>
-
-            <form onSubmit={handleScheduleSubmit} className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Session Title</label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                    placeholder="e.g. Session 7: TikTok Virality"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Session #</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={sessionNumber}
-                    onChange={(e) => setSessionNumber(parseInt(e.target.value) || 1)}
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Session Topic</label>
-                <input
-                  type="text"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  placeholder="e.g. Hook writing and audience retention metrics"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Start Time</label>
-                  <input
-                    type="datetime-local"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Duration (minutes)</label>
-                  <input
-                    type="number"
-                    min={15}
-                    step={15}
-                    value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(parseInt(e.target.value) || 60)}
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Google Meet URL</label>
-                <input
-                  type="url"
-                  value={meetUrl}
-                  onChange={(e) => setMeetUrl(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  placeholder="https://meet.google.com/abc-defg-hij"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowScheduleModal(false)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={scheduling}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
-                >
-                  {scheduling ? 'Scheduling...' : 'Confirm Session'}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Session #</label>
+              <input
+                type="number"
+                min={1}
+                value={sessionNumber}
+                onChange={(e) => setSessionNumber(parseInt(e.target.value) || 1)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                required
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Session Topic</label>
+            <input
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              placeholder="e.g. Hook writing and audience retention metrics"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Start Time</label>
+              <input
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Duration (minutes)</label>
+              <input
+                type="number"
+                min={15}
+                step={15}
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(parseInt(e.target.value) || 60)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Google Meet URL</label>
+            <input
+              type="url"
+              value={meetUrl}
+              onChange={(e) => setMeetUrl(e.target.value)}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              placeholder="https://meet.google.com/abc-defg-hij"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowScheduleModal(false)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={scheduling}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+            >
+              {scheduling ? 'Scheduling...' : 'Confirm Session'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

@@ -15,6 +15,7 @@ from app.models.schemas import (
     BonusAwardRequest,
 )
 from app.services.scoring_service import ScoringService
+from app.agent.tools import escape_like
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -50,7 +51,7 @@ async def list_students(
         query = query.where(Student.id == current_user.student_id)
 
     if role:
-        query = query.where(Student.role.ilike(f"%{role}%"))
+        query = query.where(Student.role.ilike(f"%{escape_like(role.strip())}%"))
     if status_filter:
         query = query.where(Student.status == status_filter.upper())
 
@@ -272,7 +273,7 @@ async def award_student_bonus(
     record = res.scalar_one_or_none()
 
     if record:
-        record.points = record.points + body.points
+        record.points = min(10.0, record.points + body.points)
         record.notes = f"{record.notes} | {body.notes}" if record.notes and body.notes else (body.notes or record.notes)
         record.graded_by_user_id = current_user.id
         record.updated_by = current_user.full_name
@@ -281,7 +282,7 @@ async def award_student_bonus(
             id=f"score_bonus_{uuid.uuid4().hex[:10]}",
             student_id=student_id,
             category="BONUS",
-            points=body.points,
+            points=min(10.0, body.points),
             max_points=10.0,
             graded_by_user_id=current_user.id,
             notes=body.notes or "Bonus awarded by HR Leader",

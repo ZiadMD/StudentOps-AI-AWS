@@ -1,12 +1,13 @@
 """
 Deterministic Attendance Policy Engine and Service.
 """
+import uuid
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from app.core.config import settings
-from app.models.entities import Meeting, Student, AttendanceRecord, ParticipantSession
+from app.models.entities import Meeting, Student, AttendanceRecord, ParticipantSession, MemberFollowupStatus
 from app.providers.attendance_provider import AttendanceProvider, RawMeetingAttendance
 from app.services.identity_matcher import IdentityMatcher
 
@@ -148,6 +149,20 @@ class AttendanceService:
                     })
 
         # 4. Evaluate deterministic status for target students
+        # Pre-fetch existing attendance records and absent follow-up statuses for this meeting
+        existing_recs_res = await db.execute(
+            select(AttendanceRecord).where(AttendanceRecord.meeting_id == meeting.id)
+        )
+        existing_recs_by_student = {r.student_id: r for r in existing_recs_res.scalars().all()}
+
+        flag_pattern = f"%ABSENT_{meeting.meeting_code}%"
+        flag_res = await db.execute(
+            select(MemberFollowupStatus.student_id).where(
+                MemberFollowupStatus.flagged_reason.like(flag_pattern)
+            )
+        )
+        flagged_student_ids = set(flag_res.scalars().all())
+
         attendance_records: list[AttendanceRecord] = []
 
         for student in students:
@@ -165,13 +180,7 @@ class AttendanceService:
                 confidence = 1.0
 
             # Check if record already exists to preserve excuses
-            existing_rec_res = await db.execute(
-                select(AttendanceRecord).where(
-                    AttendanceRecord.meeting_id == meeting.id,
-                    AttendanceRecord.student_id == student.id
-                )
-            )
-            existing_rec = existing_rec_res.scalar_one_or_none()
+            existing_rec = existing_recs_by_student.get(student.id)
             excuse_status = existing_rec.excuse_status if existing_rec else None
 
             status = AttendancePolicyEngine.evaluate_status(
@@ -206,15 +215,8 @@ class AttendanceService:
                 attendance_records.append(att_record)
 
             if status == "UNEXCUSED_ABSENT":
-                import uuid
-                from app.models.entities import MemberFollowupStatus
-                flag_res = await db.execute(
-                    select(MemberFollowupStatus).where(
-                        MemberFollowupStatus.student_id == student.id,
-                        MemberFollowupStatus.flagged_reason.like(f"%ABSENT_{meeting.meeting_code}%")
-                    )
-                )
-                if not flag_res.scalar_one_or_none():
+                if student.id not in flagged_student_ids:
+                    flagged_student_ids.add(student.id)
                     hr_id = student.assigned_hr_id or meeting.responsible_user_id or "usr_hr_member"
                     db.add(MemberFollowupStatus(
                         id=f"flag_{uuid.uuid4().hex[:12]}",

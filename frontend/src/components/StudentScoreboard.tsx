@@ -7,18 +7,20 @@ import {
   ChevronDown,
   Shield,
   Edit3,
-  X,
   Check,
   Eye,
   Award,
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
+import { Modal } from './ui/Modal';
+import { useToast } from '../context/ToastContext';
 
 interface StudentScoreboardProps {
   currentUser?: UserProfile | null;
 }
 
 export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUser }) => {
+  const toast = useToast();
   const [data, setData] = useState<StudentScoreSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -90,8 +92,9 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
       await api.updateBehaviorScore(editingStudent.student_id, editForm);
       setEditingStudent(null);
       await loadData();
+      toast.success('Behavior score updated successfully.');
     } catch (err: any) {
-      alert(err.message || 'Failed to update behavior score');
+      toast.error(err.message || 'Failed to update behavior score');
     } finally {
       setSaving(false);
     }
@@ -107,8 +110,9 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
       setBonusPoints(2.0);
       setBonusReason('');
       await loadData();
+      toast.success('Bonus awarded successfully.');
     } catch (err: any) {
-      alert(err.message || 'Failed to award bonus');
+      toast.error(err.message || 'Failed to award bonus');
     } finally {
       setAwardingBonus(false);
     }
@@ -189,7 +193,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   <th className="px-6 py-4 font-medium text-right">Behavior (/23)</th>
                   <th className="px-6 py-4 font-medium text-right">Interaction (/5)</th>
                   <th className="px-6 py-4 font-medium text-right">Bonus</th>
-                  <th className="px-6 py-4 font-medium text-right font-bold text-slate-800">Total Score</th>
+                  <th className="px-6 py-4 font-medium text-right font-bold text-slate-800" title="Composite score across behavior, tasks, and bonus points">Total Score</th>
                   <th className="px-6 py-4 font-medium text-right">Final Status</th>
                   {(canEditBehavior || isHrLeader) && <th className="px-6 py-4 font-medium text-right">Actions</th>}
                 </tr>
@@ -308,206 +312,178 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
         )}
       </div>
 
-      {/* Slide-over / Modal for Grading Behavior */}
-      {editingStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+      {/* Modal for Grading Behavior */}
+      <Modal
+        isOpen={!!editingStudent}
+        onClose={() => setEditingStudent(null)}
+        title={editingStudent ? `Evaluate Behavior: ${editingStudent.arabic_name}` : 'Evaluate Behavior'}
+        description={editingStudent ? editingStudent.student_name : undefined}
+        size="md"
+      >
+        {editingStudent && (
+          <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">
-                  Evaluate Behavior: {editingStudent.arabic_name}
-                </h3>
-                <span className="text-xs text-slate-500">{editingStudent.student_name}</span>
-              </div>
-              <button
-                onClick={() => setEditingStudent(null)}
-                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Group Interaction (/5)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="5"
-                    step="0.5"
-                    value={editForm.group_interaction}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, group_interaction: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Social Media (/5)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="5"
-                    step="0.5"
-                    value={editForm.social_media}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, social_media: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Hierarchy Rules (/5)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="5"
-                    step="0.5"
-                    value={editForm.hierarchy_rules}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, hierarchy_rules: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Polite Conduct (/8)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="8"
-                    step="0.5"
-                    value={editForm.polite_conduct}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, polite_conduct: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">HR Evaluation Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="Optional observation notes..."
-                  value={editForm.notes}
-                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                <label className="block font-medium text-slate-700 mb-1">Group Interaction (/5)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.5"
+                  value={editForm.group_interaction}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, group_interaction: parseFloat(e.target.value) || 0 })
+                  }
                   className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
                 />
               </div>
-
-              <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                <span className="font-semibold text-slate-800">
-                  Total:{' '}
-                  {(
-                    editForm.group_interaction +
-                    editForm.social_media +
-                    editForm.hierarchy_rules +
-                    editForm.polite_conduct
-                  ).toFixed(1)}{' '}
-                  / 23
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingStudent(null)}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    {saving ? 'Saving...' : 'Save Evaluation'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Award Bonus (HR Leader) */}
-      {bonusStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-                  <Award className="w-4 h-4" />
-                </div>
-                <h3 className="font-bold text-slate-900 text-sm">
-                  Award Member Bonus: {bonusStudent.arabic_name || bonusStudent.student_name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setBonusStudent(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500">
-              The HR Leader can grant merit bonus points that flow directly into the member&apos;s Total Score.
-            </p>
-
-            <form onSubmit={handleAwardBonus} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Bonus Points (e.g. 1.0 to 5.0)
-                </label>
+                <label className="block font-medium text-slate-700 mb-1">Social Media (/5)</label>
                 <input
                   type="number"
+                  min="0"
+                  max="5"
                   step="0.5"
-                  min="0.5"
-                  max="10.0"
-                  value={bonusPoints}
-                  onChange={(e) => setBonusPoints(parseFloat(e.target.value) || 0)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600 font-mono"
-                  required
+                  value={editForm.social_media}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, social_media: parseFloat(e.target.value) || 0 })
+                  }
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Recognition Reason / Justification
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="e.g. Exceptional reel editing turn-around and active community moderation..."
-                  value={bonusReason}
-                  onChange={(e) => setBonusReason(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                  required
+                <label className="block font-medium text-slate-700 mb-1">Hierarchy Rules (/5)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.5"
+                  value={editForm.hierarchy_rules}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, hierarchy_rules: parseFloat(e.target.value) || 0 })
+                  }
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
                 />
               </div>
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Polite Conduct (/8)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="8"
+                  step="0.5"
+                  value={editForm.polite_conduct}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, polite_conduct: parseFloat(e.target.value) || 0 })
+                  }
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                />
+              </div>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">HR Evaluation Notes</label>
+              <textarea
+                rows={2}
+                placeholder="Optional observation notes..."
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+              />
+            </div>
+
+            <div className="pt-3 flex items-center justify-between border-t border-slate-100">
+              <span className="font-semibold text-slate-800">
+                Total:{' '}
+                {(
+                  editForm.group_interaction +
+                  editForm.social_media +
+                  editForm.hierarchy_rules +
+                  editForm.polite_conduct
+                ).toFixed(1)}{' '}
+                / 23
+              </span>
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setBonusStudent(null)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  onClick={() => setEditingStudent(null)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={awardingBonus}
-                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {awardingBonus ? 'Awarding...' : 'Grant Bonus Points'}
+                  <Check className="w-3.5 h-3.5" />
+                  {saving ? 'Saving...' : 'Save Evaluation'}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Modal: Award Bonus (HR Leader) */}
+      <Modal
+        isOpen={!!bonusStudent}
+        onClose={() => setBonusStudent(null)}
+        title={bonusStudent ? `Award Member Bonus: ${bonusStudent.arabic_name || bonusStudent.student_name}` : 'Award Member Bonus'}
+        description="The HR Leader can grant merit bonus points that flow directly into the member's Total Score."
+        size="md"
+      >
+        {bonusStudent && (
+          <form onSubmit={handleAwardBonus} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Bonus Points (e.g. 1.0 to 5.0)
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min="0.5"
+                max="10.0"
+                value={bonusPoints}
+                onChange={(e) => setBonusPoints(parseFloat(e.target.value) || 0)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600 font-mono"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Recognition Reason / Justification
+              </label>
+              <textarea
+                rows={3}
+                placeholder="e.g. Exceptional reel editing turn-around and active community moderation..."
+                value={bonusReason}
+                onChange={(e) => setBonusReason(e.target.value)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setBonusStudent(null)}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={awardingBonus}
+                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+              >
+                {awardingBonus ? 'Awarding...' : 'Grant Bonus Points'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

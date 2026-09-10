@@ -4,14 +4,15 @@ Configuration settings for StudentOps AI Backend.
 from typing import Optional
 from pathlib import Path
 from dotenv import load_dotenv
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Always load the project directory .env with override=True
+# Load the project directory .env without overriding explicitly set environment variables
 _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 if _env_path.exists():
-    load_dotenv(_env_path, override=True)
+    load_dotenv(_env_path, override=False)
 else:
-    load_dotenv(override=True)
+    load_dotenv(override=False)
 
 
 class Settings(BaseSettings):
@@ -25,11 +26,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./studentops.db"
     
-    # Supabase PostgreSQL & Cloud Configuration
-    SUPABASE_URL: Optional[str] = "https://xziwgwtavxzmeuzoxwqp.supabase.co"
-    SUPABASE_PUBLISHABLE_KEY: Optional[str] = "sb_publishable_2Ha1ris_9Z5SPkIQRGFwCQ_2DofYfqx"
+    # Supabase PostgreSQL & Cloud Configuration (configured via environment)
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_PUBLISHABLE_KEY: Optional[str] = None
     SUPABASE_SECRET_KEY: Optional[str] = None
-    SUPABASE_JWKS_URL: Optional[str] = "https://xziwgwtavxzmeuzoxwqp.supabase.co/auth/v1/.well-known/jwks.json"
+    SUPABASE_JWKS_URL: Optional[str] = None
 
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
@@ -70,6 +71,7 @@ class Settings(BaseSettings):
     # OpenWA Official Channel Settings
     OPENWA_API_URL: str = "http://localhost:2785"
     OPENWA_API_KEY: Optional[str] = None
+    OPENWA_WEBHOOK_SECRET: Optional[str] = None
     OPENWA_SESSION_ID: str = "ops_official"
     OPENWA_OFFICIAL_PHONE: Optional[str] = "+201000000000"  # Fallback display / configured official number
     
@@ -85,7 +87,7 @@ class Settings(BaseSettings):
     # JWT Authentication
     JWT_SECRET_KEY: str = "studentops-super-secret-jwt-key-for-dev-only-change-in-prod-12345"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 minutes
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Rate Limiting (Requests per 60 seconds)
@@ -100,6 +102,16 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            default_secret = "studentops-super-secret-jwt-key-for-dev-only-change-in-prod-12345"
+            if not self.JWT_SECRET_KEY or self.JWT_SECRET_KEY == default_secret:
+                raise ValueError("JWT_SECRET_KEY must be securely configured in production.")
+            if "sqlite" in self.DATABASE_URL:
+                raise ValueError("Production environment must configure a production DATABASE_URL (e.g. PostgreSQL), not SQLite.")
+        return self
 
 
 settings = Settings()

@@ -443,3 +443,42 @@ async def test_agent_conversation_state_isolated_between_users(sec_client):
         "conversation_id": conv_id
     })
     assert res2.status_code == 200
+
+
+# ==============================================================================
+# 9. PASSWORD BACKDOOR REGRESSION TEST
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_password_backdoor_rejected_for_arbitrary_account(sec_client):
+    """
+    SECURITY TEST (§1.1): Ensure former backdoor passwords
+    CANNOT authenticate into an account whose actual password is unrelated.
+    """
+    former_backdoor_passwords = [
+        "admin123",
+        "head123",
+        "leader123",
+        "lead123",
+        "hrmember123",
+        "member123",
+        "SuperSecret#1234#"
+    ]
+
+    unique_email = "target.victim@studentops.org"
+    real_password = "VictimPassword123!"
+    reg_res = await sec_client.post("/api/auth/register", json={
+        "email": unique_email,
+        "password": real_password,
+        "full_name": "Victim User",
+        "role": "member"
+    })
+    assert reg_res.status_code == 201
+
+    for fake_pwd in former_backdoor_passwords:
+        login_res = await sec_client.post("/api/auth/login", json={
+            "email": unique_email,
+            "password": fake_pwd
+        })
+        assert login_res.status_code == 401, f"Former backdoor password '{fake_pwd}' unexpectedly succeeded!"
+
