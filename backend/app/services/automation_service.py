@@ -113,11 +113,11 @@ class AutomationEngine:
         )
         meetings = meetings_res.scalars().all()
         dispatched_logs = []
+        hr_settings = await self.get_hr_settings(None, db)
 
         for meeting in meetings:
             # Check meeting end time + grace
             meeting_end = meeting.start_time + timedelta(minutes=meeting.duration_minutes)
-            hr_settings = await self.get_hr_settings(None, db)
 
             grace_minutes = hr_settings.attendance_grace_minutes
             if now < (meeting_end + timedelta(minutes=grace_minutes)):
@@ -134,17 +134,23 @@ class AutomationEngine:
                 )
             )
             absentees = att_res.all()
+            if not absentees:
+                continue
+
+            # Pre-fetch existing reminders for this meeting to avoid N queries
+            trigger_source = f"AUTOMATION_ATTENDANCE_{meeting.id}"
+            existing_rems = await db.execute(
+                select(ReminderLog.recipient_id).where(
+                    ReminderLog.trigger_source == trigger_source
+                )
+            )
+            already_sent_ids = set(existing_rems.scalars().all())
 
             for att, student in absentees:
                 # Idempotency check: verify no reminder already sent for this meeting & student
-                existing_rem = await db.execute(
-                    select(ReminderLog).where(
-                        ReminderLog.recipient_id == student.id,
-                        ReminderLog.trigger_source == f"AUTOMATION_ATTENDANCE_{meeting.id}"
-                    )
-                )
-                if existing_rem.scalar_one_or_none():
+                if student.id in already_sent_ids:
                     continue
+                already_sent_ids.add(student.id)
 
                 # Re-check excuse state right before sending
                 if att.excuse_status in ("EXCUSED_ACCEPTED", "EXCUSED_MODERATE"):

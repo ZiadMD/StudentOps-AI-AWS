@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_, desc
+from sqlalchemy import select, or_, and_, desc, func
 
 from app.models.entities import Student, User, WhatsAppChatMessage, utcnow
 from app.models.schemas import (
@@ -129,35 +129,56 @@ class WhatsAppService:
 
         students_res = await db.execute(query.order_by(Student.full_name))
         students = students_res.scalars().all()
+        if not students:
+            return []
+
+        student_ids = [s.id for s in students]
+
+        # 1. Batch fetch latest message for each student using window function
+        subq = (
+            select(
+                WhatsAppChatMessage.id,
+                func.row_number().over(
+                    partition_by=WhatsAppChatMessage.student_id,
+                    order_by=desc(WhatsAppChatMessage.created_at)
+                ).label("rn")
+            )
+            .where(WhatsAppChatMessage.student_id.in_(student_ids))
+            .subquery()
+        )
+        latest_msgs_res = await db.execute(
+            select(WhatsAppChatMessage)
+            .join(subq, WhatsAppChatMessage.id == subq.c.id)
+            .where(subq.c.rn == 1)
+        )
+        latest_messages = {m.student_id: m for m in latest_msgs_res.scalars().all()}
+
+        # 2. Batch fetch unread counts grouped by student
+        unread_res = await db.execute(
+            select(WhatsAppChatMessage.student_id, func.count(WhatsAppChatMessage.id))
+            .where(
+                WhatsAppChatMessage.student_id.in_(student_ids),
+                WhatsAppChatMessage.sender_type == "STUDENT",
+                WhatsAppChatMessage.status != "read"
+            )
+            .group_by(WhatsAppChatMessage.student_id)
+        )
+        unread_counts = dict(unread_res.all())
+
+        # 3. Batch resolve assigned HR names
+        assigned_hr_ids = list({s.assigned_hr_id for s in students if s.assigned_hr_id})
+        hr_names: dict[str, str] = {}
+        if assigned_hr_ids:
+            hr_users_res = await db.execute(
+                select(User.id, User.full_name).where(User.id.in_(assigned_hr_ids))
+            )
+            hr_names = dict(hr_users_res.all())
 
         threads = []
         for s in students:
-            # Fetch latest message
-            last_msg_res = await db.execute(
-                select(WhatsAppChatMessage)
-                .where(WhatsAppChatMessage.student_id == s.id)
-                .order_by(desc(WhatsAppChatMessage.created_at))
-                .limit(1)
-            )
-            last_msg = last_msg_res.scalar_one_or_none()
-
-            # Calculate unread count (incoming student messages that are unread)
-            unread_res = await db.execute(
-                select(WhatsAppChatMessage)
-                .where(
-                    WhatsAppChatMessage.student_id == s.id,
-                    WhatsAppChatMessage.sender_type == "STUDENT",
-                    WhatsAppChatMessage.status != "read"
-                )
-            )
-            unread_count = len(unread_res.scalars().all())
-
-            # Resolve assigned HR name if assigned
-            hr_name = None
-            if s.assigned_hr_id:
-                hr_user = await db.get(User, s.assigned_hr_id)
-                if hr_user:
-                    hr_name = hr_user.full_name
+            last_msg = latest_messages.get(s.id)
+            unread_count = unread_counts.get(s.id, 0)
+            hr_name = hr_names.get(s.assigned_hr_id)
 
             threads.append(
                 WhatsAppThreadSummary(
