@@ -193,7 +193,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   <th className="px-6 py-4 font-medium text-right">Behavior (/23)</th>
                   <th className="px-6 py-4 font-medium text-right">Interaction (/5)</th>
                   <th className="px-6 py-4 font-medium text-right">Bonus</th>
-                  <th className="px-6 py-4 font-medium text-right font-bold text-slate-800">Total Score</th>
+                  <th className="px-6 py-4 font-medium text-right font-bold text-slate-800" title="Composite score across behavior, tasks, and bonus points">Total Score</th>
                   <th className="px-6 py-4 font-medium text-right">Final Status</th>
                   {(canEditBehavior || isHrLeader) && <th className="px-6 py-4 font-medium text-right">Actions</th>}
                 </tr>
