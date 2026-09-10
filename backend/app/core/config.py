@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     # OpenWA Official Channel Settings
     OPENWA_API_URL: str = "http://localhost:2785"
     OPENWA_API_KEY: Optional[str] = None
+    OPENWA_WEBHOOK_SECRET: Optional[str] = None
     OPENWA_SESSION_ID: str = "ops_official"
     OPENWA_OFFICIAL_PHONE: Optional[str] = "+201000000000"  # Fallback display / configured official number
     
@@ -85,7 +86,7 @@ class Settings(BaseSettings):
     # JWT Authentication
     JWT_SECRET_KEY: str = "studentops-super-secret-jwt-key-for-dev-only-change-in-prod-12345"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 minutes
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Rate Limiting (Requests per 60 seconds)

@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db, AsyncSessionLocal
+from app.core.config import settings
 from app.core.dependencies import get_current_active_user, require_roles, verify_student_access
 from app.core.security import decode_token
 from app.models.entities import Student, Task, Submission, MemberFollowupStatus, TaskReminder, User, utcnow
@@ -464,6 +465,27 @@ async def openwa_webhook(
     Resolves sender phone -> assigned student -> assigned HR member,
     persists chat records, and pushes live event to the HR member's socket.
     """
+    configured_secret = settings.OPENWA_WEBHOOK_SECRET
+    provided_secret = (
+        request.headers.get("X-OpenWA-Signature")
+        or request.headers.get("X-Webhook-Secret")
+    )
+    auth_header = request.headers.get("Authorization")
+    if not provided_secret and auth_header and auth_header.startswith("Bearer "):
+        provided_secret = auth_header[7:].strip()
+
+    if configured_secret:
+        if not provided_secret or provided_secret != configured_secret:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid or missing webhook signature/secret"
+            )
+    elif settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Webhook secret must be configured in production"
+        )
+
     try:
         payload = await request.json()
     except Exception:
