@@ -19,10 +19,11 @@ import { AuditViewer }        from './components/AuditViewer';
 import { WhatsAppAgentPage }  from './components/WhatsAppAgentPage';
 import { api }                from './api/client';
 import { UserProfile }        from './types';
+import { ToastProvider }      from './context/ToastContext';
 
 type AuthScreen = 'login' | 'register' | 'app';
 
-export function App() {
+function AppContent() {
   const initialUser = api.getUser();
   const [screen, setScreen]             = useState<AuthScreen>(initialUser && api.getToken() ? 'app' : 'login');
   const [currentUser, setCurrentUser]   = useState<UserProfile | null>(initialUser);
@@ -191,6 +192,14 @@ export function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }
 
