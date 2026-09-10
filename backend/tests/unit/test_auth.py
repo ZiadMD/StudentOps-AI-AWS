@@ -152,7 +152,7 @@ async def test_register_user_success(client):
 async def test_register_duplicate_email(client):
     response = await client.post("/api/auth/register", json={
         "email": "admin@studentops.org",
-        "password": "anotherpassword",
+        "password": "anotherpassword123",
         "full_name": "Duplicate Admin",
         "role": "member"
     })
