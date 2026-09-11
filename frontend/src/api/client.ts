@@ -1,6 +1,7 @@
 import {
   DashboardStats,
   Student,
+  StudentCreatePayload,
   StudentScoreSummary,
   MeetingDetail,
   EventItem,
@@ -143,6 +144,11 @@ export const api = {
   // Students & Scoreboards
   getStudents: (assignedOnly: boolean = false) =>
     fetchJson<Student[]>(`/students${assignedOnly ? '?assigned_only=true' : ''}`),
+  createStudent: (payload: StudentCreatePayload) =>
+    fetchJson<Student>('/students', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   getScoreboard: () => fetchJson<StudentScoreSummary[]>('/students/scoreboard/all'),
   updateBehaviorScore: (
     studentId: string,

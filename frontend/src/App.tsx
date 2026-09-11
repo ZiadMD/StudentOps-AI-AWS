@@ -182,7 +182,7 @@ function AppContent() {
                 isDesktopCollapsed={isDesktopCollapsed}
               />
             )}
-            {activeTab === 'students'      && <StudentsPage />}
+            {activeTab === 'students'      && <StudentsPage currentUser={currentUser} />}
             {activeTab === 'attendance'    && <AttendanceView currentUser={currentUser} />}
             {activeTab === 'scoreboard'    && <StudentScoreboard currentUser={currentUser} />}
             {activeTab === 'calendar'      && <CalendarView />}

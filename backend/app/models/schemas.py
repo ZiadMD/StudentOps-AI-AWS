@@ -23,8 +23,17 @@ class StudentBase(BaseModel):
     assigned_hr_id: Optional[str] = None
 
 
-class StudentCreate(StudentBase):
-    pass
+class StudentCreate(BaseModel):
+    student_code: Optional[str] = None
+    full_name: str
+    arabic_name: str
+    email: EmailStr
+    phone: str
+    university: Optional[str] = "Faculty of Engineering"
+    role: Optional[str] = "Member"
+    status: Optional[str] = "ACTIVE"
+    team_id: Optional[str] = None
+    assigned_hr_id: Optional[str] = None
 
 
 class StudentResponse(StudentBase):

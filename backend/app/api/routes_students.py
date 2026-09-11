@@ -1,3 +1,4 @@
+import uuid
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,8 +6,9 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, verify_student_access, require_roles
-from app.models.entities import Student, User, ScoreRecord, utcnow
+from app.models.entities import Student, User, ScoreRecord, Team, utcnow
 from app.models.schemas import (
+    StudentCreate,
     StudentResponse,
     StudentScoreSummary,
     BehaviorScoreUpdate,
@@ -57,6 +59,115 @@ async def list_students(
 
     res = await db.execute(query)
     return res.scalars().all()
+
+
+@router.post("", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
+async def create_student(
+    body: StudentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([
+        "region_hr_head", "committee_hr_leader", "committee_head", "team_lead", "hr_admin", "committee_hr_member"
+    ]))
+):
+    """
+    Registers a new member with committee scoping and duplicate prevention.
+    - region_hr_head / hr_admin: can create members across any committee or unassigned.
+    - committee_head / committee_hr_leader / team_lead / committee_hr_member: restricted to their committee.
+    - committee_member / member: forbidden (HTTP 403).
+    """
+    full_name = body.full_name.strip()
+    arabic_name = body.arabic_name.strip()
+    email = str(body.email).strip().lower()
+    phone = body.phone.strip()
+
+    if not full_name:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Full name cannot be empty.")
+    if not arabic_name:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Arabic name cannot be empty.")
+    if not phone:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Phone number cannot be empty.")
+
+    university = (body.university or "Faculty of Engineering").strip()
+    role = (body.role or "Member").strip()
+    status_val = (body.status or "ACTIVE").strip().upper()
+    if status_val not in ("ACTIVE", "INACTIVE", "PROBATION"):
+        status_val = "ACTIVE"
+
+    # Scoping determination
+    target_team_id = body.team_id
+    if current_user.role in ("committee_head", "committee_hr_leader", "team_lead", "committee_hr_member"):
+        if target_team_id and target_team_id != current_user.team_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot create members outside your assigned committee."
+            )
+        target_team_id = current_user.team_id
+    elif current_user.role in ("region_hr_head", "hr_admin"):
+        if target_team_id:
+            team_res = await db.execute(select(Team).where(Team.id == target_team_id))
+            if not team_res.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Assigned committee team '{target_team_id}' not found."
+                )
+
+    # Optional assigned_hr_id verification
+    assigned_hr_id = body.assigned_hr_id
+    if assigned_hr_id:
+        hr_res = await db.execute(select(User).where(User.id == assigned_hr_id))
+        if not hr_res.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Assigned HR member '{assigned_hr_id}' not found."
+            )
+
+    # Check duplicate email
+    existing_email = await db.execute(select(Student).where(Student.email == email))
+    if existing_email.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A member with email '{email}' already exists."
+        )
+
+    # Student code handling
+    if body.student_code and body.student_code.strip():
+        student_code = body.student_code.strip().upper()
+        existing_code = await db.execute(select(Student).where(Student.student_code == student_code))
+        if existing_code.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A member with student code '{student_code}' already exists."
+            )
+    else:
+        # Auto-generate unique code
+        for _ in range(10):
+            candidate_code = f"ST-2026-{uuid.uuid4().hex[:6].upper()}"
+            existing_code = await db.execute(select(Student).where(Student.student_code == candidate_code))
+            if not existing_code.scalar_one_or_none():
+                student_code = candidate_code
+                break
+        else:
+            student_code = f"ST-2026-{int(utcnow().timestamp())}"
+
+    student_id = f"stu_{uuid.uuid4().hex[:12]}"
+
+    new_student = Student(
+        id=student_id,
+        student_code=student_code,
+        full_name=full_name,
+        arabic_name=arabic_name,
+        email=email,
+        phone=phone,
+        university=university,
+        role=role,
+        status=status_val,
+        team_id=target_team_id,
+        assigned_hr_id=assigned_hr_id,
+    )
+    db.add(new_student)
+    await db.commit()
+    await db.refresh(new_student)
+    return new_student
 
 
 @router.get("/scoreboard/all", response_model=list[StudentScoreSummary])
