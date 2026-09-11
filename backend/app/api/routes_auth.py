@@ -2,6 +2,7 @@
 Authentication and User Account Management Endpoints for StudentOps AI.
 """
 from typing import Optional, Any
+from datetime import datetime, timezone
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -17,7 +18,8 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
-    validate_password_strength
+    validate_password_strength,
+    hash_invitation_token
 )
 from app.core.dependencies import (
     get_current_active_user,
@@ -26,7 +28,7 @@ from app.core.dependencies import (
     rate_limit_register,
     rate_limit_refresh
 )
-from app.models.entities import User, Team, Student
+from app.models.entities import User, Team, Student, StudentInvitation
 from app.models.schemas import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -35,7 +37,8 @@ from app.models.schemas import (
     RefreshTokenRequest,
     TeamResponse,
     TeamCreateRequest,
-    UserRoleUpdateRequest
+    UserRoleUpdateRequest,
+    StudentLinkRequest
 )
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -100,16 +103,73 @@ async def register_user(
                 detail=f"Team with ID '{payload.team_id}' not found."
             )
 
-    # 4. Check if a matching student profile already exists in the system
-    student_res = await db.execute(
-        select(Student).where(func.lower(Student.email) == email_clean)
-    )
-    matched_student = student_res.scalar_one_or_none()
-    student_id = matched_student.id if matched_student else None
+    # 4. Process secure student profile linking via trusted invitation token only
+    # SECURITY HARDENING (Account Takeover & Enumeration Prevention):
+    # - Knowing an existing student's email address MUST NEVER auto-link the account.
+    # - Self-registration without a valid cryptographic invitation token strictly sets student_id = None.
+    # - Email equality alone is never sufficient to establish student identity.
+    student_id = None
+    assigned_team_id = payload.team_id
+    invitation_to_mark: Optional[StudentInvitation] = None
 
-    # Link team to student if not already assigned
-    if matched_student and payload.team_id and not matched_student.team_id:
-        matched_student.team_id = payload.team_id
+    if payload.invitation_token and payload.invitation_token.strip():
+        tok_clean = payload.invitation_token.strip()
+        tok_hash = hash_invitation_token(tok_clean)
+
+        inv_res = await db.execute(
+            select(StudentInvitation)
+            .options(selectinload(StudentInvitation.student))
+            .where(StudentInvitation.token_hash == tok_hash)
+        )
+        invitation = inv_res.scalar_one_or_none()
+        if not invitation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid invitation token."
+            )
+        if invitation.is_used:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation token has already been used."
+            )
+
+        now = datetime.now(timezone.utc)
+        inv_exp = invitation.expires_at
+        if inv_exp.tzinfo is None:
+            inv_exp = inv_exp.replace(tzinfo=timezone.utc)
+        if inv_exp < now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation token has expired."
+            )
+
+        student = invitation.student
+        if not student:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Associated student profile not found."
+            )
+
+        # Verify student profile is not already claimed by another active user
+        claimed_res = await db.execute(
+            select(User).where(User.student_id == student.id)
+        )
+        if claimed_res.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This student profile is already linked to an existing account."
+            )
+
+        # Cryptographic invitation tokens are strictly bound to the intended student's email
+        if student.email.lower() != email_clean:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation token is bound to a different email address."
+            )
+
+        student_id = student.id
+        assigned_team_id = student.team_id or payload.team_id
+        invitation_to_mark = invitation
 
     # 5. Create new User entity with strictly non-privileged 'member' role
     new_user = User(
@@ -119,11 +179,16 @@ async def register_user(
         full_name=payload.full_name.strip(),
         arabic_name=payload.arabic_name.strip() if payload.arabic_name else None,
         role="member",  # Non-negotiable server-side enforcement: normal users cannot self-assign roles
-        team_id=payload.team_id,
+        team_id=assigned_team_id,
         student_id=student_id,
         is_active=True
     )
     db.add(new_user)
+    if invitation_to_mark:
+        invitation_to_mark.is_used = True
+        invitation_to_mark.used_at = datetime.now(timezone.utc)
+        invitation_to_mark.used_by_user_id = new_user.id
+
     await db.commit()
 
     # Reload with relationships
@@ -388,4 +453,95 @@ async def update_user_role(
     await db.refresh(target_user)
 
     return _build_user_response(target_user)
+
+
+@router.post("/link-student", response_model=UserResponse)
+async def link_student_profile(
+    payload: StudentLinkRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Securely links an existing authenticated user account to a Student profile using a trusted HR-issued invitation token.
+    Enforces single-use, email binding, and prevents account hijacking.
+    """
+    if current_user.student_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account is already linked to a student profile."
+        )
+
+    tok_clean = payload.invitation_token.strip()
+    tok_hash = hash_invitation_token(tok_clean)
+
+    inv_res = await db.execute(
+        select(StudentInvitation)
+        .options(selectinload(StudentInvitation.student))
+        .where(StudentInvitation.token_hash == tok_hash)
+    )
+    invitation = inv_res.scalar_one_or_none()
+    if not invitation:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid invitation token."
+        )
+    if invitation.is_used:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation token has already been used."
+        )
+
+    now = datetime.now(timezone.utc)
+    inv_exp = invitation.expires_at
+    if inv_exp.tzinfo is None:
+        inv_exp = inv_exp.replace(tzinfo=timezone.utc)
+    if inv_exp < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation token has expired."
+        )
+
+    student = invitation.student
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated student profile not found."
+        )
+
+    # Verify student profile is not already claimed
+    claimed_res = await db.execute(
+        select(User).where(User.student_id == student.id)
+    )
+    if claimed_res.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This student profile is already linked to an existing account."
+        )
+
+    # Verify token is bound to this specific user's email
+    if student.email.lower() != current_user.email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation token is bound to a different email address."
+        )
+
+    current_user.student_id = student.id
+    if student.team_id and not current_user.team_id:
+        current_user.team_id = student.team_id
+
+    invitation.is_used = True
+    invitation.used_at = now
+    invitation.used_by_user_id = current_user.id
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    # Reload with relationships
+    res = await db.execute(
+        select(User)
+        .options(selectinload(User.team))
+        .where(User.id == current_user.id)
+    )
+    user_loaded = res.scalar_one()
+    return _build_user_response(user_loaded)
 

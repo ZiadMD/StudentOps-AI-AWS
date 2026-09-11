@@ -15,6 +15,7 @@ from app.models.entities import Task, Submission, Student, User, TaskAssignment,
 from app.models.schemas import (
     TaskSchema,
     SubmissionSchema,
+    TaskScoreItemSchema,
     TechnicalScoreUpdate,
     TaskCreateRequest,
     TaskAssignRequest,
@@ -237,6 +238,83 @@ async def assign_students_to_task(
     return {"status": "success", "task_id": task_id, "assigned_new": added_count}
 
 
+@router.get("/{task_id}/scores", response_model=list[TaskScoreItemSchema])
+async def list_task_scores_for_hr(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Score collection endpoint for HR and Leadership roles.
+    Allows HR Members, HR Leaders, Regional HR Heads, and Committee Heads to read
+    numerical task scores, grading status, and student metadata.
+    Does NOT expose technical submission files or deliverable URLs.
+    
+    Authorization / Scoping:
+    - region_hr_head / hr_admin: can collect scores across all committees.
+    - committee_hr_leader / committee_hr_member: restricted to their assigned committee.
+    - committee_head / team_lead: restricted to their assigned committee.
+    - committee_member / member: strictly forbidden (HTTP 403).
+    """
+    # 1. Committee members cannot view internal task scores
+    if current_user.role in ("committee_member", "member"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: score collection is restricted to HR and leadership roles."
+        )
+
+    # 2. Verify task exists
+    task_res = await db.execute(select(Task).where(Task.id == task_id))
+    task = task_res.scalar_one_or_none()
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task with ID '{task_id}' not found."
+        )
+
+    # 3. Verify committee scope for committee-scoped roles
+    is_scoped = current_user.role in ("committee_hr_leader", "committee_hr_member", "committee_head", "team_lead")
+    if is_scoped and task.team_id and current_user.team_id and task.team_id != current_user.team_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: this task belongs to a different committee."
+        )
+
+    # 4. Query submissions
+    query = (
+        select(Submission, Student, Task)
+        .join(Student, Submission.student_id == Student.id)
+        .join(Task, Submission.task_id == Task.id)
+        .where(Submission.task_id == task_id)
+    )
+
+    if is_scoped and current_user.team_id:
+        query = query.where(Student.team_id == current_user.team_id)
+
+    res = await db.execute(query)
+    records = res.all()
+
+    results = []
+    for sub, std, t in records:
+        results.append(TaskScoreItemSchema(
+            submission_id=sub.id,
+            task_id=sub.task_id,
+            task_title=t.title,
+            student_id=std.id,
+            student_name=std.full_name,
+            arabic_name=std.arabic_name,
+            status=sub.status,
+            score=sub.score,
+            technical_score=sub.technical_score or sub.score,
+            reviewer_notes=sub.reviewer_notes,
+            submitted_at=sub.submitted_at,
+            reviewed_at=sub.reviewed_at,
+            graded_by_user_id=sub.graded_by_user_id
+        ))
+
+    return results
+
+
 @router.get("/{task_id}/submissions", response_model=list[SubmissionSchema])
 async def list_submissions_for_task(
     task_id: str,
@@ -366,6 +444,62 @@ async def get_submission(
         technical_score=sub.technical_score or sub.score,
         file_url=sub.file_url,
         reviewer_notes=sub.reviewer_notes,
+        graded_by_user_id=sub.graded_by_user_id
+    )
+
+
+@router.get("/submissions/{submission_id}/score", response_model=TaskScoreItemSchema)
+async def get_submission_score_for_hr(
+    submission_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Retrieves score and grading status for a single submission.
+    Provides safe score collection for HR without exposing technical submission deliverables.
+    """
+    if current_user.role in ("committee_member", "member"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: score collection is restricted to HR and leadership roles."
+        )
+
+    res = await db.execute(
+        select(Submission, Student, Task)
+        .join(Student, Submission.student_id == Student.id)
+        .join(Task, Submission.task_id == Task.id)
+        .where(Submission.id == submission_id)
+    )
+    row = res.first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Submission with ID '{submission_id}' not found."
+        )
+
+    sub, std, task = row
+    is_scoped = current_user.role in ("committee_hr_leader", "committee_hr_member", "committee_head", "team_lead")
+
+    if is_scoped and current_user.team_id:
+        if std.team_id != current_user.team_id or (task.team_id and task.team_id != current_user.team_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: this submission belongs to a different committee."
+            )
+
+    return TaskScoreItemSchema(
+        submission_id=sub.id,
+        task_id=sub.task_id,
+        task_title=task.title,
+        student_id=std.id,
+        student_name=std.full_name,
+        arabic_name=std.arabic_name,
+        status=sub.status,
+        score=sub.score,
+        technical_score=sub.technical_score or sub.score,
+        reviewer_notes=sub.reviewer_notes,
+        submitted_at=sub.submitted_at,
+        reviewed_at=sub.reviewed_at,
         graded_by_user_id=sub.graded_by_user_id
     )
 

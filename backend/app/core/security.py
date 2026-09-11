@@ -4,6 +4,8 @@ Handles Password Hashing (Bcrypt) and JWT Token Operations (PyJWT).
 """
 from typing import Optional, Any
 from datetime import datetime, timezone, timedelta
+import secrets
+import hashlib
 import bcrypt
 import jwt
 
@@ -111,3 +113,19 @@ def decode_token(token: str) -> dict[str, Any]:
         settings.JWT_SECRET_KEY,
         algorithms=[settings.JWT_ALGORITHM]
     )
+
+
+def hash_invitation_token(raw_token: str) -> str:
+    """Hashes invitation token using SHA-256 for secure database storage."""
+    return hashlib.sha256(raw_token.strip().encode("utf-8")).hexdigest()
+
+
+def generate_invitation_token() -> tuple[str, str]:
+    """
+    Generates a cryptographically secure, unpredictable invitation token.
+    Returns (raw_token, token_hash).
+    Only raw_token is delivered to the user; token_hash is stored in the database.
+    """
+    raw_token = f"inv_{secrets.token_urlsafe(32)}"
+    token_hash = hash_invitation_token(raw_token)
+    return raw_token, token_hash
