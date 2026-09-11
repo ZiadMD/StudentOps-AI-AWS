@@ -52,6 +52,19 @@ export interface Student {
   created_at: string;
 }
 
+export interface StudentCreatePayload {
+  student_code?: string;
+  full_name: string;
+  arabic_name: string;
+  email: string;
+  phone: string;
+  university?: string;
+  role?: string;
+  status?: string;
+  team_id?: string | null;
+  assigned_hr_id?: string | null;
+}
+
 export interface StudentScoreSummary {
   student_id: string;
   student_name: string;
