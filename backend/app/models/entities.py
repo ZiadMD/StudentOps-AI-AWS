@@ -93,6 +93,26 @@ class Student(Base):
     submissions = relationship("Submission", back_populates="student", cascade="all, delete-orphan")
     scores = relationship("ScoreRecord", back_populates="student", cascade="all, delete-orphan")
     whatsapp_messages = relationship("WhatsAppChatMessage", back_populates="student", cascade="all, delete-orphan")
+    invitations = relationship("StudentInvitation", back_populates="student", cascade="all, delete-orphan")
+
+
+class StudentInvitation(Base):
+    __tablename__ = "student_invitations"
+
+    id = Column(String(36), primary_key=True, index=True)
+    student_id = Column(String(36), ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    created_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_used = Column(Boolean, default=False, nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    used_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    # Relationships
+    student = relationship("Student", back_populates="invitations")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    used_by = relationship("User", foreign_keys=[used_by_user_id])
 
 
 class Meeting(Base):

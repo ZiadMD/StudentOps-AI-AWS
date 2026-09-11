@@ -1,12 +1,14 @@
 import uuid
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, verify_student_access, require_roles
-from app.models.entities import Student, User, ScoreRecord, Team, utcnow
+from app.core.security import generate_invitation_token
+from app.models.entities import Student, User, ScoreRecord, Team, StudentInvitation, utcnow
 from app.models.schemas import (
     StudentCreate,
     StudentResponse,
@@ -15,6 +17,8 @@ from app.models.schemas import (
     AssignCohortRequest,
     StudentPhoneUpdate,
     BonusAwardRequest,
+    StudentInvitationCreateRequest,
+    StudentInvitationResponse
 )
 from app.services.scoring_service import ScoringService
 from app.agent.tools import escape_like
@@ -404,4 +408,54 @@ async def award_student_bonus(
     await db.commit()
     summary = await ScoringService.get_student_score_summary(student_id, db)
     return summary
+
+
+@router.post("/{student_id}/invitation", response_model=StudentInvitationResponse, status_code=status.HTTP_201_CREATED)
+async def create_student_invitation(
+    student_id: str,
+    payload: Optional[StudentInvitationCreateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Generates a cryptographically secure, single-use invitation token for a student profile.
+    Requires write-level access to the student (scoped to committee HR, committee heads, regional heads, or HR admins).
+    Regular members are strictly forbidden.
+    """
+    student = await verify_student_access(student_id, current_user, db, mode="write")
+
+    # Check if student is already claimed by an active user account
+    claimed_res = await db.execute(select(User).where(User.student_id == student.id))
+    if claimed_res.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Student profile is already claimed by an active user account."
+        )
+
+    days = payload.expires_in_days if payload and payload.expires_in_days else 7
+    raw_token, token_hash = generate_invitation_token()
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=days)
+
+    invitation = StudentInvitation(
+        id=f"inv_{uuid.uuid4().hex[:12]}",
+        student_id=student.id,
+        token_hash=token_hash,
+        created_by_user_id=current_user.id,
+        expires_at=expires_at,
+        is_used=False,
+        created_at=now
+    )
+    db.add(invitation)
+    await db.commit()
+    await db.refresh(invitation)
+
+    return StudentInvitationResponse(
+        id=invitation.id,
+        student_id=invitation.student_id,
+        token=raw_token,
+        expires_at=invitation.expires_at,
+        is_used=invitation.is_used,
+        created_at=invitation.created_at
+    )
 

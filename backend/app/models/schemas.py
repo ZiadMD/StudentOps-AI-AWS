@@ -208,6 +208,27 @@ class SubmissionSchema(BaseModel):
     graded_by_user_id: Optional[str] = None
 
 
+class TaskScoreItemSchema(BaseModel):
+    """
+    Score-only projection for HR score collection.
+    Deliberately excludes file_url, proprietary deliverables, and submission content.
+    """
+    submission_id: str
+    task_id: str
+    task_title: Optional[str] = None
+    student_id: str
+    student_name: Optional[str] = None
+    arabic_name: Optional[str] = None
+    status: str
+    score: Optional[float] = None
+    technical_score: Optional[float] = None
+    reviewer_notes: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+    reviewed_at: Optional[datetime] = None
+    graded_by_user_id: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TaskSubmitRequest(BaseModel):
     file_url: str = Field(..., min_length=1, description="Deliverable or file URL for task submission")
 
@@ -430,6 +451,25 @@ class UserRegisterRequest(BaseModel):
     arabic_name: Optional[str] = Field(None, max_length=100)
     role: Optional[str] = Field("member", description="Ignored on public registration; always creates member accounts")
     team_id: Optional[str] = Field(None, max_length=50)
+    invitation_token: Optional[str] = Field(None, description="Optional single-use invitation token to link an existing Student profile")
+
+
+class StudentInvitationCreateRequest(BaseModel):
+    expires_in_days: Optional[int] = Field(7, ge=1, le=30, description="Token expiration window in days")
+
+
+class StudentInvitationResponse(BaseModel):
+    id: str
+    student_id: str
+    token: Optional[str] = None
+    expires_at: datetime
+    is_used: bool
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StudentLinkRequest(BaseModel):
+    invitation_token: str = Field(..., min_length=10, description="Single-use invitation token issued by HR/Admin")
 
 
 class UserLoginRequest(BaseModel):
