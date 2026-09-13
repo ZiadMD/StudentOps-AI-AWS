@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import json
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from app.services.identity_matcher import IdentityMatcher
 from app.models.entities import Student, Meeting, Event, Task, Submission, AttendanceRecord, ScoreRecord
@@ -16,7 +16,7 @@ from app.services.calendar_service import CalendarService
 from app.services.reminder_service import ReminderService
 from app.providers.attendance_provider import MockAttendanceProvider
 from app.providers.calendar_provider import MockCalendarProvider
-from app.providers.messaging_provider import MockMessagingProvider
+from app.providers.messaging_provider import get_messaging_provider
 
 
 class ToolCategory:
@@ -28,11 +28,17 @@ class ToolCategory:
 # Global singleton provider instances
 mock_meet_provider = MockAttendanceProvider()
 mock_cal_provider = MockCalendarProvider()
-mock_msg_provider = MockMessagingProvider()
 
 attendance_service = AttendanceService(mock_meet_provider)
 calendar_service = CalendarService(mock_cal_provider)
-reminder_service = ReminderService(mock_msg_provider)
+
+
+def get_reminder_service() -> ReminderService:
+    """Returns a ReminderService configured with the current messaging provider factory."""
+    return ReminderService(get_messaging_provider())
+
+
+reminder_service = get_reminder_service()
 
 
 def escape_like(val: str) -> str:
@@ -321,23 +327,37 @@ async def tool_get_meeting(db: AsyncSession, meeting_id: str) -> dict:
 
 async def tool_get_meeting_attendance(
     db: AsyncSession,
-    meeting_id: Optional[str] = "today_sync",
+    meeting_id: Optional[str] = None,
     team_id: Optional[str] = None
 ) -> dict:
     """
     Retrieve or compute deterministic attendance for a meeting.
-    Defaults to today's sync meeting. Scoped by team_id if provided.
+    Defaults to the latest meeting if meeting_id is omitted, None, empty, 'today', or 'latest'.
+    Preserves explicit meeting_id/code lookup and team_id scoping.
     """
-    if not meeting_id or meeting_id == "today" or meeting_id == "latest":
-        meeting_id = "today_sync"
-
-    # Find meeting
-    res = await db.execute(
-        select(Meeting).where((Meeting.id == meeting_id) | (Meeting.meeting_code == meeting_id))
-    )
-    meeting = res.scalar_one_or_none()
-    if not meeting:
-        return {"success": False, "message": f"Meeting '{meeting_id}' not found."}
+    clean_id = (meeting_id or "").strip()
+    if not clean_id or clean_id.lower() in ("today", "latest"):
+        # Dynamically resolve latest meeting from Meeting table
+        stmt = select(Meeting)
+        if team_id:
+            stmt = stmt.where((Meeting.team_id == team_id) | (Meeting.team_id.is_(None)))
+        stmt = stmt.order_by(Meeting.start_time.desc()).limit(1)
+        res = await db.execute(stmt)
+        meeting = res.scalar_one_or_none()
+        if not meeting:
+            return {"success": False, "message": "No meetings found."}
+    else:
+        # Find meeting by explicit ID, meeting_code, or numeric session_number
+        conditions = [(Meeting.id == clean_id), (Meeting.meeting_code == clean_id)]
+        if clean_id.isdigit():
+            conditions.append(Meeting.session_number == int(clean_id))
+        stmt = select(Meeting).where(or_(*conditions))
+        if team_id:
+            stmt = stmt.where((Meeting.team_id == team_id) | (Meeting.team_id.is_(None)))
+        res = await db.execute(stmt)
+        meeting = res.scalar_one_or_none()
+        if not meeting:
+            return {"success": False, "message": f"Meeting '{clean_id}' not found."}
 
     # Fetch attendance records
     att_res = await db.execute(
@@ -512,7 +532,7 @@ async def tool_get_student_score(db: AsyncSession, student_id_or_name: str) -> d
                 "message": s_lookup.get("message", f"Multiple students found matching '{student_id_or_name}'.")
             }
         return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
-    
+
     student_id = s_lookup["student"]["id"]
     summary = await ScoringService.get_student_score_summary(student_id, db)
     if not summary:
@@ -567,7 +587,8 @@ async def tool_prepare_reminder(
             ev_res = await db.execute(select(Event).where(Event.id == event_schema.id))
             event = ev_res.scalar_one_or_none()
 
-    preview_text = reminder_service.generate_meeting_reminder_text(
+    service = get_reminder_service()
+    preview_text = service.generate_meeting_reminder_text(
         student_name=students[0].arabic_name or students[0].full_name,
         event_title=event.title if event else "الاجتماع القادم",
         event_time=event.start_time if event else datetime.now(timezone.utc),
@@ -625,7 +646,8 @@ async def tool_send_reminder(
         ev_res = await db.execute(select(Event).where(Event.id == event_id))
         event = ev_res.scalar_one_or_none()
 
-    result = await reminder_service.send_reminders(
+    service = get_reminder_service()
+    result = await service.send_reminders(
         students=list(students),
         event=event,
         custom_message=custom_message,
@@ -642,14 +664,14 @@ async def tool_send_reminder(
 TOOL_DEFINITIONS = [
     {
         "name": "get_meeting_attendance",
-        "description": "Retrieves the deterministic attendance record for a meeting (defaults to today's sync). Identifies present, late, and absent students.",
+        "description": "Retrieves the deterministic attendance record for a meeting (defaults to latest meeting). Identifies present, late, and absent students.",
         "category": ToolCategory.READ_ONLY,
         "parameters": {
             "type": "object",
             "properties": {
                 "meeting_id": {
                     "type": "string",
-                    "description": "The ID or code of the meeting (e.g., 'today_sync', 'meet_21_08')."
+                    "description": "The ID or code of the meeting (e.g., 'meet_21_08', or omit for latest meeting)."
                 }
             }
         }
