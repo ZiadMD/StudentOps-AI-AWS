@@ -61,31 +61,6 @@ def upgrade() -> None:
         op.create_index(op.f('ix_events_id'), 'events', ['id'], unique=False)
         op.create_index(op.f('ix_events_start_time'), 'events', ['start_time'], unique=False)
 
-    if 'students' not in existing_tables:
-        op.create_table('students',
-        sa.Column('id', sa.String(length=36), nullable=False),
-        sa.Column('student_code', sa.String(length=20), nullable=True),
-        sa.Column('full_name', sa.String(length=100), nullable=False),
-        sa.Column('arabic_name', sa.String(length=100), nullable=False),
-        sa.Column('email', sa.String(length=100), nullable=False),
-        sa.Column('phone', sa.String(length=30), nullable=False),
-        sa.Column('university', sa.String(length=100), nullable=True),
-        sa.Column('role', sa.String(length=50), nullable=True),
-        sa.Column('status', sa.String(length=20), nullable=True),
-        sa.Column('team_id', sa.String(length=36), nullable=True),
-        sa.Column('assigned_hr_id', sa.String(length=36), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
-        sa.ForeignKeyConstraint(['assigned_hr_id'], ['users.id'], ),
-        sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
-        sa.PrimaryKeyConstraint('id')
-        )
-        op.create_index(op.f('ix_students_arabic_name'), 'students', ['arabic_name'], unique=False)
-        op.create_index(op.f('ix_students_assigned_hr_id'), 'students', ['assigned_hr_id'], unique=False)
-        op.create_index(op.f('ix_students_email'), 'students', ['email'], unique=True)
-        op.create_index(op.f('ix_students_id'), 'students', ['id'], unique=False)
-        op.create_index(op.f('ix_students_student_code'), 'students', ['student_code'], unique=True)
-        op.create_index(op.f('ix_students_team_id'), 'students', ['team_id'], unique=False)
-
     if 'teams' not in existing_tables:
         op.create_table('teams',
         sa.Column('id', sa.String(length=36), nullable=False),
@@ -111,7 +86,6 @@ def upgrade() -> None:
         sa.Column('student_id', sa.String(length=36), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
-        sa.ForeignKeyConstraint(['student_id'], ['students.id'], ),
         sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
         sa.PrimaryKeyConstraint('id')
         )
@@ -119,6 +93,40 @@ def upgrade() -> None:
         op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
         op.create_index(op.f('ix_users_student_id'), 'users', ['student_id'], unique=False)
         op.create_index(op.f('ix_users_team_id'), 'users', ['team_id'], unique=False)
+
+    if 'students' not in existing_tables:
+        op.create_table('students',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('student_code', sa.String(length=20), nullable=True),
+        sa.Column('full_name', sa.String(length=100), nullable=False),
+        sa.Column('arabic_name', sa.String(length=100), nullable=False),
+        sa.Column('email', sa.String(length=100), nullable=False),
+        sa.Column('phone', sa.String(length=30), nullable=False),
+        sa.Column('university', sa.String(length=100), nullable=True),
+        sa.Column('role', sa.String(length=50), nullable=True),
+        sa.Column('status', sa.String(length=20), nullable=True),
+        sa.Column('team_id', sa.String(length=36), nullable=True),
+        sa.Column('assigned_hr_id', sa.String(length=36), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(['assigned_hr_id'], ['users.id'], ),
+        sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
+        sa.PrimaryKeyConstraint('id')
+        )
+        op.create_index(op.f('ix_students_arabic_name'), 'students', ['arabic_name'], unique=False)
+        op.create_index(op.f('ix_students_assigned_hr_id'), 'students', ['assigned_hr_id'], unique=False)
+        op.create_index(op.f('ix_students_email'), 'students', ['email'], unique=True)
+        op.create_index(op.f('ix_students_id'), 'students', ['id'], unique=False)
+        op.create_index(op.f('ix_students_student_code'), 'students', ['student_code'], unique=True)
+        op.create_index(op.f('ix_students_team_id'), 'students', ['team_id'], unique=False)
+
+    if 'users' not in existing_tables and 'students' not in existing_tables:
+        op.create_foreign_key(
+            'fk_users_student_id_students',
+            'users',
+            'students',
+            ['student_id'],
+            ['id'],
+        )
 
     if 'automation_settings' not in existing_tables:
         op.create_table('automation_settings',
@@ -555,6 +563,18 @@ def downgrade() -> None:
         op.drop_index(op.f('ix_automation_settings_id'), table_name='automation_settings')
         op.drop_table('automation_settings')
 
+    if 'users' in existing_tables and 'students' in existing_tables:
+        op.drop_constraint('fk_users_student_id_students', 'users', type_='foreignkey')
+
+    if 'students' in existing_tables:
+        op.drop_index(op.f('ix_students_team_id'), table_name='students')
+        op.drop_index(op.f('ix_students_student_code'), table_name='students')
+        op.drop_index(op.f('ix_students_id'), table_name='students')
+        op.drop_index(op.f('ix_students_email'), table_name='students')
+        op.drop_index(op.f('ix_students_assigned_hr_id'), table_name='students')
+        op.drop_index(op.f('ix_students_arabic_name'), table_name='students')
+        op.drop_table('students')
+
     if 'users' in existing_tables:
         op.drop_index(op.f('ix_users_team_id'), table_name='users')
         op.drop_index(op.f('ix_users_student_id'), table_name='users')
@@ -566,15 +586,6 @@ def downgrade() -> None:
         op.drop_index(op.f('ix_teams_id'), table_name='teams')
         op.drop_index(op.f('ix_teams_code'), table_name='teams')
         op.drop_table('teams')
-
-    if 'students' in existing_tables:
-        op.drop_index(op.f('ix_students_team_id'), table_name='students')
-        op.drop_index(op.f('ix_students_student_code'), table_name='students')
-        op.drop_index(op.f('ix_students_id'), table_name='students')
-        op.drop_index(op.f('ix_students_email'), table_name='students')
-        op.drop_index(op.f('ix_students_assigned_hr_id'), table_name='students')
-        op.drop_index(op.f('ix_students_arabic_name'), table_name='students')
-        op.drop_table('students')
 
     if 'events' in existing_tables:
         op.drop_index(op.f('ix_events_start_time'), table_name='events')
