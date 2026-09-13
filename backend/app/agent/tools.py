@@ -7,8 +7,9 @@ from datetime import datetime, timezone
 import json
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
+from app.services.identity_matcher import IdentityMatcher
 from app.models.entities import Student, Meeting, Event, Task, Submission, AttendanceRecord, ScoreRecord
 from app.core.time import as_utc
 from app.services.attendance_service import AttendanceService, AttendancePolicyEngine
@@ -48,41 +49,244 @@ def escape_like(val: str) -> str:
 # Tool Implementation Handlers
 # =========================================================
 
-async def tool_get_student(db: AsyncSession, context: PermissionContext, student_id_or_name: str) -> dict:
-    """Retrieve full student profile by ID, email, or name. Enforces team scope."""
-    query = student_id_or_name.strip().lower()
-    escaped = escape_like(query)
-    
-    q = select(Student).where(
-        (Student.id == student_id_or_name) |
-        (Student.email.ilike(f"%{escaped}%")) |
-        (Student.full_name.ilike(f"%{escaped}%")) |
-        (Student.arabic_name.ilike(f"%{escaped}%"))
-    )
-    
-    if not context.is_admin_override:
-        if not context.team_id:
-            return {"found": False, "message": "Unauthorized: Missing team scope."}
-        q = q.where(Student.team_id == context.team_id)
+async def tool_get_student(
+    db: AsyncSession,
+    context: Any = None,
+    student_id_or_name: Optional[str] = None,
+    **kwargs
+) -> dict:
+    """Retrieve full student profile by ID, code, email, or name with dynamic identity resolution and team scoping."""
+    # Support flexible parameter ordering:
+    # 1. tool_get_student(db, context, query)
+    # 2. tool_get_student(db, query)
+    # 3. tool_get_student(db, query, context=context)
+    # 4. tool_get_student(db=db, context=context, student_id_or_name=query)
+    if isinstance(context, str) and student_id_or_name is None:
+        real_query = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        real_query = student_id_or_name or kwargs.get("student_id_or_name", "")
+    else:
+        real_context = kwargs.get("context")
+        real_query = student_id_or_name or (context if isinstance(context, str) else "") or kwargs.get("student_id_or_name", "")
 
-    res = await db.execute(q)
-    student = res.scalar_one_or_none()
-    if not student:
-        return {"found": False, "message": f"Student '{student_id_or_name}' not found or outside your team scope."}
-    return {
-        "found": True,
-        "student": {
-            "id": student.id,
-            "student_code": student.student_code,
-            "full_name": student.full_name,
-            "arabic_name": student.arabic_name,
-            "email": student.email,
-            "phone": student.phone,
-            "role": student.role,
-            "status": student.status,
-            "university": student.university
+    raw_query = real_query
+    if not isinstance(raw_query, str) or not raw_query.strip():
+        return {"found": False, "message": "No student identifier provided."}
+
+    raw_query = raw_query.strip()
+    query = raw_query.lower()
+    escaped = escape_like(query)
+
+    def is_scoped(student_obj) -> bool:
+        if not real_context or real_context.is_admin_override:
+            return True
+        if not real_context.team_id:
+            return False
+        return student_obj.team_id == real_context.team_id
+
+    # 1. Direct match by ID (primary key) or exact student_code
+    exact_res = await db.execute(
+        select(Student).where(
+            (Student.id == raw_query) |
+            (func.lower(Student.student_code) == query)
+        )
+    )
+    exact_student = exact_res.scalar_one_or_none()
+    if exact_student:
+        if not is_scoped(exact_student):
+            return {"found": False, "message": f"Student '{raw_query}' not found or outside your team scope."}
+        return {
+            "found": True,
+            "student": {
+                "id": exact_student.id,
+                "student_code": exact_student.student_code,
+                "full_name": exact_student.full_name,
+                "arabic_name": exact_student.arabic_name,
+                "email": exact_student.email,
+                "phone": exact_student.phone,
+                "role": exact_student.role,
+                "status": exact_student.status,
+                "university": exact_student.university,
+                "team_id": exact_student.team_id
+            }
         }
-    }
+
+    # 2. Exact email match
+    email_res = await db.execute(
+        select(Student).where(func.lower(Student.email) == query)
+    )
+    email_student = email_res.scalar_one_or_none()
+    if email_student:
+        if not is_scoped(email_student):
+            return {"found": False, "message": f"Student '{raw_query}' not found or outside your team scope."}
+        return {
+            "found": True,
+            "student": {
+                "id": email_student.id,
+                "student_code": email_student.student_code,
+                "full_name": email_student.full_name,
+                "arabic_name": email_student.arabic_name,
+                "email": email_student.email,
+                "phone": email_student.phone,
+                "role": email_student.role,
+                "status": email_student.status,
+                "university": email_student.university,
+                "team_id": email_student.team_id
+            }
+        }
+
+    # 3. Dynamic multi-tier name resolution using IdentityMatcher across students
+    all_res = await db.execute(select(Student))
+    all_students_unfiltered = all_res.scalars().all()
+    if not all_students_unfiltered:
+        return {"found": False, "message": f"Student '{raw_query}' not found."}
+
+    all_students = [s for s in all_students_unfiltered if is_scoped(s)]
+    if not all_students and real_context and not real_context.is_admin_override and real_context.team_id:
+        return {"found": False, "message": f"Student '{raw_query}' not found or outside your team scope."}
+
+    norm_query = IdentityMatcher.normalize_text(raw_query)
+
+    exact_name_matches = []
+    token_matches = []
+
+    for s in all_students:
+        norm_ar = IdentityMatcher.normalize_text(s.arabic_name or "")
+        norm_en = IdentityMatcher.normalize_text(s.full_name or "")
+
+        # Check exact normalized full name match
+        if norm_query and (norm_query == norm_ar or norm_query == norm_en):
+            exact_name_matches.append(s)
+            continue
+
+        # Check token matching via IdentityMatcher
+        matched_ar, conf_ar = IdentityMatcher._match_name_tokens(norm_query, norm_ar)
+        matched_en, conf_en = IdentityMatcher._match_name_tokens(norm_query, norm_en)
+
+        if matched_ar or matched_en:
+            conf = max(conf_ar, conf_en)
+            token_matches.append((s, conf))
+
+    # Evaluate exact normalized name matches first
+    if len(exact_name_matches) == 1:
+        s = exact_name_matches[0]
+        return {
+            "found": True,
+            "student": {
+                "id": s.id,
+                "student_code": s.student_code,
+                "full_name": s.full_name,
+                "arabic_name": s.arabic_name,
+                "email": s.email,
+                "phone": s.phone,
+                "role": s.role,
+                "status": s.status,
+                "university": s.university,
+                "team_id": s.team_id
+            }
+        }
+    elif len(exact_name_matches) > 1:
+        return {
+            "found": False,
+            "ambiguous": True,
+            "matches": [
+                {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
+                for s in exact_name_matches
+            ],
+            "message": f"Multiple students found matching '{raw_query}'."
+        }
+
+    # Evaluate token matches
+    if len(token_matches) == 1:
+        s = token_matches[0][0]
+        return {
+            "found": True,
+            "student": {
+                "id": s.id,
+                "student_code": s.student_code,
+                "full_name": s.full_name,
+                "arabic_name": s.arabic_name,
+                "email": s.email,
+                "phone": s.phone,
+                "role": s.role,
+                "status": s.status,
+                "university": s.university,
+                "team_id": s.team_id
+            }
+        }
+    elif len(token_matches) > 1:
+        token_matches.sort(key=lambda x: x[1], reverse=True)
+        top_conf = token_matches[0][1]
+        top_matches = [m for m in token_matches if abs(m[1] - top_conf) <= 0.001]
+        if len(top_matches) == 1:
+            s = top_matches[0][0]
+            return {
+                "found": True,
+                "student": {
+                    "id": s.id,
+                    "student_code": s.student_code,
+                    "full_name": s.full_name,
+                    "arabic_name": s.arabic_name,
+                    "email": s.email,
+                    "phone": s.phone,
+                    "role": s.role,
+                    "status": s.status,
+                    "university": s.university,
+                    "team_id": s.team_id
+                }
+            }
+        return {
+            "found": False,
+            "ambiguous": True,
+            "matches": [
+                {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
+                for s, _ in top_matches
+            ],
+            "message": f"Multiple students found matching '{raw_query}'."
+        }
+
+    # 4. Fallback SQL ILIKE substring search (safety net for partial codes or IDs)
+    res = await db.execute(
+        select(Student).where(
+            (Student.id.ilike(f"%{escaped}%")) |
+            (Student.student_code.ilike(f"%{escaped}%")) |
+            (Student.email.ilike(f"%{escaped}%")) |
+            (Student.full_name.ilike(f"%{escaped}%")) |
+            (Student.arabic_name.ilike(f"%{escaped}%"))
+        )
+    )
+    like_students = [s for s in res.scalars().all() if is_scoped(s)]
+    if len(like_students) == 1:
+        s = like_students[0]
+        return {
+            "found": True,
+            "student": {
+                "id": s.id,
+                "student_code": s.student_code,
+                "full_name": s.full_name,
+                "arabic_name": s.arabic_name,
+                "email": s.email,
+                "phone": s.phone,
+                "role": s.role,
+                "status": s.status,
+                "university": s.university,
+                "team_id": s.team_id
+            }
+        }
+    elif len(like_students) > 1:
+        return {
+            "found": False,
+            "ambiguous": True,
+            "matches": [
+                {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
+                for s in like_students
+            ],
+            "message": f"Multiple students found matching '{raw_query}'."
+        }
+
+    return {"found": False, "message": f"Student '{raw_query}' not found or outside your team scope."}
 
 
 async def tool_search_students(db: AsyncSession, context: PermissionContext, query: str) -> dict:
@@ -411,12 +615,34 @@ async def tool_get_pending_submissions(db: AsyncSession, context: PermissionCont
     }
 
 
-async def tool_get_student_score(db: AsyncSession, context: PermissionContext, student_id_or_name: str) -> dict:
+async def tool_get_student_score(
+    db: AsyncSession,
+    context: Any = None,
+    student_id_or_name: Optional[str] = None,
+    **kwargs
+) -> dict:
     """Retrieve 8.xlsx scoring summary for a student."""
+    if isinstance(context, str) and student_id_or_name is None:
+        real_query = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        real_query = student_id_or_name or kwargs.get("student_id_or_name", "")
+    else:
+        real_context = kwargs.get("context")
+        real_query = student_id_or_name or (context if isinstance(context, str) else "") or kwargs.get("student_id_or_name", "")
+
     # Find student ID first
-    s_lookup = await tool_get_student(db, context, student_id_or_name)
+    s_lookup = await tool_get_student(db, context=real_context, student_id_or_name=real_query)
     if not s_lookup.get("found"):
-        return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
+        if s_lookup.get("ambiguous"):
+            return {
+                "found": False,
+                "ambiguous": True,
+                "matches": s_lookup.get("matches", []),
+                "message": s_lookup.get("message", f"Multiple students found matching '{real_query}'.")
+            }
+        return {"found": False, "message": s_lookup.get("message", f"Student '{real_query}' not found or outside your team scope.")}
     
     student_id = s_lookup["student"]["id"]
     summary = await ScoringService.get_student_score_summary(student_id, db)
