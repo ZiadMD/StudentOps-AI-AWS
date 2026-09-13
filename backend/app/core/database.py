@@ -56,6 +56,14 @@ else:
 # Engine configuration
 engine = create_async_engine(db_url, **engine_kwargs)
 
+from sqlalchemy import event
+if "sqlite" in db_url:
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
 # Async session factory
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

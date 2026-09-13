@@ -31,23 +31,13 @@ async def submit_feedback(
     """
     # Determine student ID
     student_id = current_user.student_id
-    student = None
-    if student_id:
-        std_res = await db.execute(select(Student).where(Student.id == student_id))
-        student = std_res.scalar_one_or_none()
-    else:
-        std_res = await db.execute(select(Student).where(Student.email == current_user.email))
-        student = std_res.scalar_one_or_none()
-        if student:
-            student_id = student.id
-        else:
-            # Fallback to first student if admin/tester
-            std_first = await db.execute(select(Student))
-            student = std_first.scalars().first()
-            if student:
-                student_id = student.id
-
     if not student_id:
+        raise HTTPException(status_code=403, detail="No linked student profile found")
+        
+    std_res = await db.execute(select(Student).where(Student.id == student_id))
+    student = std_res.scalar_one_or_none()
+    
+    if not student:
         raise HTTPException(status_code=400, detail="Cannot identify student profile for feedback submission.")
 
     # Identify target HR Member
@@ -170,7 +160,7 @@ async def update_feedback_status(
     feedback_id: str,
     body: FeedbackStatusUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["committee_hr_leader", "hr_admin"]))
+    current_user: User = Depends(require_roles(["committee_hr_leader"]))
 ):
     """
     HR Leader reviews and marks member feedback as REVIEWED or ACTIONED.
@@ -181,6 +171,13 @@ async def update_feedback_status(
     if not fb:
         raise HTTPException(status_code=404, detail="Feedback not found")
 
+    std_res = await db.execute(select(Student).where(Student.id == fb.student_id))
+    std = std_res.scalar_one_or_none()
+    
+    if current_user.role == "committee_hr_leader":
+        if not std or std.team_id != current_user.team_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access feedback from another committee")
+
     fb.status = body.status
     fb.notes = body.notes or fb.notes
     fb.reviewed_by_user_id = current_user.id
@@ -188,9 +185,6 @@ async def update_feedback_status(
 
     await db.commit()
     await db.refresh(fb)
-
-    std_res = await db.execute(select(Student).where(Student.id == fb.student_id))
-    std = std_res.scalar_one_or_none()
 
     return FeedbackResponse(
         id=fb.id,

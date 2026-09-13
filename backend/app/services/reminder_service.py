@@ -1,7 +1,8 @@
 """
 Reminder and Notification Engine.
 """
-from typing import Optional
+import uuid
+from typing import Optional, List, Dict
 from datetime import datetime, timezone
 import json
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -101,7 +102,7 @@ class ReminderService:
 
             if db:
                 reminder_log = ReminderLog(
-                    id=f"rem_{int(datetime.now().timestamp())}_{s.id}",
+                    id=f"rem_{uuid.uuid4().hex[:12]}",
                     recipient_id=s.id,
                     recipient_name=s.full_name,
                     recipient_phone=s.phone,

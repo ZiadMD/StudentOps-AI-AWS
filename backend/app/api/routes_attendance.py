@@ -12,6 +12,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, require_roles
 from app.models.entities import Meeting, AttendanceRecord, Student, User, MeetingAssignment
+from app.services.audit_service import AuditService
 from app.models.schemas import MeetingDetailResponse, AttendanceRecordSchema, MeetingCreateRequest
 from app.agent.tools import attendance_service
 
@@ -32,12 +33,11 @@ async def list_meetings(
             query = query.where((Meeting.id.in_(subq)) | (Meeting.team_id == current_user.team_id))
         else:
             query = query.where(Meeting.id.in_(subq))
-    elif current_user.role in ("committee_head", "team_lead"):
+    elif current_user.role in ("committee_head", "team_lead", "committee_hr_leader", "committee_hr_member"):
         if current_user.team_id:
             query = query.where(Meeting.team_id == current_user.team_id)
-    elif current_user.role in ("committee_hr_leader", "committee_hr_member"):
-        if current_user.team_id:
-            query = query.where(Meeting.team_id == current_user.team_id)
+        else:
+            return []
 
     res = await db.execute(query)
     meetings = res.scalars().all()
@@ -168,23 +168,14 @@ async def get_meeting_attendance(
     )
     records = att_res.all()
 
-    # If empty, process
-    if not records:
-        await attendance_service.process_meeting_attendance(meeting.id, db)
-        att_res = await db.execute(
-            select(AttendanceRecord, Student)
-            .join(Student, AttendanceRecord.student_id == Student.id)
-            .where(AttendanceRecord.meeting_id == meeting.id)
-        )
-        records = att_res.all()
+    # Removed automatic processing to ensure GET is read-only (ISSUE-13)
 
     # Filter records based on role and team scoping
-    if current_user.role in ("committee_head", "team_lead", "committee_hr_leader"):
+    if current_user.role in ("committee_head", "team_lead", "committee_hr_leader", "committee_hr_member"):
         if current_user.team_id:
             records = [r for r in records if r[1].team_id == current_user.team_id]
-    elif current_user.role == "committee_hr_member":
-        if current_user.team_id:
-            records = [r for r in records if r[1].team_id == current_user.team_id]
+        else:
+            records = []
     elif current_user.role in ("committee_member", "member"):
         records = [r for r in records if r[1].id == current_user.student_id]
 
@@ -235,8 +226,17 @@ async def reprocess_meeting(
     Triggers the deterministic attendance policy processor for a meeting.
     HR Member takes attendance, which records statuses and flags absent members for human WhatsApp follow-up.
     """
+    res = await db.execute(select(Meeting).where((Meeting.id == meeting_id) | (Meeting.meeting_code == meeting_id)))
+    meeting = res.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+        
+    if current_user.role != "hr_admin" and current_user.team_id:
+        if meeting.team_id != current_user.team_id:
+            raise HTTPException(status_code=403, detail="Cannot process attendance for another committee's meeting")
+
     try:
-        records = await attendance_service.process_meeting_attendance(meeting_id, db)
+        records = await attendance_service.process_meeting_attendance(meeting.id, db)
     except ValueError as err:
         raise HTTPException(status_code=404, detail=str(err))
 
@@ -246,3 +246,86 @@ async def reprocess_meeting(
         "message": "Attendance evaluated and synced successfully. Absenteeism flags created for human follow-up."
     }
 
+
+
+from pydantic import BaseModel
+
+class ManualAttendanceUpdate(BaseModel):
+    status: str
+    excuse_reason: Optional[str] = None
+    excuse_status: Optional[str] = None
+
+@router.put("/meetings/{meeting_id}/records/{student_id}/status", response_model=AttendanceRecordSchema)
+async def update_attendance_status(
+    meeting_id: str,
+    student_id: str,
+    body: ManualAttendanceUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "hr_admin", "region_hr_head"]))
+):
+    """
+    HR manually updates attendance status or excuse.
+    Requires matching committee.
+    """
+    # Validate Meeting
+    res = await db.execute(select(Meeting).where(Meeting.id == meeting_id))
+    meeting = res.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    if current_user.role in ["committee_hr_member", "committee_hr_leader"] and current_user.team_id:
+        if meeting.team_id != current_user.team_id:
+            raise HTTPException(status_code=403, detail="Cannot edit attendance for another committee")
+
+    # Validate Student
+    s_res = await db.execute(select(Student).where(Student.id == student_id))
+    student = s_res.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    if current_user.role in ["committee_hr_member", "committee_hr_leader"] and current_user.team_id:
+        if student.team_id != current_user.team_id:
+            raise HTTPException(status_code=403, detail="Cannot edit attendance for a student from another committee")
+
+    # Update or Create Record
+    att_res = await db.execute(
+        select(AttendanceRecord).where(
+            AttendanceRecord.meeting_id == meeting_id,
+            AttendanceRecord.student_id == student_id
+        )
+    )
+    record = att_res.scalar_one_or_none()
+    
+    if not record:
+        record = AttendanceRecord(
+            id=f"att_{uuid.uuid4().hex[:12]}",
+            meeting_id=meeting_id,
+            student_id=student_id,
+            status=body.status.upper(),
+            excuse_reason=body.excuse_reason,
+            excuse_status=body.excuse_status,
+        )
+        db.add(record)
+    else:
+        record.status = body.status.upper()
+        if body.excuse_reason is not None:
+            record.excuse_reason = body.excuse_reason
+        if body.excuse_status is not None:
+            record.excuse_status = body.excuse_status
+            
+    await db.commit()
+    await db.refresh(record)
+
+    return AttendanceRecordSchema(
+        id=record.id,
+        student_id=student.id,
+        student_name=student.full_name,
+        arabic_name=student.arabic_name,
+        status=record.status,
+        match_confidence=record.match_confidence,
+        first_join=record.first_join,
+        last_leave=record.last_leave,
+        total_duration_minutes=record.total_duration_minutes,
+        excuse_reason=record.excuse_reason,
+        excuse_status=record.excuse_status
+    )

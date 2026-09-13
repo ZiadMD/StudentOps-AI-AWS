@@ -54,6 +54,7 @@ class ScoringService:
         social_med = scores_by_cat.get("SOCIAL_MEDIA", 5.0)
         hierarchy = scores_by_cat.get("HIERARCHY_RULES", 5.0)
         polite = scores_by_cat.get("POLITE_CONDUCT", 8.0)
+        interaction = scores_by_cat.get("INTERACTION", 5.0)
         total_behavior = group_int + social_med + hierarchy + polite
 
         # 5. Bonus Points (awarded by HR Leader)
@@ -84,6 +85,7 @@ class ScoringService:
             pending_task_count=pending_tasks,
             average_task_quality=round(avg_quality, 1),
             group_interaction_score=group_int,
+            interaction_score=interaction,
             social_media_score=social_med,
             hierarchy_rules_score=hierarchy,
             polite_conduct_score=polite,

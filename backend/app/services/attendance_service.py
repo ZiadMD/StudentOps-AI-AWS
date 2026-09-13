@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.models.entities import Meeting, Student, AttendanceRecord, ParticipantSession, MemberFollowupStatus
 from app.providers.attendance_provider import AttendanceProvider, RawMeetingAttendance
 from app.services.identity_matcher import IdentityMatcher
+from app.core.time import as_utc
 
 
 class AttendancePolicyEngine:
@@ -37,12 +38,9 @@ class AttendancePolicyEngine:
         if not first_join or total_duration_minutes <= 0:
             return "UNEXCUSED_ABSENT"
 
-        # Calculate join delay in minutes
-        # Ensure meeting_start and first_join have comparable timezone awareness
-        if meeting_start.tzinfo and not first_join.tzinfo:
-            first_join = first_join.replace(tzinfo=timezone.utc)
-        elif not meeting_start.tzinfo and first_join.tzinfo:
-            meeting_start = meeting_start.replace(tzinfo=timezone.utc)
+        # Calculate join delay in minutes (ISSUE-21 Timezone Conversion)
+        first_join = as_utc(first_join)
+        meeting_start = as_utc(meeting_start)
 
         delay_minutes = (first_join - meeting_start).total_seconds() / 60.0
         attendance_percent = (total_duration_minutes / max(meeting_duration_minutes, 1)) * 100.0
@@ -163,6 +161,13 @@ class AttendanceService:
         )
         flagged_student_ids = set(flag_res.scalars().all())
 
+        # Pre-fetch HR Leaders for fallback assignments (ISSUE-15)
+        hr_leaders = {}
+        for std in students:
+            if std.team_id and std.team_id not in hr_leaders:
+                hr_res = await db.execute(select(User.id).where(User.team_id == std.team_id, User.role == "committee_hr_leader").limit(1))
+                hr_leaders[std.team_id] = hr_res.scalar_one_or_none()
+                
         attendance_records: list[AttendanceRecord] = []
 
         for student in students:
@@ -217,7 +222,9 @@ class AttendanceService:
             if status == "UNEXCUSED_ABSENT":
                 if student.id not in flagged_student_ids:
                     flagged_student_ids.add(student.id)
-                    hr_id = student.assigned_hr_id or meeting.responsible_user_id or "usr_hr_member"
+                    hr_id = student.assigned_hr_id
+                    if not hr_id:
+                        hr_id = hr_leaders.get(student.team_id)
                     db.add(MemberFollowupStatus(
                         id=f"flag_{uuid.uuid4().hex[:12]}",
                         student_id=student.id,
