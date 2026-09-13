@@ -55,6 +55,12 @@ frontend/dist/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*-journal
+*-wal
+*-shm
 data/
 8.xlsx
 
@@ -63,6 +69,7 @@ data/
 # ==============================
 .vscode/
 .idea/
+.opencode/
 *.swp
 *.swo
 *~
