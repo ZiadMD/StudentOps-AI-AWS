@@ -4,7 +4,7 @@ Database Seeding Module based on 8.xlsx Ground Truth and Operational Data.
 import asyncio
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from app.core.database import AsyncSessionLocal, init_db
 from app.models.entities import (
     Student, Meeting, ParticipantSession, AttendanceRecord,
@@ -210,7 +210,6 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
     core_pwd = get_password_hash("member123")
     existing_emails = {u["email"] for u in users_data}
     existing_ids = {u["id"] for u in users_data}
-
     for i, p in enumerate(CORE_TEAM, 1):
         name_lower = p["name"].lower()
         candidate_users = [
@@ -295,6 +294,10 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
                 existing_emails.add(email)
                 existing_ids.add(uid)
 
+    desired_student_links = {
+        u["id"]: u.get("student_id") for u in users_data if u.get("student_id")
+    }
+
     for u_data in users_data:
         u_res = await db.execute(
             select(User).where(
@@ -304,16 +307,16 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
         )
         existing_u = u_res.scalar_one_or_none()
         if not existing_u:
-            db.add(User(**u_data))
+            db.add(User(**{**u_data, "student_id": None}))
         else:
             existing_u.hashed_password = u_data["hashed_password"]
             existing_u.role = u_data["role"]
             existing_u.team_id = u_data["team_id"]
             existing_u.full_name = u_data["full_name"]
             existing_u.arabic_name = u_data["arabic_name"]
-            if u_data.get("student_id") is not None:
-                existing_u.student_id = u_data["student_id"]
             existing_u.is_active = True
+
+    await db.flush()
 
     # If students and operational data are already populated and force is not set,
     # safely commit updated users/teams and return idempotently.
@@ -419,6 +422,14 @@ async def seed_all(db: AsyncSession, include_synthetic: bool = False, force: boo
 
     for s_data in students_data:
         db.add(Student(**s_data))
+
+    await db.flush()
+    for user_id, student_id in desired_student_links.items():
+        user_res = await db.execute(select(User).where(User.id == user_id))
+        user = user_res.scalar_one_or_none()
+        if user:
+            user.student_id = student_id
+    await db.flush()
 
 
     # 2. Historical Meetings from 8.xlsx + Today's Live Meeting (Social Media Committee)
@@ -989,7 +1000,35 @@ if __name__ == "__main__":
         if force:
             from app.core.database import engine, Base
             async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.drop_all)
+                await conn.execute(text("UPDATE students SET assigned_hr_id = NULL"))
+                await conn.execute(text("UPDATE users SET student_id = NULL"))
+                reset_order = [
+                    "student_invitations",
+                    "attendance_records",
+                    "participant_sessions",
+                    "submissions",
+                    "score_records",
+                    "reminder_logs",
+                    "agent_action_audits",
+                    "member_followup_statuses",
+                    "task_reminders",
+                    "whatsapp_chat_messages",
+                    "meeting_assignments",
+                    "task_assignments",
+                    "automation_settings",
+                    "member_feedbacks",
+                    "member_questions",
+                    "committee_reports",
+                    "meetings",
+                    "tasks",
+                    "refresh_sessions",
+                    "users",
+                    "students",
+                    "events",
+                    "teams",
+                ]
+                for table_name in reset_order:
+                    await conn.execute(text(f"DELETE FROM {table_name}"))
         await init_db()
         async with AsyncSessionLocal() as session:
             await seed_all(session, include_synthetic=True, force=force)

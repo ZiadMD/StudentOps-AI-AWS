@@ -30,6 +30,7 @@ from app.providers.openwa_provider import OpenWAProvider
 from app.providers.messaging_provider import OutgoingMessage
 from app.services.attendance_service import AttendanceService
 from app.api.routes_tasks import get_task_reminder_candidates
+from app.core.time import as_utc
 
 logger = logging.getLogger("studentops.automation")
 
@@ -117,7 +118,7 @@ class AutomationEngine:
 
         for meeting in meetings:
             # Check meeting end time + grace
-            meeting_end = meeting.start_time + timedelta(minutes=meeting.duration_minutes)
+            meeting_end = as_utc(meeting.start_time) + timedelta(minutes=meeting.duration_minutes)
 
             grace_minutes = hr_settings.attendance_grace_minutes
             if now < (meeting_end + timedelta(minutes=grace_minutes)):
@@ -165,23 +166,8 @@ class AutomationEngine:
                     "meeting_time": time_str,
                 })
 
-                # Dispatch via OpenWA if enabled
-                msg_status = "SENT"
-                if hr_settings.whatsapp_enabled:
-                    try:
-                        out = OutgoingMessage(
-                            recipient_id=student.id,
-                            recipient_name=student.full_name,
-                            recipient_phone=student.phone,
-                            content=msg_text,
-                            channel="WHATSAPP_OFFICIAL",
-                        )
-                        res = await self.openwa.send_message(out)
-                        if not res.success and not getattr(res, "is_uncertain", False):
-                            msg_status = "FAILED"
-                    except Exception as exc:
-                        logger.warning(f"OpenWA delivery warning in attendance automation: {exc}")
-                        msg_status = "FAILED"
+                # Queue message for human approval (HITL boundary)
+                msg_status = "PENDING_APPROVAL"
 
                 # Record immutable audit log
                 rem_log = ReminderLog(
@@ -223,7 +209,7 @@ class AutomationEngine:
             hr_settings = await self.get_hr_settings(task.created_by_user_id, db)
             deadline = task.deadline
             if deadline.tzinfo is None:
-                deadline = deadline.replace(tzinfo=timezone.utc)
+                deadline = as_utc(deadline)
 
             deadline_str = deadline.strftime("%A, %d %b %I:%M %p")
 
@@ -251,22 +237,7 @@ class AutomationEngine:
                             "deadline": deadline_str,
                         })
 
-                        msg_status = "SENT"
-                        if hr_settings.whatsapp_enabled:
-                            try:
-                                out = OutgoingMessage(
-                                    recipient_id=student.id,
-                                    recipient_name=student.full_name,
-                                    recipient_phone=student.phone,
-                                    content=msg_text,
-                                    channel="WHATSAPP_OFFICIAL",
-                                )
-                                res = await self.openwa.send_message(out)
-                                if not res.success and not getattr(res, "is_uncertain", False):
-                                    msg_status = "FAILED"
-                            except Exception as exc:
-                                logger.warning(f"OpenWA delivery warning in task pre-deadline: {exc}")
-                                msg_status = "FAILED"
+                        msg_status = "PENDING_APPROVAL"
 
                         # Log to TaskReminder and ReminderLog
                         db.add(TaskReminder(
@@ -320,22 +291,7 @@ class AutomationEngine:
                             "deadline": deadline_str,
                         })
 
-                        msg_status = "SENT"
-                        if hr_settings.whatsapp_enabled:
-                            try:
-                                out = OutgoingMessage(
-                                    recipient_id=student.id,
-                                    recipient_name=student.full_name,
-                                    recipient_phone=student.phone,
-                                    content=msg_text,
-                                    channel="WHATSAPP_OFFICIAL",
-                                )
-                                res = await self.openwa.send_message(out)
-                                if not res.success and not getattr(res, "is_uncertain", False):
-                                    msg_status = "FAILED"
-                            except Exception as exc:
-                                logger.warning(f"OpenWA delivery warning in task post-deadline: {exc}")
-                                msg_status = "FAILED"
+                        msg_status = "PENDING_APPROVAL"
 
                         db.add(TaskReminder(
                             id=f"tr_{uuid.uuid4().hex[:12]}",
@@ -389,15 +345,89 @@ class AutomationEngine:
         await db.commit()
         return dispatched_logs
 
+    async def run_pre_meeting_cycle(self, db: AsyncSession) -> list[dict]:
+        """
+        Scans upcoming meetings (next 24h).
+        Idempotently queues pre-meeting reminders for assigned students.
+        """
+        now = utcnow()
+        cutoff = now + timedelta(hours=24)
+
+        meetings_res = await db.execute(
+            select(Meeting).where(
+                Meeting.start_time > now,
+                Meeting.start_time <= cutoff
+            )
+        )
+        meetings = meetings_res.scalars().all()
+        dispatched_logs = []
+
+        for meeting in meetings:
+            hr_settings = await self.get_hr_settings(None, db)
+            
+            trigger_source = f"AUTOMATION_PRE_MEETING_{meeting.id}"
+            existing_rems = await db.execute(
+                select(ReminderLog.recipient_id).where(
+                    ReminderLog.trigger_source == trigger_source
+                )
+            )
+            already_sent_ids = set(existing_rems.scalars().all())
+
+            # Find assigned students
+            from app.models.entities import MeetingAssignment
+            assign_res = await db.execute(
+                select(Student).join(MeetingAssignment, Student.id == MeetingAssignment.student_id).where(MeetingAssignment.meeting_id == meeting.id)
+            )
+            assigned_students = assign_res.scalars().all()
+
+            for student in assigned_students:
+                if student.id in already_sent_ids:
+                    continue
+                already_sent_ids.add(student.id)
+
+                template = "مرحباً {name}، نذكرك باللقاء القادم: {session_name} ({meeting_time}). نرجو الحضور في الموعد."
+                time_str = meeting.start_time.strftime("%d %b %I:%M %p")
+                msg_text = render_template(template, {
+                    "name": student.arabic_name or student.full_name,
+                    "session_name": meeting.title,
+                    "meeting_time": time_str,
+                })
+
+                msg_status = "PENDING_APPROVAL"
+
+                rem_log = ReminderLog(
+                    id=f"rem_pre_{uuid.uuid4().hex[:12]}",
+                    recipient_id=student.id,
+                    recipient_name=student.full_name,
+                    recipient_phone=student.phone,
+                    channel="WHATSAPP_OFFICIAL",
+                    message_content=msg_text,
+                    status=msg_status,
+                    trigger_source=trigger_source,
+                    sent_at=now,
+                )
+                db.add(rem_log)
+                dispatched_logs.append({
+                    "type": "PRE_MEETING",
+                    "student_id": student.id,
+                    "meeting_id": meeting.id,
+                    "status": msg_status
+                })
+
+        await db.commit()
+        return dispatched_logs
+
     async def run_cycle(self, db: AsyncSession) -> dict:
         """Runs a complete automation cycle."""
         att_results = await self.run_attendance_cycle(db)
         task_results = await self.run_task_cycle(db)
+        pre_meet_results = await self.run_pre_meeting_cycle(db)
         return {
             "timestamp": utcnow().isoformat(),
             "attendance_reminders_sent": len(att_results),
             "task_reminders_sent": len(task_results),
-            "details": att_results + task_results
+            "pre_meeting_reminders_sent": len(pre_meet_results),
+            "details": att_results + task_results + pre_meet_results
         }
 
 

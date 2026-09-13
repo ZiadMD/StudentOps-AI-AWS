@@ -33,7 +33,7 @@ async def test_primary_demo_workflow_end_to_end():
             query="Who was absent from today's meeting?",
             conversation_id=conv_id,
             db=db,
-            user_role="HR_LEAD"
+            user_role="hr_admin"
         )
         assert turn1_resp.conversation_id == conv_id
         assert len(turn1_resp.tool_executions) == 1
@@ -46,7 +46,7 @@ async def test_primary_demo_workflow_end_to_end():
             query="Remind them about the next meeting",
             conversation_id=conv_id,
             db=db,
-            user_role="HR_LEAD"
+            user_role="hr_admin"
         )
         assert turn2_resp.requires_confirmation is True
         assert turn2_resp.pending_confirmation is not None

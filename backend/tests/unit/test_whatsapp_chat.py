@@ -133,13 +133,16 @@ async def test_hr_member_can_send_message_to_assigned_student(client, test_db_se
 
 
 @pytest.mark.asyncio
-async def test_openwa_webhook_incoming_message_resolution(client, test_db_session):
+async def test_openwa_webhook_incoming_message_resolution(client, test_db_session, monkeypatch):
     """
     Webhook receives incoming message:
     1. Resolves sender's phone number -> Student (std_ziad).
     2. Resolves Student -> assigned HR Member (usr_hr_member).
     3. Persists record in DB.
     """
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "OPENWA_WEBHOOK_SECRET", "test-secret")
+
     payload = {
         "event": "onMessage",
         "data": {
@@ -150,7 +153,11 @@ async def test_openwa_webhook_incoming_message_resolution(client, test_db_sessio
         }
     }
 
-    res = await client.post("/api/whatsapp/webhook", json=payload)
+    res = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "test-secret"},
+        json=payload,
+    )
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
@@ -168,8 +175,11 @@ async def test_openwa_webhook_incoming_message_resolution(client, test_db_sessio
 
 
 @pytest.mark.asyncio
-async def test_openwa_webhook_ack_receipt(client, test_db_session):
+async def test_openwa_webhook_ack_receipt(client, test_db_session, monkeypatch):
     """Webhook receives delivery and read receipts and updates message status."""
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "OPENWA_WEBHOOK_SECRET", "test-secret")
+
     # Seeded message cmsg_seed_003 has openwa_message_id = true_201012345678@c.us_SEED03
     ack_payload = {
         "event": "onAck",
@@ -179,7 +189,11 @@ async def test_openwa_webhook_ack_receipt(client, test_db_session):
         }
     }
 
-    res = await client.post("/api/whatsapp/webhook", json=ack_payload)
+    res = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "test-secret"},
+        json=ack_payload,
+    )
     assert res.status_code == 200
     assert res.json()["status"] == "ack_updated"
 
@@ -292,7 +306,7 @@ async def test_webhook_authentication_and_secret_enforcement(client, monkeypatch
 
     # 1. Missing secret header
     res_missing = await client.post("/api/whatsapp/webhook", json=payload)
-    assert res_missing.status_code == 403
+    assert res_missing.status_code == 401
 
     # 2. Invalid secret header
     res_invalid = await client.post(

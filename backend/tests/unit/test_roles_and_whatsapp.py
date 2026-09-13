@@ -80,21 +80,21 @@ async def test_technical_submissions_privacy_for_hr_roles(client):
     hr_member_token = await get_token(client, "hr.member@studentops.org", "hrmember123")
 
     # 1. Committee Head accesses submissions -> 200
-    res_head = await client.get("/api/tasks/task_001/submissions", headers={"Authorization": f"Bearer {head_token}"})
+    res_head = await client.get("/api/tasks/tsk_1/submissions", headers={"Authorization": f"Bearer {head_token}"})
     assert res_head.status_code == 200
     assert isinstance(res_head.json(), list)
 
     # 2. Region HR Head forbidden -> 403
-    res_region = await client.get("/api/tasks/task_001/submissions", headers={"Authorization": f"Bearer {region_token}"})
+    res_region = await client.get("/api/tasks/tsk_1/submissions", headers={"Authorization": f"Bearer {region_token}"})
     assert res_region.status_code == 403
     assert "HR roles do not have permission" in res_region.json()["detail"]
 
     # 3. Committee HR Leader forbidden -> 403
-    res_leader = await client.get("/api/tasks/task_001/submissions", headers={"Authorization": f"Bearer {leader_token}"})
+    res_leader = await client.get("/api/tasks/tsk_1/submissions", headers={"Authorization": f"Bearer {leader_token}"})
     assert res_leader.status_code == 403
 
     # 4. Committee HR Member forbidden -> 403
-    res_hr_member = await client.get("/api/tasks/task_001/submissions", headers={"Authorization": f"Bearer {hr_member_token}"})
+    res_hr_member = await client.get("/api/tasks/tsk_1/submissions", headers={"Authorization": f"Bearer {hr_member_token}"})
     assert res_hr_member.status_code == 403
 
 

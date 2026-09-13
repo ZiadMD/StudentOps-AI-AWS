@@ -245,3 +245,9 @@ async def verify_student_access(
         )
     return student
 
+
+rate_limit_webhook = create_rate_limit_dependency(
+    max_requests=120,
+    window_seconds=60,
+    key_prefix="webhook"
+)

@@ -30,6 +30,8 @@ async def get_committee_summary(
     Computes real-time executive summary for the Social Media Committee.
     Used by HR Leader to review committee health and prepare upward reports to HR Head.
     """
+    if current_user.role == "committee_hr_leader" and not current_user.team_id:
+        raise HTTPException(status_code=403, detail="A committee team is required for this report")
     team_id = current_user.team_id or "team_media"
 
     # Team details
@@ -75,19 +77,28 @@ async def get_committee_summary(
 
     # 4. Open Flags (Absenteeism / Overdue tasks)
     flag_res = await db.execute(
-        select(func.count(MemberFollowupStatus.id)).where(
+        select(func.count(MemberFollowupStatus.id))
+        .join(Student, MemberFollowupStatus.student_id == Student.id)
+        .where(
+            Student.team_id == team_id,
             MemberFollowupStatus.status.in_(["PENDING", "ESCALATED"])
         )
     )
     open_flags = flag_res.scalar() or 0
 
     # 5. Member Feedback count
-    fb_res = await db.execute(select(func.count(MemberFeedback.id)))
+    fb_res = await db.execute(
+        select(func.count(MemberFeedback.id))
+        .join(Student, MemberFeedback.student_id == Student.id)
+        .where(Student.team_id == team_id)
+    )
     feedback_count = fb_res.scalar() or 0
 
     # 6. Bonus Points awarded
     bonus_res = await db.execute(
-        select(func.sum(ScoreRecord.points)).where(ScoreRecord.category == "BONUS")
+        select(func.sum(ScoreRecord.points))
+        .join(Student, ScoreRecord.student_id == Student.id)
+        .where(ScoreRecord.category == "BONUS", Student.team_id == team_id)
     )
     total_bonuses = bonus_res.scalar() or 0.0
 
@@ -187,3 +198,43 @@ async def list_reports(
         )
         for rep, team, submitter in rows
     ]
+
+
+@router.post("/{report_id}/acknowledge", response_model=CommitteeReportResponse)
+async def acknowledge_report(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["region_hr_head", "hr_admin"]))
+):
+    """
+    HR Head acknowledges a submitted committee report. (ISSUE-22)
+    HR Leaders cannot acknowledge their own reports.
+    """
+    query = select(CommitteeReport, Team, User).outerjoin(
+        Team, CommitteeReport.team_id == Team.id
+    ).outerjoin(
+        User, CommitteeReport.submitted_by_user_id == User.id
+    ).where(CommitteeReport.id == report_id)
+    
+    res = await db.execute(query)
+    row = res.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    report, team, submitter = row
+    
+    report.acknowledged_at = utcnow()
+    await db.commit()
+    await db.refresh(report)
+    
+    return CommitteeReportResponse(
+        id=report.id,
+        team_id=report.team_id,
+        team_name=team.name if team else "Social Media Committee",
+        submitted_by_name=submitter.full_name if submitter else "HR Leader",
+        report_title=report.report_title,
+        metrics_summary=json.loads(report.metrics_summary) if report.metrics_summary else {},
+        notes=report.notes or "",
+        submitted_at=report.submitted_at,
+        acknowledged_at=report.acknowledged_at
+    )

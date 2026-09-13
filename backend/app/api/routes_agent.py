@@ -16,7 +16,7 @@ from app.models.schemas import (
 )
 from app.models.entities import AgentActionAudit, User, Student
 from app.agent.react_agent import agent_engine, stream_openrouter, CONVERSATION_STATE
-from app.agent.tools import TOOL_DEFINITIONS, tool_send_reminder
+from app.agent.tools import TOOL_DEFINITIONS, tool_send_reminder, PermissionContext
 from app.services.audit_service import AuditService
 from app.core.config import settings
 
@@ -105,7 +105,7 @@ async def stream_chat_with_agent(
         state = CONVERSATION_STATE.setdefault(scoped_conv_key, {
             "last_absent_student_ids": [],
             "last_absent_students": [],
-            "last_meeting_id": "today_sync",
+            "last_meeting_id": None,
             "history": []
         })
 
@@ -188,23 +188,42 @@ async def confirm_action(
             detail=f"Action '{payload.action_id}' is not pending confirmation (current status: {audit_entry.status})."
         )
 
-    # Scoping check: verify ownership or team membership of targets
+    # Validate target scope before changing the pending action state.
     params = json.loads(audit_entry.parameters) if audit_entry.parameters else {}
     target_student_ids = params.get("student_ids", [])
     if current_user.role in ("committee_head", "team_lead", "committee_hr_member", "committee_hr_leader") and target_student_ids:
-        # Verify all target students belong to the user's committee
-        if current_user.team_id:
-            invalid_res = await db.execute(
-                select(Student.id).where(
-                    Student.id.in_(target_student_ids),
-                    Student.team_id != current_user.team_id
-                )
+        if not current_user.team_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot confirm actions without an assigned team or committee."
             )
-            if invalid_res.scalars().first():
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Cannot confirm actions targeting members outside your assigned team or committee."
-                )
+        invalid_res = await db.execute(
+            select(Student.id).where(
+                Student.id.in_(target_student_ids),
+                Student.team_id != current_user.team_id
+            )
+        )
+        if invalid_res.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot confirm actions targeting members outside your assigned team or committee."
+            )
+        
+    # Atomic Lock
+    from sqlalchemy import update
+    stmt = (
+        update(AgentActionAudit)
+        .where(AgentActionAudit.action_id == audit_entry.action_id, AgentActionAudit.status == "PENDING_CONFIRMATION")
+        .values(status="EXECUTING_CONFIRMATION")
+    )
+    result = await db.execute(stmt)
+    if result.rowcount == 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Action is already being confirmed or has been modified by another request."
+        )
+    await db.commit()
+    await db.refresh(audit_entry)
 
     if not payload.confirmed:
         audit_entry.status = "REJECTED"
@@ -219,8 +238,10 @@ async def confirm_action(
         }
 
     if audit_entry.tool_name == "send_reminder":
+        context = PermissionContext(user_id=current_user.id, role=current_user.role, team_id=current_user.team_id)
         exec_res = await tool_send_reminder(
             db=db,
+            context=context,
             student_ids=target_student_ids,
             event_id=params.get("event_id"),
             custom_message=params.get("custom_message"),

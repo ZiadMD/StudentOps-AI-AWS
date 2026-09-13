@@ -22,8 +22,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db, AsyncSessionLocal
+from app.core.time import as_utc
 from app.core.config import settings
-from app.core.dependencies import get_current_active_user, require_roles, verify_student_access
+from app.core.dependencies import get_current_active_user, require_roles, rate_limit_webhook, verify_student_access
 from app.core.security import decode_token
 from app.models.entities import Student, Task, Submission, MemberFollowupStatus, TaskReminder, User, utcnow
 from app.models.schemas import (
@@ -43,12 +44,16 @@ from app.services.whatsapp_service import WhatsAppService
 from app.services.whatsapp_connection_manager import ws_manager
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
-openwa = OpenWAProvider()
 
+def get_openwa(current_user: User = Depends(get_current_active_user)) -> OpenWAProvider:
+    if current_user.role in ["region_hr_head", "hr_admin"]:
+        return OpenWAProvider(session_id="ops-official")
+    return OpenWAProvider(session_id=f"hr_{current_user.id}")
 
 @router.get("/status", response_model=OfficialWhatsAppStatus)
 async def get_official_status(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    openwa: OpenWAProvider = Depends(get_openwa)
 ):
     """
     Returns live connectivity status of official organization OpenWA daemon.
@@ -67,7 +72,8 @@ async def get_official_status(
 
 @router.get("/qr")
 async def get_official_qr(
-    current_user: User = Depends(require_roles(["region_hr_head", "hr_admin", "committee_hr_leader", "committee_hr_member"]))
+    current_user: User = Depends(require_roles(["region_hr_head", "hr_admin", "committee_hr_leader", "committee_hr_member"])),
+    openwa: OpenWAProvider = Depends(get_openwa)
 ):
     """
     Returns QR authentication payload for pairing official org number or HR session.
@@ -122,7 +128,8 @@ async def get_official_qr(
 async def send_official_message(
     body: OfficialWhatsAppSendRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["region_hr_head", "hr_admin"]))
+    current_user: User = Depends(require_roles(["region_hr_head", "hr_admin"])),
+    openwa: OpenWAProvider = Depends(get_openwa)
 ):
     """
     Dispatches an official organization broadcast via the headless OpenWA container.
@@ -286,14 +293,11 @@ async def list_sla_escalations(
         flagged = followup.flagged_at
         if flagged:
             if flagged.tzinfo is None:
-                flagged = flagged.replace(tzinfo=timezone.utc)
+                flagged = as_utc(flagged)
             days_open = (now - flagged).days
         else:
             days_open = 0
         is_over_sla = days_open >= 3 and followup.status != "RESOLVED"
-        if is_over_sla and not followup.is_escalated:
-            followup.is_escalated = True
-            await db.commit()
 
         results.append({
             "id": followup.id,
@@ -349,7 +353,8 @@ async def send_thread_message(
     student_id: str,
     body: WhatsAppSendMessageRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"]))
+    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"])),
+    openwa: OpenWAProvider = Depends(get_openwa)
 ):
     """
     Dispatches an outgoing WhatsApp message to the assigned student via OpenWA.
@@ -376,7 +381,8 @@ async def send_thread_media(
     caption: Optional[str] = Form(None),
     reply_to_message_id: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"]))
+    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"])),
+    openwa: OpenWAProvider = Depends(get_openwa)
 ):
     """
     Uploads and dispatches media (image, video, document, audio) to the assigned student.
@@ -418,7 +424,8 @@ async def react_to_message(
     message_id: str,
     body: WhatsAppReactionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"]))
+    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"])),
+    openwa: OpenWAProvider = Depends(get_openwa)
 ):
     """Applies or updates an emoji reaction on a message in the thread."""
     return await WhatsAppService.add_reaction(
@@ -437,7 +444,8 @@ async def edit_thread_message(
     message_id: str,
     body: WhatsAppEditMessageRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"]))
+    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"])),
+    openwa: OpenWAProvider = Depends(get_openwa)
 ):
     """Edits an outgoing HR message in the thread."""
     return await WhatsAppService.edit_message(
@@ -454,7 +462,7 @@ async def edit_thread_message(
 # OpenWA Webhook Ingestion & Real-Time WebSocket
 # =========================================================
 
-@router.post("/webhook")
+@router.post("/webhook", dependencies=[Depends(rate_limit_webhook)])
 async def openwa_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -466,24 +474,24 @@ async def openwa_webhook(
     persists chat records, and pushes live event to the HR member's socket.
     """
     configured_secret = settings.OPENWA_WEBHOOK_SECRET
-    provided_secret = (
-        request.headers.get("X-OpenWA-Signature")
-        or request.headers.get("X-Webhook-Secret")
-    )
-    auth_header = request.headers.get("Authorization")
-    if not provided_secret and auth_header and auth_header.startswith("Bearer "):
-        provided_secret = auth_header[7:].strip()
+    provided_secret = request.headers.get("X-Webhook-Secret")
 
-    if configured_secret:
-        if not provided_secret or provided_secret != configured_secret:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid or missing webhook signature/secret"
-            )
-    elif settings.ENVIRONMENT == "production":
+    if not configured_secret:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Webhook secret must be configured in production"
+            detail="Webhook secret must be configured"
+        )
+
+    if not provided_secret:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing webhook secret"
+        )
+
+    if provided_secret != configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid webhook secret"
         )
 
     try:
@@ -513,6 +521,25 @@ async def whatsapp_chat_websocket(
         if not user_id:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
+
+        import asyncio
+        db_session = AsyncSessionLocal()
+        try:
+            stmt = select(User).where(User.id == user_id)
+            result = await db_session.execute(stmt)
+            user = result.scalar_one_or_none()
+            
+            if not user or not user.is_active:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+                
+            allowed_roles = {"committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"}
+            if user.role not in allowed_roles:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+        finally:
+            await asyncio.shield(db_session.close())
+
     except Exception:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return

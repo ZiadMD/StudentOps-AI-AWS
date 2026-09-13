@@ -12,6 +12,7 @@ from sqlalchemy import select, func
 import jwt
 
 from app.core.database import get_db
+from app.core.time import as_utc
 from app.core.security import (
     get_password_hash,
     verify_password,
@@ -28,7 +29,8 @@ from app.core.dependencies import (
     rate_limit_register,
     rate_limit_refresh
 )
-from app.models.entities import User, Team, Student, StudentInvitation
+from app.models.entities import User, Team, Student, StudentInvitation, RefreshSession
+from app.services.audit_service import AuditService
 from app.models.schemas import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -134,9 +136,7 @@ async def register_user(
             )
 
         now = datetime.now(timezone.utc)
-        inv_exp = invitation.expires_at
-        if inv_exp.tzinfo is None:
-            inv_exp = inv_exp.replace(tzinfo=timezone.utc)
+        inv_exp = as_utc(invitation.expires_at)
         if inv_exp < now:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -208,6 +208,17 @@ async def register_user(
     }
     access_token = create_access_token(token_claims)
     refresh_token = create_refresh_token(token_claims)
+    
+    decoded_rt = decode_token(refresh_token)
+    session_id = f"sess_{uuid.uuid4().hex[:12]}"
+    new_session = RefreshSession(
+        id=session_id,
+        user_id=user_loaded.id,
+        refresh_token_jti=decoded_rt["jti"],
+        expires_at=datetime.fromtimestamp(decoded_rt["exp"], tz=timezone.utc)
+    )
+    db.add(new_session)
+    await db.commit()
 
     return TokenResponse(
         access_token=access_token,
@@ -273,6 +284,17 @@ async def login_user(
     }
     access_token = create_access_token(token_claims)
     refresh_token = create_refresh_token(token_claims)
+    
+    decoded_rt = decode_token(refresh_token)
+    session_id = f"sess_{uuid.uuid4().hex[:12]}"
+    new_session = RefreshSession(
+        id=session_id,
+        user_id=user.id,
+        refresh_token_jti=decoded_rt["jti"],
+        expires_at=datetime.fromtimestamp(decoded_rt["exp"], tz=timezone.utc)
+    )
+    db.add(new_session)
+    await db.commit()
 
     return TokenResponse(
         access_token=access_token,
@@ -294,13 +316,13 @@ async def login_for_swagger_token(
     )
 
 
-@router.post("/refresh", dependencies=[Depends(rate_limit_refresh)])
+@router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(rate_limit_refresh)])
 async def refresh_access_token(
     payload: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Validates a JWT refresh token and returns a freshly minted access token.
+    Validates a JWT refresh token, checks for revocation, rotates the session, and returns fresh tokens.
     """
     try:
         decoded = decode_token(payload.refresh_token)
@@ -310,6 +332,7 @@ async def refresh_access_token(
                 detail="Invalid token type: refresh token expected."
             )
         user_id = decoded.get("sub")
+        jti = decoded.get("jti")
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -321,8 +344,35 @@ async def refresh_access_token(
             detail="Invalid refresh token."
         )
 
+    # Verify session is not revoked
+    res_session = await db.execute(
+        select(RefreshSession).where(RefreshSession.refresh_token_jti == jti)
+    )
+    session = res_session.scalar_one_or_none()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh session not found."
+        )
+    if session.revoked_at:
+        # POTENTIAL THEFT DETECTED: A revoked token is being reused.
+        # Revoke ALL sessions for this user as a defense mechanism.
+        await db.execute(
+            select(RefreshSession).where(RefreshSession.user_id == user_id)
+        ) # Just logic outline, actually let's just revoke everything.
+        now = datetime.now(timezone.utc)
+        all_user_sessions_res = await db.execute(select(RefreshSession).where(RefreshSession.user_id == user_id))
+        for s in all_user_sessions_res.scalars():
+            if not s.revoked_at:
+                s.revoked_at = now
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token reuse detected. All sessions revoked."
+        )
+
     # Verify user is active
-    res = await db.execute(select(User).where(User.id == user_id))
+    res = await db.execute(select(User).options(selectinload(User.team)).where(User.id == user_id))
     user = res.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(
@@ -330,17 +380,35 @@ async def refresh_access_token(
             detail="User account no longer active or valid."
         )
 
-    new_access_token = create_access_token({
+    # Rotate tokens
+    now = datetime.now(timezone.utc)
+    session.revoked_at = now  # Revoke the old one
+    
+    token_claims = {
         "sub": user.id,
         "email": user.email,
         "role": user.role,
         "team_id": user.team_id
-    })
-
-    return {
-        "access_token": new_access_token,
-        "token_type": "bearer"
     }
+    new_access_token = create_access_token(token_claims)
+    new_refresh_token = create_refresh_token(token_claims)
+    
+    decoded_new_rt = decode_token(new_refresh_token)
+    new_session = RefreshSession(
+        id=f"sess_{uuid.uuid4().hex[:12]}",
+        user_id=user.id,
+        refresh_token_jti=decoded_new_rt["jti"],
+        expires_at=datetime.fromtimestamp(decoded_new_rt["exp"], tz=timezone.utc)
+    )
+    db.add(new_session)
+    await db.commit()
+
+    return TokenResponse(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+        user=_build_user_response(user)
+    )
 
 
 @router.get("/me", response_model=UserResponse)
@@ -448,9 +516,20 @@ async def update_user_role(
                 detail="Cannot demote the last remaining active HR administrator."
             )
 
+    old_role = target_user.role
     target_user.role = payload.role
     await db.commit()
     await db.refresh(target_user)
+
+    await AuditService.record_action(
+        db=db,
+        intent="UPDATE_USER_ROLE",
+        tool_name="api_routes_auth",
+        parameters={"target_user_id": user_id, "old_role": old_role, "new_role": payload.role},
+        result={"status": "SUCCESS"},
+        user_id=admin_user.id,
+        status="EXECUTED"
+    )
 
     return _build_user_response(target_user)
 
@@ -492,9 +571,7 @@ async def link_student_profile(
         )
 
     now = datetime.now(timezone.utc)
-    inv_exp = invitation.expires_at
-    if inv_exp.tzinfo is None:
-        inv_exp = inv_exp.replace(tzinfo=timezone.utc)
+    inv_exp = as_utc(invitation.expires_at)
     if inv_exp < now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -544,4 +621,46 @@ async def link_student_profile(
     )
     user_loaded = res.scalar_one()
     return _build_user_response(user_loaded)
+
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(
+    payload: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Revokes the provided refresh token to end the session."""
+    try:
+        decoded = decode_token(payload.refresh_token)
+        jti = decoded.get("jti")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
+        
+    res = await db.execute(select(RefreshSession).where(RefreshSession.refresh_token_jti == jti))
+    session = res.scalar_one_or_none()
+    if session and session.user_id == current_user.id and not session.revoked_at:
+        session.revoked_at = datetime.now(timezone.utc)
+        await db.commit()
+    return {"detail": "Successfully logged out"}
+
+
+@router.post("/logout-all", status_code=status.HTTP_200_OK)
+async def logout_all(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Revokes all active sessions for the current user."""
+    res = await db.execute(
+        select(RefreshSession).where(
+            RefreshSession.user_id == current_user.id,
+            RefreshSession.revoked_at == None
+        )
+    )
+    sessions = res.scalars().all()
+    now = datetime.now(timezone.utc)
+    for s in sessions:
+        s.revoked_at = now
+    await db.commit()
+    return {"detail": f"Successfully revoked {len(sessions)} active sessions."}
 

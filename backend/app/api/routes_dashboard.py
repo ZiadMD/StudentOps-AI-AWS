@@ -1,11 +1,13 @@
 """
 Dashboard Overview Statistics Endpoint.
 """
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
+from app.core.time import as_utc
 from app.core.dependencies import get_current_active_user
 from app.models.entities import Student, Meeting, AttendanceRecord, Submission, Event, AgentActionAudit, User
 from app.models.schemas import DashboardStats
@@ -44,11 +46,41 @@ async def get_dashboard_stats(
         std_res = await db.execute(select(func.count(Student.id)))
     total_students = std_res.scalar() or 0
 
-    # 2. Today's Attendance
+    # 2. Attendance for the current or most recent relevant meeting
+    now = datetime.now(timezone.utc)
+    meeting_query = select(Meeting).order_by(Meeting.start_time.desc())
+    if current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
+        if not current_user.team_id:
+            meeting_query = None
+        else:
+            meeting_query = meeting_query.where(Meeting.team_id == current_user.team_id)
+    elif current_user.role == "committee_hr_member":
+        if current_user.team_id:
+            meeting_query = meeting_query.where(Meeting.team_id == current_user.team_id)
+        else:
+            meeting_query = None
+    elif current_user.role in ("committee_member", "member"):
+        if current_user.team_id:
+            meeting_query = meeting_query.where(Meeting.team_id == current_user.team_id)
+        else:
+            meeting_query = None
+
+    relevant_meeting_id = None
+    if meeting_query is not None:
+        meeting_res = await db.execute(meeting_query)
+        meetings = list(meeting_res.scalars().all())
+        current_meetings = [
+            m for m in meetings
+            if as_utc(m.start_time) <= now
+        ]
+        relevant_meetings = current_meetings or list(reversed(meetings))[:1]
+        if relevant_meetings:
+            relevant_meeting_id = relevant_meetings[0].id
+
     att_query = (
         select(AttendanceRecord, Student)
         .join(Student, AttendanceRecord.student_id == Student.id)
-        .where(AttendanceRecord.meeting_id == "today_sync")
+        .where(AttendanceRecord.meeting_id == relevant_meeting_id)
     )
     if current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
         att_query = att_query.where(Student.team_id == current_user.team_id)
