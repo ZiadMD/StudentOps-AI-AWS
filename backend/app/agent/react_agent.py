@@ -4,6 +4,8 @@ ReAct AI Agent Loop with OpenRouter LLM (streaming) and Deterministic Grounding.
 from typing import Any, AsyncIterator, Optional
 import json
 import re
+import time
+from collections import OrderedDict
 import httpx
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,11 +14,8 @@ from app.core.config import settings
 from app.agent.tools import TOOL_REGISTRY, tool_get_student
 from app.services.audit_service import AuditService
 from app.models.schemas import (
-    AgentChatResponse, ToolCallExecution, PendingConfirmation
+    AgentChatResponse, ToolCallExecution, PendingConfirmation, PermissionContext
 )
-
-from collections import OrderedDict
-import time
 
 
 class BoundedConversationState:
@@ -148,6 +147,7 @@ class BoundedConversationState:
 
 # Bounded in-memory conversational state per conversation_id
 CONVERSATION_STATE = BoundedConversationState()
+ConversationStateCache = BoundedConversationState
 
 
 async def stream_groq(messages: list[dict], system: str = "") -> AsyncIterator[str]:
@@ -302,15 +302,104 @@ async def call_openrouter(messages: list[dict], system: str = "") -> str:
     return "".join(parts)
 
 
+from app.models.schemas import PermissionContext
+
 class ReActAgent:
     """ReAct Reasoning & Action Engine — grounded deterministic intents + OpenRouter LLM."""
 
-    async def execute_tool(self, tool_name: str, parameters: dict[str, Any], db: AsyncSession) -> tuple[Any, str]:
+    @staticmethod
+    def extract_student_query(query: str) -> str:
+        """
+        Extracts student name, student code, or student ID from a score-intent query.
+        Removes intent trigger words and filler phrases while preserving the student target.
+        """
+        q = query.strip()
+
+        # 1. Check for explicit student code (e.g. CORE-2026-001, ST-2026-101, TEST-2026-001) or ID (e.g. std_...)
+        code_match = re.search(r'\b(std_[a-zA-Z0-9_]+|[A-Za-z0-9]+-\d{4}-\d{3,4})\b', q, re.IGNORECASE)
+        if code_match:
+            return code_match.group(1).strip()
+
+        # 2. Normalize punctuation (strip apostrophe-s, quotes, question marks)
+        cleaned = re.sub(r"['’]s\b", " ", q, flags=re.IGNORECASE)
+        cleaned = re.sub(r'[\?؟!،,\.:"\'`]', " ", cleaned)
+
+        # 3. Pattern: "What is <NAME>'s evaluation score?" or "Show <NAME>'s score"
+        m_en_suffix = re.search(
+            r'^(?:what\s+is\s+)?(?:show\s+)?(?:get\s+)?(?:view\s+)?(?:check\s+)?(?:tell\s+me\s+)?(?:can\s+you\s+)?(?:please\s+)?(.+?)\s+(?:evaluation\s+score|evaluation\s+scores|evaluation\s+summary|scorecard|evaluation|scores|score|behavior|points)$',
+            cleaned,
+            re.IGNORECASE
+        )
+        if m_en_suffix and m_en_suffix.group(1).strip():
+            candidate = m_en_suffix.group(1).strip()
+            candidate = re.sub(r'^(?:the\s+|a\s+|an\s+|student\s+|member\s+)', '', candidate, flags=re.IGNORECASE).strip()
+            if candidate:
+                return candidate
+
+        # 4. Pattern: "Score for <NAME>" or "Evaluation of <NAME>"
+        m_en_prefix = re.search(
+            r'(?:evaluation\s+score|evaluation\s+summary|scorecard|evaluation|scores|score|behavior|points)\s+(?:for|of|about)\s+(.+)$',
+            cleaned,
+            re.IGNORECASE
+        )
+        if m_en_prefix and m_en_prefix.group(1).strip():
+            candidate = m_en_prefix.group(1).strip()
+            candidate = re.sub(r'^(?:the\s+|student\s+|member\s+)', '', candidate, flags=re.IGNORECASE).strip()
+            if candidate:
+                return candidate
+
+        # 5. Arabic Pattern: "تقييم <NAME>" or "درجات <NAME>"
+        m_ar_prefix = re.search(
+            r'^(?:عرض|ماهو|ما\s+هو|ما\s+هي|ماهي|عايز|اريد|أريد|أظهر|اظهر)?\s*(?:تقييم|درجات|درجة|نقاط|سلوك|سجل|بطاقة\s+تقييم)\s*(?:الطالب|العضو|للطالب|للعضو|لـ|ل)?\s*(.+)$',
+            cleaned
+        )
+        if m_ar_prefix and m_ar_prefix.group(1).strip():
+            candidate = m_ar_prefix.group(1).strip()
+            candidate = re.sub(r'^(?:الطالب|العضو)\s+', '', candidate).strip()
+            if candidate:
+                return candidate
+
+        # 6. Arabic Suffix: "<NAME> تقييم" or "<NAME> درجات"
+        m_ar_suffix = re.search(
+            r'^(.+?)\s+(?:تقييم|درجات|درجة|نقاط|سلوك)$',
+            cleaned
+        )
+        if m_ar_suffix and m_ar_suffix.group(1).strip():
+            return m_ar_suffix.group(1).strip()
+
+        # 7. Fallback: remove stop/trigger words from sentence
+        stop_words = {
+            "what", "is", "the", "show", "get", "check", "view", "evaluation",
+            "score", "scorecard", "scores", "points", "behavior", "discipline",
+            "for", "of", "about", "please", "can", "you", "tell", "me", "student", "member",
+            "عرض", "ماهو", "ما", "هو", "هي", "ماهي", "تقييم", "درجة", "درجات",
+            "نقاط", "سلوك", "الطالب", "العضو", "للطالب", "للعضو", "عن"
+        }
+        words = [w for w in cleaned.split() if w.lower() not in stop_words]
+        return " ".join(words).strip()
+
+    async def execute_tool(
+        self,
+        tool_name: str,
+        parameters: dict[str, Any],
+        db: AsyncSession,
+        context: PermissionContext
+    ) -> tuple[Any, str]:
+        from app.agent.tools import TOOL_REGISTRY, TOOL_DEFINITIONS
         handler = TOOL_REGISTRY.get(tool_name)
         if not handler:
             return {"error": f"Unknown tool: {tool_name}"}, "FAILED"
+            
+        # AI Tool Allowlist & Role Verification
+        tool_def = next((t for t in TOOL_DEFINITIONS if t["name"] == tool_name), None)
+        if tool_def:
+            allowed_roles = tool_def.get("required_roles", [])
+            role_to_check = "committee_hr_leader" if context.role in ("HR_LEAD", "hr_lead") else context.role
+            if allowed_roles and role_to_check not in allowed_roles and not context.is_admin_override:
+                return {"error": f"Unauthorized: Role '{context.role}' lacks permission for tool '{tool_name}'."}, "FAILED"
+
         try:
-            res = await handler(db=db, **parameters)
+            res = await handler(db=db, context=context, **parameters)
             if isinstance(res, dict) and res.get("status") == "REQUIRES_CONFIRMATION":
                 return res, "PENDING_CONFIRMATION"
             return res, "SUCCESS"
@@ -435,6 +524,14 @@ class ReActAgent:
         - Immutable audit trails record the exact user_id.
         """
         acting_user = user_id or user_role
+        is_admin = (user_role in ("region_hr_head", "hr_admin") or (user_role in ("HR_LEAD", "hr_lead") and not team_id))
+        context = PermissionContext(
+            user_id=acting_user,
+            role=user_role,
+            team_id=team_id,
+            is_admin_override=is_admin,
+            is_confirmed_action=False
+        )
         scoped_state_key = f"{acting_user}:{conversation_id}"
         state = CONVERSATION_STATE.setdefault(scoped_state_key, {
             "last_absent_student_ids": [],
@@ -506,12 +603,12 @@ class ReActAgent:
             att_params = {"meeting_id": "latest"}
             if user_role == "team_lead" and team_id:
                 att_params["team_id"] = team_id
-            att_result, att_status = await self.execute_tool(tool_name, att_params, db)
+            att_result, att_status = await self.execute_tool(tool_name, att_params, db, context)
             tool_executions.append(ToolCallExecution(
                 tool_name=tool_name, parameters=att_params, result=att_result, status=att_status,
                 reasoning_summary="Compiling organizational overview..."
             ))
-            cal_result, _ = await self.execute_tool("get_upcoming_events", {"limit": 3}, db)
+            cal_result, _ = await self.execute_tool("get_upcoming_events", {"limit": 3}, db, context)
             events_count = len(cal_result.get("events", [])) if isinstance(cal_result, dict) else 0
 
             summary = att_result.get("summary", {}) if isinstance(att_result, dict) else {}
@@ -549,7 +646,7 @@ class ReActAgent:
             params = {"meeting_id": explicit_meeting if explicit_meeting else "latest"}
             if user_role == "team_lead" and team_id:
                 params["team_id"] = team_id
-            result, status = await self.execute_tool(tool_name, params, db)
+            result, status = await self.execute_tool(tool_name, params, db, context)
             tool_executions.append(ToolCallExecution(
                 tool_name=tool_name, parameters=params, result=result, status=status,
                 reasoning_summary="Checking meeting attendance records..."
@@ -597,12 +694,12 @@ class ReActAgent:
                 att_p = {"meeting_id": "latest"}
                 if user_role == "team_lead" and team_id:
                     att_p["team_id"] = team_id
-                att_res, _ = await self.execute_tool("get_meeting_attendance", att_p, db)
+                att_res, _ = await self.execute_tool("get_meeting_attendance", att_p, db, context)
                 absent_list = att_res.get("absent_students", []) if isinstance(att_res, dict) else []
                 target_ids = [s["student_id"] for s in absent_list]
                 state["last_absent_students"] = absent_list
                 state["last_absent_student_ids"] = target_ids
-            cal_res, cal_stat = await self.execute_tool("get_upcoming_meetings", {"limit": 3}, db)
+            cal_res, cal_stat = await self.execute_tool("get_upcoming_meetings", {"limit": 3}, db, context)
             tool_executions.append(ToolCallExecution(
                 tool_name="get_upcoming_meetings", parameters={"limit": 3},
                 result=cal_res, status=cal_stat,
@@ -613,7 +710,7 @@ class ReActAgent:
             prep_params = {"student_ids": target_ids, "event_id": next_event_id}
             if user_role == "team_lead" and team_id:
                 prep_params["team_id"] = team_id
-            prep_res, prep_stat = await self.execute_tool("prepare_reminder", prep_params, db)
+            prep_res, prep_stat = await self.execute_tool("prepare_reminder", prep_params, db, context)
             tool_executions.append(ToolCallExecution(
                 tool_name="prepare_reminder", parameters=prep_params,
                 result=prep_res, status=prep_stat,
@@ -628,7 +725,7 @@ class ReActAgent:
             )
             pending_conf = PendingConfirmation(
                 action_id=action_id, tool_name="send_reminder",
-                description=f"Send reminder for '{prep_res.get('event', {}).get('title', 'Upcoming Meeting')}' to {len(target_ids)} member(s).",
+                description=f"Send reminder for '{(prep_res.get('event') or {}).get('title', 'Upcoming Meeting')}' to {len(target_ids)} member(s).",
                 target_count=len(target_ids), preview_data=prep_res
             )
             if is_arabic:
@@ -659,7 +756,7 @@ class ReActAgent:
                 return AgentChatResponse(conversation_id=conversation_id, response=resp_text, tool_executions=[])
 
             # Dynamic identity resolution via tool_get_student / IdentityMatcher
-            lookup_res = await tool_get_student(db, target_name)
+            lookup_res = await tool_get_student(db=db, context=context, student_id_or_name=target_name)
 
             # Handle Ambiguous resolution
             if lookup_res.get("ambiguous"):
@@ -694,7 +791,7 @@ class ReActAgent:
             resolved_student_id = resolved_student["id"]
 
             params = {"student_id_or_name": resolved_student_id}
-            result, status = await self.execute_tool("get_student_score", params, db)
+            result, status = await self.execute_tool("get_student_score", params, db, context)
             tool_executions.append(ToolCallExecution(
                 tool_name="get_student_score", parameters=params, result=result, status=status,
                 reasoning_summary=f"Retrieving official evaluation scorecard for {resolved_student.get('full_name')}..."
@@ -739,7 +836,7 @@ class ReActAgent:
             params = {}
             if user_role == "team_lead" and team_id:
                 params["team_id"] = team_id
-            result, status = await self.execute_tool("get_pending_submissions", params, db)
+            result, status = await self.execute_tool("get_pending_submissions", params, db, context)
             tool_executions.append(ToolCallExecution(
                 tool_name="get_pending_submissions", parameters=params, result=result, status=status,
                 reasoning_summary="Querying pending task submissions..."
@@ -760,7 +857,7 @@ class ReActAgent:
 
         # ── INTENT 5: Calendar ────────────────────────────────────────────
         elif any(w in query_clean.lower() for w in ["calendar", "meeting", "قادم", "ميتينج", "اجتماع", "مواعيد", "schedule", "event", "حدث"]):
-            result, status = await self.execute_tool("get_upcoming_events", {"limit": 5}, db)
+            result, status = await self.execute_tool("get_upcoming_events", {"limit": 5}, db, context)
             tool_executions.append(ToolCallExecution(
                 tool_name="get_upcoming_events", parameters={"limit": 5}, result=result, status=status,
                 reasoning_summary="Retrieving upcoming schedule..."

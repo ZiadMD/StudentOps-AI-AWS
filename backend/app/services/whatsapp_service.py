@@ -441,19 +441,14 @@ class WhatsAppService:
             if not clean_digits:
                 return {"status": "ignored", "reason": "No sender phone"}
 
-            # Match student by phone
-            # We match clean_digits or matching suffix (Egyptian phone 9/10 digits)
-            suffix = clean_digits[-9:] if len(clean_digits) >= 9 else clean_digits
-            st_res = await db.execute(
-                select(Student).where(
-                    or_(
-                        Student.phone == clean_digits,
-                        Student.phone.like(f"%{suffix}"),
-                        Student.phone == f"+{clean_digits}",
-                    )
-                )
-            )
-            student = st_res.scalars().first()
+            # Match only one student by exact normalized international number.
+            # Ambiguous normalized duplicates fail closed instead of selecting the first row.
+            st_res = await db.execute(select(Student))
+            matches = [
+                candidate for candidate in st_res.scalars().all()
+                if format_phone_international(candidate.phone) == clean_digits
+            ]
+            student = matches[0] if len(matches) == 1 else None
 
             if not student:
                 logger.info("WhatsApp webhook: incoming message from unregistered phone %s", clean_digits)

@@ -28,15 +28,12 @@ async def ask_question(
     """
     student_id = current_user.student_id
     if not student_id:
-        std_res = await db.execute(select(Student).where(Student.email == current_user.email))
-        std = std_res.scalar_one_or_none()
-        if std:
-            student_id = std.id
-        else:
-            std_first = await db.execute(select(Student.id))
-            student_id = std_first.scalars().first()
-
-    if not student_id:
+        raise HTTPException(status_code=403, detail="No linked student profile found")
+        
+    std_res = await db.execute(select(Student).where(Student.id == student_id))
+    student = std_res.scalar_one_or_none()
+    
+    if not student:
         raise HTTPException(status_code=400, detail="Cannot identify student profile for question submission.")
 
     team_id = current_user.team_id or "team_media"
@@ -129,6 +126,9 @@ async def answer_question(
     q = res.scalar_one_or_none()
     if not q:
         raise HTTPException(status_code=404, detail="Question not found")
+
+    if current_user.role in ["committee_head", "team_lead"] and q.team_id != current_user.team_id:
+        raise HTTPException(status_code=403, detail="Cannot answer questions from another committee")
 
     q.answer = body.answer.strip()
     q.status = "ANSWERED"

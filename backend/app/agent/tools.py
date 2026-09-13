@@ -8,15 +8,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 
+from app.models.schemas import PermissionContext
+from app.core.config import settings
 from app.services.identity_matcher import IdentityMatcher
 from app.models.entities import Student, Meeting, Event, Task, Submission, AttendanceRecord, ScoreRecord
+from app.core.time import as_utc
 from app.services.attendance_service import AttendanceService, AttendancePolicyEngine
 from app.services.scoring_service import ScoringService
 from app.services.calendar_service import CalendarService
 from app.services.reminder_service import ReminderService
-from app.providers.attendance_provider import MockAttendanceProvider
-from app.providers.calendar_provider import MockCalendarProvider
-from app.providers.messaging_provider import get_messaging_provider
+from app.providers.attendance_provider import GoogleMeetAttendanceProvider, MockAttendanceProvider
+from app.providers.calendar_provider import GoogleCalendarProvider, MockCalendarProvider
+from app.providers.messaging_provider import get_messaging_provider, MockMessagingProvider
+from app.providers.openwa_provider import OpenWAProvider
 
 
 class ToolCategory:
@@ -25,12 +29,13 @@ class ToolCategory:
     EXTERNAL_ACTION = "EXTERNAL_ACTION"
 
 
-# Global singleton provider instances
-mock_meet_provider = MockAttendanceProvider()
-mock_cal_provider = MockCalendarProvider()
+# Keep offline demos and tests deterministic while using live integrations in production.
+use_live_providers = settings.ENVIRONMENT.lower() == "production" or settings.MESSAGING_PROVIDER.lower() == "openwa"
+meet_provider = GoogleMeetAttendanceProvider() if use_live_providers else MockAttendanceProvider()
+cal_provider = GoogleCalendarProvider() if use_live_providers else MockCalendarProvider()
 
-attendance_service = AttendanceService(mock_meet_provider)
-calendar_service = CalendarService(mock_cal_provider)
+attendance_service = AttendanceService(meet_provider)
+calendar_service = CalendarService(cal_provider)
 
 
 def get_reminder_service() -> ReminderService:
@@ -50,14 +55,42 @@ def escape_like(val: str) -> str:
 # Tool Implementation Handlers
 # =========================================================
 
-async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
-    """Retrieve full student profile by ID, code, email, or name with dynamic identity resolution."""
-    raw_query = student_id_or_name.strip()
-    if not raw_query:
+async def tool_get_student(
+    db: AsyncSession,
+    context: Any = None,
+    student_id_or_name: Optional[str] = None,
+    **kwargs
+) -> dict:
+    """Retrieve full student profile by ID, code, email, or name with dynamic identity resolution and team scoping."""
+    # Support flexible parameter ordering:
+    # 1. tool_get_student(db, context, query)
+    # 2. tool_get_student(db, query)
+    # 3. tool_get_student(db, query, context=context)
+    # 4. tool_get_student(db=db, context=context, student_id_or_name=query)
+    if isinstance(context, str) and student_id_or_name is None:
+        real_query = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        real_query = student_id_or_name or kwargs.get("student_id_or_name", "")
+    else:
+        real_context = kwargs.get("context")
+        real_query = student_id_or_name or (context if isinstance(context, str) else "") or kwargs.get("student_id_or_name", "")
+
+    raw_query = real_query
+    if not isinstance(raw_query, str) or not raw_query.strip():
         return {"found": False, "message": "No student identifier provided."}
 
+    raw_query = raw_query.strip()
     query = raw_query.lower()
     escaped = escape_like(query)
+
+    def is_scoped(student_obj) -> bool:
+        if not real_context or real_context.is_admin_override:
+            return True
+        if not real_context.team_id:
+            return False
+        return student_obj.team_id == real_context.team_id
 
     # 1. Direct match by ID (primary key) or exact student_code
     exact_res = await db.execute(
@@ -68,6 +101,8 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
     )
     exact_student = exact_res.scalar_one_or_none()
     if exact_student:
+        if not is_scoped(exact_student):
+            return {"found": False, "message": f"Student '{raw_query}' not found or outside your team scope."}
         return {
             "found": True,
             "student": {
@@ -79,7 +114,8 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
                 "phone": exact_student.phone,
                 "role": exact_student.role,
                 "status": exact_student.status,
-                "university": exact_student.university
+                "university": exact_student.university,
+                "team_id": exact_student.team_id
             }
         }
 
@@ -89,6 +125,8 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
     )
     email_student = email_res.scalar_one_or_none()
     if email_student:
+        if not is_scoped(email_student):
+            return {"found": False, "message": f"Student '{raw_query}' not found or outside your team scope."}
         return {
             "found": True,
             "student": {
@@ -100,15 +138,20 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
                 "phone": email_student.phone,
                 "role": email_student.role,
                 "status": email_student.status,
-                "university": email_student.university
+                "university": email_student.university,
+                "team_id": email_student.team_id
             }
         }
 
     # 3. Dynamic multi-tier name resolution using IdentityMatcher across students
     all_res = await db.execute(select(Student))
-    all_students = all_res.scalars().all()
-    if not all_students:
-        return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
+    all_students_unfiltered = all_res.scalars().all()
+    if not all_students_unfiltered:
+        return {"found": False, "message": f"Student '{raw_query}' not found."}
+
+    all_students = [s for s in all_students_unfiltered if is_scoped(s)]
+    if not all_students and real_context and not real_context.is_admin_override and real_context.team_id:
+        return {"found": False, "message": f"Student '{raw_query}' not found or outside your team scope."}
 
     norm_query = IdentityMatcher.normalize_text(raw_query)
 
@@ -146,7 +189,8 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
                 "phone": s.phone,
                 "role": s.role,
                 "status": s.status,
-                "university": s.university
+                "university": s.university,
+                "team_id": s.team_id
             }
         }
     elif len(exact_name_matches) > 1:
@@ -157,7 +201,7 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
                 {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
                 for s in exact_name_matches
             ],
-            "message": f"Multiple students found matching '{student_id_or_name}'."
+            "message": f"Multiple students found matching '{raw_query}'."
         }
 
     # Evaluate token matches
@@ -174,18 +218,39 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
                 "phone": s.phone,
                 "role": s.role,
                 "status": s.status,
-                "university": s.university
+                "university": s.university,
+                "team_id": s.team_id
             }
         }
     elif len(token_matches) > 1:
+        token_matches.sort(key=lambda x: x[1], reverse=True)
+        top_conf = token_matches[0][1]
+        top_matches = [m for m in token_matches if abs(m[1] - top_conf) <= 0.001]
+        if len(top_matches) == 1:
+            s = top_matches[0][0]
+            return {
+                "found": True,
+                "student": {
+                    "id": s.id,
+                    "student_code": s.student_code,
+                    "full_name": s.full_name,
+                    "arabic_name": s.arabic_name,
+                    "email": s.email,
+                    "phone": s.phone,
+                    "role": s.role,
+                    "status": s.status,
+                    "university": s.university,
+                    "team_id": s.team_id
+                }
+            }
         return {
             "found": False,
             "ambiguous": True,
             "matches": [
                 {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
-                for s, _ in token_matches
+                for s, _ in top_matches
             ],
-            "message": f"Multiple students found matching '{student_id_or_name}'."
+            "message": f"Multiple students found matching '{raw_query}'."
         }
 
     # 4. Fallback SQL ILIKE substring search (safety net for partial codes or IDs)
@@ -198,7 +263,7 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
             (Student.arabic_name.ilike(f"%{escaped}%"))
         )
     )
-    like_students = res.scalars().all()
+    like_students = [s for s in res.scalars().all() if is_scoped(s)]
     if len(like_students) == 1:
         s = like_students[0]
         return {
@@ -212,7 +277,8 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
                 "phone": s.phone,
                 "role": s.role,
                 "status": s.status,
-                "university": s.university
+                "university": s.university,
+                "team_id": s.team_id
             }
         }
     elif len(like_students) > 1:
@@ -223,24 +289,31 @@ async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
                 {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
                 for s in like_students
             ],
-            "message": f"Multiple students found matching '{student_id_or_name}'."
+            "message": f"Multiple students found matching '{raw_query}'."
         }
 
-    return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
+    msg = f"Student '{raw_query}' not found or outside your team scope." if (real_context and not real_context.is_admin_override and real_context.team_id) else f"Student '{raw_query}' not found."
+    return {"found": False, "message": msg}
 
 
-async def tool_search_students(db: AsyncSession, query: str) -> dict:
-    """Search active members across names, roles, and emails."""
+async def tool_search_students(db: AsyncSession, context: PermissionContext, query: str) -> dict:
+    """Search active members across names, roles, and emails. Enforces team scope."""
     escaped = escape_like(query.strip())
     q = f"%{escaped}%"
-    res = await db.execute(
-        select(Student).where(
-            (Student.full_name.ilike(q)) |
-            (Student.arabic_name.ilike(q)) |
-            (Student.email.ilike(q)) |
-            (Student.role.ilike(q))
-        )
+    
+    q_obj = select(Student).where(
+        (Student.full_name.ilike(q)) |
+        (Student.arabic_name.ilike(q)) |
+        (Student.email.ilike(q)) |
+        (Student.role.ilike(q))
     )
+    
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"count": 0, "students": [], "message": "Unauthorized: Missing team scope."}
+        q_obj = q_obj.where(Student.team_id == context.team_id)
+        
+    res = await db.execute(q_obj)
     students = res.scalars().all()
     return {
         "count": len(students),
@@ -251,14 +324,21 @@ async def tool_search_students(db: AsyncSession, query: str) -> dict:
     }
 
 
-async def tool_list_students(db: AsyncSession, role: Optional[str] = None, status: Optional[str] = None) -> dict:
-    """List students with optional role or status filters."""
+async def tool_list_students(db: AsyncSession, context: PermissionContext, role: Optional[str] = None, status: Optional[str] = None) -> dict:
+    """List students with optional role or status filters. Enforces team scope."""
     query = select(Student)
+    
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"count": 0, "students": [], "message": "Unauthorized: Missing team scope."}
+        query = query.where(Student.team_id == context.team_id)
+        
     if role:
         escaped_role = escape_like(role.strip())
         query = query.where(Student.role.ilike(f"%{escaped_role}%"))
     if status:
         query = query.where(Student.status == status.upper())
+        
     res = await db.execute(query)
     students = res.scalars().all()
     return {
@@ -270,30 +350,46 @@ async def tool_list_students(db: AsyncSession, role: Optional[str] = None, statu
     }
 
 
-async def tool_get_student_contacts(db: AsyncSession, student_ids: list[str]) -> dict:
-    """Retrieve contact details for specified students."""
-    res = await db.execute(select(Student).where(Student.id.in_(student_ids)))
+async def tool_get_student_contacts(db: AsyncSession, context: PermissionContext, student_ids: list[str]) -> dict:
+    """Retrieve private contact information (phone, email) for specific students. Enforces team scope."""
+    q = select(Student).where(Student.id.in_(student_ids))
+    
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"contacts": [], "message": "Unauthorized: Missing team scope."}
+        q = q.where(Student.team_id == context.team_id)
+        
+    res = await db.execute(q)
     students = res.scalars().all()
     return {
         "contacts": [
-            {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "email": s.email, "phone": s.phone}
+            {"id": s.id, "name": s.full_name, "phone": s.phone, "email": s.email}
             for s in students
         ]
     }
 
 
-async def tool_get_upcoming_meetings(db: AsyncSession, limit: int = 5) -> dict:
-    """Retrieve upcoming scheduled Google Meet meetings and events."""
-    events = await calendar_service.get_upcoming_events(db, limit=limit)
-    meetings = [e for e in events if e.event_type in ("MEETING", "CAMP", "WORKSHOP")]
+async def tool_get_upcoming_meetings(db: AsyncSession, context: PermissionContext, limit: int = 5) -> dict:
+    """Retrieve upcoming meetings. Enforces team scope."""
+    now = datetime.now(timezone.utc)
+    q = select(Meeting).where(Meeting.start_time >= now).order_by(Meeting.start_time.asc()).limit(limit)
+    
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"count": 0, "meetings": [], "message": "Unauthorized: Missing team scope."}
+        q = q.where(Meeting.team_id == context.team_id)
+        
+    res = await db.execute(q)
+    meetings = res.scalars().all()
     return {
         "count": len(meetings),
         "meetings": [
             {
                 "id": m.id,
+                "code": m.meeting_code,
                 "title": m.title,
                 "start_time": m.start_time.isoformat(),
-                "end_time": m.end_time.isoformat(),
+                "duration_minutes": m.duration_minutes,
                 "location": m.location,
                 "meet_url": m.meet_url
             }
@@ -302,14 +398,19 @@ async def tool_get_upcoming_meetings(db: AsyncSession, limit: int = 5) -> dict:
     }
 
 
-async def tool_get_meeting(db: AsyncSession, meeting_id: str) -> dict:
-    """Retrieve metadata and status for a meeting."""
-    res = await db.execute(
-        select(Meeting).where((Meeting.id == meeting_id) | (Meeting.meeting_code == meeting_id))
-    )
+async def tool_get_meeting(db: AsyncSession, context: PermissionContext, meeting_id: str) -> dict:
+    """Retrieve metadata and status for a meeting. Enforces context team_id."""
+    query = select(Meeting).where((Meeting.id == meeting_id) | (Meeting.meeting_code == meeting_id))
+    
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"found": False, "message": "Unauthorized: Missing team scope."}
+        query = query.where(Meeting.team_id == context.team_id)
+        
+    res = await db.execute(query)
     meeting = res.scalar_one_or_none()
     if not meeting:
-        return {"found": False, "message": f"Meeting '{meeting_id}' not found."}
+        return {"found": False, "message": f"Meeting '{meeting_id}' not found or outside team scope."}
     return {
         "found": True,
         "meeting": {
@@ -327,33 +428,57 @@ async def tool_get_meeting(db: AsyncSession, meeting_id: str) -> dict:
 
 async def tool_get_meeting_attendance(
     db: AsyncSession,
+    context: Any = None,
     meeting_id: Optional[str] = None,
-    team_id: Optional[str] = None
+    team_id: Optional[str] = None,
+    **kwargs
 ) -> dict:
     """
     Retrieve or compute deterministic attendance for a meeting.
-    Defaults to the latest meeting if meeting_id is omitted, None, empty, 'today', or 'latest'.
-    Preserves explicit meeting_id/code lookup and team_id scoping.
+    Defaults to the latest relevant meeting. Enforces context team_id and parameters team_id.
     """
-    clean_id = (meeting_id or "").strip()
+    if isinstance(context, str) and meeting_id is None:
+        real_meeting_id = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        real_meeting_id = meeting_id or kwargs.get("meeting_id")
+    else:
+        real_context = kwargs.get("context")
+        real_meeting_id = meeting_id or (context if isinstance(context, str) else None)
+
+    target_team_id = None
+    if real_context and not real_context.is_admin_override:
+        if not real_context.team_id:
+            return {"success": False, "message": "Unauthorized: Missing team scope."}
+        target_team_id = real_context.team_id
+    elif team_id:
+        target_team_id = team_id
+
+    clean_id = (real_meeting_id or "").strip()
     if not clean_id or clean_id.lower() in ("today", "latest"):
-        # Dynamically resolve latest meeting from Meeting table
-        stmt = select(Meeting)
-        if team_id:
-            stmt = stmt.where((Meeting.team_id == team_id) | (Meeting.team_id.is_(None)))
-        stmt = stmt.order_by(Meeting.start_time.desc()).limit(1)
-        res = await db.execute(stmt)
-        meeting = res.scalar_one_or_none()
-        if not meeting:
-            return {"success": False, "message": "No meetings found."}
+        meeting_query = select(Meeting)
+        if target_team_id:
+            meeting_query = meeting_query.where((Meeting.team_id == target_team_id) | (Meeting.team_id.is_(None)))
+        meeting_query = meeting_query.order_by(Meeting.start_time.desc())
+        meeting_res = await db.execute(meeting_query)
+        meetings = list(meeting_res.scalars().all())
+        if not meetings:
+            return {"success": False, "message": "No relevant meeting found." if real_context else "No meetings found."}
+        now = datetime.now(timezone.utc)
+        current = [
+            m for m in meetings
+            if as_utc(m.start_time) <= now
+        ]
+        meeting = (current or list(meetings))[0]
     else:
         # Find meeting by explicit ID, meeting_code, or numeric session_number
         conditions = [(Meeting.id == clean_id), (Meeting.meeting_code == clean_id)]
         if clean_id.isdigit():
             conditions.append(Meeting.session_number == int(clean_id))
         stmt = select(Meeting).where(or_(*conditions))
-        if team_id:
-            stmt = stmt.where((Meeting.team_id == team_id) | (Meeting.team_id.is_(None)))
+        if target_team_id:
+            stmt = stmt.where((Meeting.team_id == target_team_id) | (Meeting.team_id.is_(None)))
         res = await db.execute(stmt)
         meeting = res.scalar_one_or_none()
         if not meeting:
@@ -367,28 +492,14 @@ async def tool_get_meeting_attendance(
     )
     records = att_res.all()
 
-    # If no records yet, process with AttendanceService
-    if not records:
-        try:
-            await attendance_service.process_meeting_attendance(meeting.id, db)
-            att_res = await db.execute(
-                select(AttendanceRecord, Student)
-                .join(Student, AttendanceRecord.student_id == Student.id)
-                .where(AttendanceRecord.meeting_id == meeting.id)
-            )
-            records = att_res.all()
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    # Apply team scoping if requested
-    if team_id:
-        records = [r for r in records if r[1].team_id == team_id]
-
     present = []
     late = []
     absent = []
 
     for att, std in records:
+        if target_team_id and std.team_id != target_team_id:
+            continue
+            
         item = {
             "student_id": std.id,
             "name": std.full_name,
@@ -405,6 +516,9 @@ async def tool_get_meeting_attendance(
         else:
             absent.append(item)
 
+    total = len(present) + len(late) + len(absent)
+    rate = round(((len(present) + len(late)) / total * 100), 2) if total > 0 else 100.0
+
     return {
         "success": True,
         "meeting": {
@@ -413,10 +527,11 @@ async def tool_get_meeting_attendance(
             "date": meeting.start_time.strftime("%Y-%m-%d %H:%M UTC")
         },
         "summary": {
-            "total_expected": len(records),
+            "total_expected": total,
             "present_count": len(present),
             "late_count": len(late),
-            "absent_count": len(absent)
+            "absent_count": len(absent),
+            "attendance_rate": rate
         },
         "present_students": present,
         "late_students": late,
@@ -424,8 +539,16 @@ async def tool_get_meeting_attendance(
     }
 
 
-async def tool_get_student_attendance(db: AsyncSession, student_id: str) -> dict:
-    """Retrieve full attendance history for a single student."""
+async def tool_get_student_attendance(db: AsyncSession, context: PermissionContext, student_id: str) -> dict:
+    """Retrieve full attendance history for a single student. Enforces context team scope."""
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"student_id": student_id, "history": [], "message": "Unauthorized: Missing team scope."}
+        # verify student belongs to team
+        std_res = await db.execute(select(Student.id).where(Student.id == student_id, Student.team_id == context.team_id))
+        if not std_res.scalar_one_or_none():
+            return {"student_id": student_id, "history": [], "message": "Unauthorized: Student outside team scope."}
+            
     res = await db.execute(
         select(AttendanceRecord, Meeting)
         .join(Meeting, AttendanceRecord.meeting_id == Meeting.id)
@@ -448,7 +571,7 @@ async def tool_get_student_attendance(db: AsyncSession, student_id: str) -> dict
     }
 
 
-async def tool_get_upcoming_events(db: AsyncSession, limit: int = 10) -> dict:
+async def tool_get_upcoming_events(db: AsyncSession, context: PermissionContext, limit: int = 10) -> dict:
     """Retrieve upcoming calendar events and deadlines."""
     events = await calendar_service.get_upcoming_events(db, limit=limit)
     return {
@@ -467,9 +590,15 @@ async def tool_get_upcoming_events(db: AsyncSession, limit: int = 10) -> dict:
     }
 
 
-async def tool_get_tasks(db: AsyncSession) -> dict:
-    """List all tasks and deadlines."""
-    res = await db.execute(select(Task).order_by(Task.task_number.asc()))
+async def tool_get_tasks(db: AsyncSession, context: PermissionContext) -> dict:
+    """List all tasks and deadlines. Enforces context team_id."""
+    query = select(Task).order_by(Task.task_number.asc())
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"count": 0, "tasks": [], "message": "Unauthorized: Missing team scope."}
+        query = query.where(Task.team_id == context.team_id)
+        
+    res = await db.execute(query)
     tasks = res.scalars().all()
     return {
         "count": len(tasks),
@@ -487,17 +616,17 @@ async def tool_get_tasks(db: AsyncSession) -> dict:
     }
 
 
-async def tool_get_pending_submissions(
-    db: AsyncSession,
-    task_id: Optional[str] = None,
-    team_id: Optional[str] = None
-) -> dict:
-    """List students who have pending/unsubmitted tasks. Scoped by team_id if provided."""
+async def tool_get_pending_submissions(db: AsyncSession, context: PermissionContext, task_id: Optional[str] = None) -> dict:
+    """List students who have pending/unsubmitted tasks. Enforces context team scope."""
     query = select(Submission, Student, Task).join(Student, Submission.student_id == Student.id).join(Task, Submission.task_id == Task.id)
     if task_id:
         query = query.where(Submission.task_id == task_id)
-    if team_id:
-        query = query.where(Student.team_id == team_id)
+        
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"pending_count": 0, "pending_submissions": [], "message": "Unauthorized: Missing team scope."}
+        query = query.where(Student.team_id == context.team_id)
+        
     query = query.where(Submission.status.in_(["PENDING", "MISSED"]))
     res = await db.execute(query)
     records = res.all()
@@ -509,29 +638,44 @@ async def tool_get_pending_submissions(
                 "student_name": s.full_name,
                 "arabic_name": s.arabic_name,
                 "phone": s.phone,
-                "task_number": t.task_number,
+                "task_id": t.id,
                 "task_title": t.title,
-                "status": sub.status,
-                "deadline": t.deadline.isoformat()
+                "deadline": t.deadline.isoformat(),
+                "status": sub.status
             }
             for sub, s, t in records
         ]
     }
 
 
-async def tool_get_student_score(db: AsyncSession, student_id_or_name: str) -> dict:
+async def tool_get_student_score(
+    db: AsyncSession,
+    context: Any = None,
+    student_id_or_name: Optional[str] = None,
+    **kwargs
+) -> dict:
     """Retrieve 8.xlsx scoring summary for a student."""
+    if isinstance(context, str) and student_id_or_name is None:
+        real_query = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        real_query = student_id_or_name or kwargs.get("student_id_or_name", "")
+    else:
+        real_context = kwargs.get("context")
+        real_query = student_id_or_name or (context if isinstance(context, str) else "") or kwargs.get("student_id_or_name", "")
+
     # Find student ID first
-    s_lookup = await tool_get_student(db, student_id_or_name)
+    s_lookup = await tool_get_student(db, context=real_context, student_id_or_name=real_query)
     if not s_lookup.get("found"):
         if s_lookup.get("ambiguous"):
             return {
                 "found": False,
                 "ambiguous": True,
                 "matches": s_lookup.get("matches", []),
-                "message": s_lookup.get("message", f"Multiple students found matching '{student_id_or_name}'.")
+                "message": s_lookup.get("message", f"Multiple students found matching '{real_query}'.")
             }
-        return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
+        return {"found": False, "message": s_lookup.get("message", f"Student '{real_query}' not found.")}
 
     student_id = s_lookup["student"]["id"]
     summary = await ScoringService.get_student_score_summary(student_id, db)
@@ -543,13 +687,17 @@ async def tool_get_student_score(db: AsyncSession, student_id_or_name: str) -> d
     }
 
 
-async def tool_get_scores(db: AsyncSession, team_id: Optional[str] = None) -> dict:
-    """Retrieve evaluation scoreboard for all members, optionally scoped by team."""
+async def tool_get_scores(db: AsyncSession, context: PermissionContext) -> dict:
+    """Retrieve evaluation scoreboard for all members. Enforces context team scope."""
     summaries = await ScoringService.get_all_summaries(db)
-    if team_id:
-        team_std_res = await db.execute(select(Student.id).where(Student.team_id == team_id))
+    
+    if not context.is_admin_override:
+        if not context.team_id:
+            return {"total_members": 0, "scoreboard": [], "message": "Unauthorized: Missing team scope."}
+        team_std_res = await db.execute(select(Student.id).where(Student.team_id == context.team_id))
         team_ids = set(team_std_res.scalars().all())
         summaries = [s for s in summaries if s.student_id in team_ids]
+        
     return {
         "total_members": len(summaries),
         "scoreboard": [s.model_dump() for s in summaries]
@@ -558,18 +706,35 @@ async def tool_get_scores(db: AsyncSession, team_id: Optional[str] = None) -> di
 
 async def tool_prepare_reminder(
     db: AsyncSession,
-    student_ids: list[str],
+    context: Any = None,
+    student_ids: Optional[list[str]] = None,
     event_id: Optional[str] = None,
     custom_message: Optional[str] = None,
-    team_id: Optional[str] = None
+    team_id: Optional[str] = None,
+    **kwargs
 ) -> dict:
     """
     Drafts a reminder message for specified students without sending.
-    Safe read-only operation. Scoped by team_id if provided.
+    Enforces context team scope.
     """
-    query = select(Student).where(Student.id.in_(student_ids))
-    if team_id:
+    if isinstance(context, list) and student_ids is None:
+        student_ids = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        student_ids = student_ids or kwargs.get("student_ids", [])
+    else:
+        real_context = kwargs.get("context")
+        student_ids = student_ids or (context if isinstance(context, list) else []) or kwargs.get("student_ids", [])
+
+    query = select(Student).where(Student.id.in_(student_ids or []))
+    if real_context and not real_context.is_admin_override:
+        if not real_context.team_id:
+            return {"success": False, "message": "Unauthorized: Missing team scope."}
+        query = query.where(Student.team_id == real_context.team_id)
+    elif team_id:
         query = query.where(Student.team_id == team_id)
+        
     res = await db.execute(query)
     students = res.scalars().all()
     if not students:
@@ -578,37 +743,42 @@ async def tool_prepare_reminder(
     # Fetch event
     event = None
     if event_id:
-        ev_res = await db.execute(select(Event).where(Event.id == event_id))
-        event = ev_res.scalar_one_or_none()
+        evt_res = await db.execute(
+            select(Meeting).where((Meeting.id == event_id) | (Meeting.meeting_code == event_id))
+        )
+        event = evt_res.scalar_one_or_none()
+        if not event:
+            ev_res = await db.execute(select(Event).where(Event.id == event_id))
+            event = ev_res.scalar_one_or_none()
     if not event:
-        # Fallback to next meeting
         event_schema = await calendar_service.get_next_meeting(db)
         if event_schema:
             ev_res = await db.execute(select(Event).where(Event.id == event_schema.id))
             event = ev_res.scalar_one_or_none()
-
-    service = get_reminder_service()
-    preview_text = service.generate_meeting_reminder_text(
-        student_name=students[0].arabic_name or students[0].full_name,
-        event_title=event.title if event else "الاجتماع القادم",
-        event_time=event.start_time if event else datetime.now(timezone.utc),
-        meet_url=event.meet_url if event else ""
-    )
-
+        
+    if custom_message:
+        msg = custom_message
+    elif event:
+        service = get_reminder_service()
+        msg = service.generate_meeting_reminder_text(
+            student_name=students[0].arabic_name or students[0].full_name,
+            event_title=event.title,
+            event_time=getattr(event, "start_time", datetime.now(timezone.utc)),
+            meet_url=getattr(event, "meet_url", "") or ""
+        )
+    else:
+        msg = "This is an automated reminder regarding your upcoming tasks or meetings. Please check your dashboard."
+    
     return {
         "success": True,
         "target_count": len(students),
+        "event": {"id": event.id, "title": event.title} if event else None,
+        "message_preview": msg,
+        "student_ids_verified": [s.id for s in students],
         "recipients": [
             {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "phone": s.phone}
             for s in students
         ],
-        "event": {
-            "id": event.id if event else None,
-            "title": event.title if event else None,
-            "time": event.start_time.isoformat() if event else None,
-            "meet_url": event.meet_url if event else None
-        } if event else None,
-        "message_preview": preview_text,
         "channel": "WHATSAPP",
         "requires_confirmation": True
     }
@@ -616,19 +786,47 @@ async def tool_prepare_reminder(
 
 async def tool_send_reminder(
     db: AsyncSession,
-    student_ids: list[str],
+    context: Any = None,
+    student_ids: Optional[list[str]] = None,
     event_id: Optional[str] = None,
     custom_message: Optional[str] = None,
     channel: str = "WHATSAPP",
-    is_confirmed: bool = False
+    is_confirmed: bool = False,
+    team_id: Optional[str] = None,
+    **kwargs
 ) -> dict:
     """
     Sends reminders to students.
-    EXTERNAL ACTION: Requires confirmation before sending.
+    EXTERNAL ACTION: Requires confirmation before sending. Enforces context team scope.
     """
-    if not is_confirmed:
+    if isinstance(context, list) and student_ids is None:
+        student_ids = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        student_ids = student_ids or kwargs.get("student_ids", [])
+    else:
+        real_context = kwargs.get("context")
+        student_ids = student_ids or (context if isinstance(context, list) else []) or kwargs.get("student_ids", [])
+
+    is_confirmed_action = False
+    if real_context:
+        is_confirmed_action = real_context.is_confirmed_action
+    if is_confirmed:
+        is_confirmed_action = True
+
+    if not is_confirmed_action:
         # Intercept and demand confirmation
-        prep = await tool_prepare_reminder(db, student_ids, event_id, custom_message)
+        prep = await tool_prepare_reminder(
+            db=db,
+            context=real_context,
+            student_ids=student_ids,
+            event_id=event_id,
+            custom_message=custom_message,
+            team_id=team_id
+        )
+        if not prep.get("success"):
+            return prep
         return {
             "status": "REQUIRES_CONFIRMATION",
             "message": f"Confirmation required before sending reminders to {prep['target_count']} recipient(s).",
@@ -636,15 +834,28 @@ async def tool_send_reminder(
         }
 
     # Fetch students
-    res = await db.execute(select(Student).where(Student.id.in_(student_ids)))
+    query = select(Student).where(Student.id.in_(student_ids or []))
+    if real_context and not real_context.is_admin_override:
+        if not real_context.team_id:
+            return {"success": False, "message": "Unauthorized: Missing team scope."}
+        query = query.where(Student.team_id == real_context.team_id)
+    elif team_id:
+        query = query.where(Student.team_id == team_id)
+        
+    res = await db.execute(query)
     students = res.scalars().all()
     if not students:
-        return {"success": False, "message": "No students found."}
+        return {"success": False, "message": "No students found in allowed scope."}
 
     event = None
     if event_id:
-        ev_res = await db.execute(select(Event).where(Event.id == event_id))
-        event = ev_res.scalar_one_or_none()
+        evt_res = await db.execute(
+            select(Meeting).where((Meeting.id == event_id) | (Meeting.meeting_code == event_id))
+        )
+        event = evt_res.scalar_one_or_none()
+        if not event:
+            ev_res = await db.execute(select(Event).where(Event.id == event_id))
+            event = ev_res.scalar_one_or_none()
 
     service = get_reminder_service()
     result = await service.send_reminders(
@@ -666,6 +877,7 @@ TOOL_DEFINITIONS = [
         "name": "get_meeting_attendance",
         "description": "Retrieves the deterministic attendance record for a meeting (defaults to latest meeting). Identifies present, late, and absent students.",
         "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "committee_hr_member", "team_lead"],
         "parameters": {
             "type": "object",
             "properties": {
@@ -680,10 +892,11 @@ TOOL_DEFINITIONS = [
         "name": "get_upcoming_meetings",
         "description": "Retrieves upcoming Google Meet / Calendar meetings.",
         "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "committee_hr_member", "team_lead", "committee_member", "member"],
         "parameters": {
             "type": "object",
             "properties": {
-                "limit": {"type": "integer", "description": "Maximum number of meetings to return (default 5)."}
+                "limit": {"type": "integer"}
             }
         }
     },
@@ -691,105 +904,174 @@ TOOL_DEFINITIONS = [
         "name": "get_student_contacts",
         "description": "Retrieves verified contact channels (phone, email) for specific student IDs.",
         "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "team_lead"],
         "parameters": {
             "type": "object",
             "properties": {
-                "student_ids": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of student IDs."
-                }
+                "student_ids": {"type": "array", "items": {"type": "string"}}
             },
             "required": ["student_ids"]
         }
     },
     {
         "name": "prepare_reminder",
-        "description": "Drafts and previews a reminder message for students without sending it.",
+        "description": "Drafts a reminder message for specified students.",
         "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "team_lead"],
         "parameters": {
             "type": "object",
             "properties": {
                 "student_ids": {"type": "array", "items": {"type": "string"}},
-                "event_id": {"type": "string", "description": "Target event/meeting ID."},
-                "custom_message": {"type": "string", "description": "Optional custom message text."}
+                "event_id": {"type": "string"},
+                "custom_message": {"type": "string"}
             },
             "required": ["student_ids"]
         }
     },
     {
         "name": "send_reminder",
-        "description": "Sends an automated reminder message to target students via WhatsApp/SMS. SENSITIVE: Requires human confirmation.",
+        "description": "Dispatches prepared reminders via official WhatsApp API.",
         "category": ToolCategory.EXTERNAL_ACTION,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader"],
         "parameters": {
             "type": "object",
             "properties": {
                 "student_ids": {"type": "array", "items": {"type": "string"}},
-                "event_id": {"type": "string", "description": "Target event/meeting ID."},
-                "custom_message": {"type": "string", "description": "Optional custom message text."},
-                "channel": {"type": "string", "enum": ["WHATSAPP", "SMS"]}
+                "event_id": {"type": "string"},
+                "custom_message": {"type": "string"},
+                "is_confirmed": {"type": "boolean"}
             },
-            "required": ["student_ids"]
+            "required": ["student_ids", "is_confirmed"]
         }
     },
     {
         "name": "get_student_score",
-        "description": "Retrieves the exact 8.xlsx evaluation scorecard for a student (Attendance, Tasks /10, Behavior /23).",
+        "description": "Retrieves the detailed performance scorecard for a member.",
         "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "committee_hr_member", "team_lead", "committee_member", "member"],
         "parameters": {
             "type": "object",
             "properties": {
-                "student_id_or_name": {"type": "string", "description": "Student ID or full/Arabic name."}
+                "student_id_or_name": {"type": "string"}
             },
             "required": ["student_id_or_name"]
         }
     },
     {
         "name": "get_scores",
-        "description": "Retrieves the full evaluation summary board across all members.",
+        "description": "Retrieves the scoreboard for multiple members.",
         "category": ToolCategory.READ_ONLY,
-        "parameters": {"type": "object", "properties": {}}
-    },
-    {
-        "name": "get_pending_submissions",
-        "description": "Retrieves students who have not submitted a task deadline.",
-        "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "team_lead"],
         "parameters": {
             "type": "object",
             "properties": {
-                "task_id": {"type": "string", "description": "Optional task ID."}
+            }
+        }
+    },
+    {
+        "name": "get_pending_submissions",
+        "description": "Lists students with pending task submissions.",
+        "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "team_lead"],
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string"}
             }
         }
     },
     {
         "name": "search_students",
-        "description": "Searches students by name, email, or role.",
+        "description": "Search active members.",
         "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "team_lead"],
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search keyword."}
+                "query": {"type": "string"}
             },
             "required": ["query"]
+        }
+    },
+    {
+        "name": "get_student",
+        "description": "Retrieve full student profile.",
+        "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "team_lead"],
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "student_id_or_name": {"type": "string"}
+            },
+            "required": ["student_id_or_name"]
+        }
+    },
+    {
+        "name": "list_students",
+        "description": "List students.",
+        "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "team_lead"],
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "role": {"type": "string"},
+                "status": {"type": "string"}
+            }
+        }
+    },
+    {
+        "name": "get_upcoming_events",
+        "description": "Retrieve upcoming calendar events.",
+        "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "committee_hr_member", "team_lead", "committee_member", "member"],
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer"}
+            }
+        }
+    },
+    {
+        "name": "get_tasks",
+        "description": "List all tasks.",
+        "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "committee_hr_member", "team_lead", "committee_member", "member"],
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+    {
+        "name": "get_student_attendance",
+        "description": "Retrieve student attendance.",
+        "category": ToolCategory.READ_ONLY,
+        "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "committee_hr_member", "team_lead", "committee_member", "member"],
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "student_id": {"type": "string"}
+            },
+            "required": ["student_id"]
         }
     }
 ]
 
 
-# Tool dispatcher map
+
 TOOL_REGISTRY = {
-    "get_meeting_attendance": tool_get_meeting_attendance,
-    "get_upcoming_meetings": tool_get_upcoming_meetings,
-    "get_student_contacts": tool_get_student_contacts,
-    "prepare_reminder": tool_prepare_reminder,
-    "send_reminder": tool_send_reminder,
-    "get_student_score": tool_get_student_score,
-    "get_scores": tool_get_scores,
-    "get_pending_submissions": tool_get_pending_submissions,
-    "search_students": tool_search_students,
-    "get_student": tool_get_student,
-    "list_students": tool_list_students,
-    "get_upcoming_events": tool_get_upcoming_events,
-    "get_tasks": tool_get_tasks,
-    "get_student_attendance": tool_get_student_attendance,
+    'get_student': tool_get_student,
+    'search_students': tool_search_students,
+    'list_students': tool_list_students,
+    'get_student_contacts': tool_get_student_contacts,
+    'get_upcoming_meetings': tool_get_upcoming_meetings,
+    'get_meeting': tool_get_meeting,
+    'get_meeting_attendance': tool_get_meeting_attendance,
+    'get_student_attendance': tool_get_student_attendance,
+    'get_upcoming_events': tool_get_upcoming_events,
+    'get_tasks': tool_get_tasks,
+    'get_pending_submissions': tool_get_pending_submissions,
+    'get_student_score': tool_get_student_score,
+    'get_scores': tool_get_scores,
+    'prepare_reminder': tool_prepare_reminder,
+    'send_reminder': tool_send_reminder,
 }

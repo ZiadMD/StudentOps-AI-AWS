@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, verify_student_access, require_roles
 from app.core.security import generate_invitation_token
 from app.models.entities import Student, User, ScoreRecord, Team, StudentInvitation, utcnow
+from app.services.audit_service import AuditService
 from app.models.schemas import (
     StudentCreate,
     StudentResponse,
@@ -131,6 +132,13 @@ async def create_student(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"A member with email '{email}' already exists."
+        )
+        
+    existing_phone = await db.execute(select(Student).where(Student.phone == phone))
+    if existing_phone.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A member with phone '{phone}' already exists."
         )
 
     # Student code handling
@@ -270,6 +278,7 @@ async def update_behavior_score(
         ("SOCIAL_MEDIA", body.social_media, 5.0),
         ("HIERARCHY_RULES", body.hierarchy_rules, 5.0),
         ("POLITE_CONDUCT", body.polite_conduct, 8.0),
+        ("INTERACTION", body.interaction, 5.0),
     ]
 
     for cat_name, points, max_pts in categories:
@@ -352,14 +361,20 @@ async def update_student_phone(
     student_id: str,
     body: StudentPhoneUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["region_hr_head", "committee_hr_leader", "hr_admin"]))
+    current_user: User = Depends(require_roles(["committee_hr_leader", "hr_admin", "committee_hr_member"]))
 ):
-    """
-    Updates a student's WhatsApp contact phone number.
-    Restricted to Region HR Head, Committee HR Leader, and Organization Admin.
-    """
+    """Updates a student's phone number. Prevents duplicates."""
     student = await verify_student_access(student_id, current_user, db)
-    student.phone = body.phone.strip()
+    
+    new_phone = body.phone.strip()
+    existing_phone = await db.execute(select(Student).where(Student.phone == new_phone, Student.id != student_id))
+    if existing_phone.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A member with phone '{new_phone}' already exists."
+        )
+
+    student.phone = new_phone
     await db.commit()
     await db.refresh(student)
     return student

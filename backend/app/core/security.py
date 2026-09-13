@@ -8,6 +8,7 @@ import secrets
 import hashlib
 import bcrypt
 import jwt
+import uuid
 
 from app.core.config import settings
 
@@ -90,10 +91,12 @@ def create_refresh_token(data: dict[str, Any], expires_delta: Optional[timedelta
     else:
         expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
+    jti = str(uuid.uuid4())
     to_encode.update({
         "exp": expire,
         "iat": now,
-        "type": "refresh"
+        "type": "refresh",
+        "jti": jti
     })
     encoded_jwt = jwt.encode(
         to_encode,

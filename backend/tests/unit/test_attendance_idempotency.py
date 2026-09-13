@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy import select
 
 from app.core.database import Base
-from app.models.entities import Meeting, Student, AttendanceRecord, ParticipantSession
+from app.models.entities import Meeting, Student, AttendanceRecord, ParticipantSession, User
 from app.services.attendance_service import AttendanceService, AttendancePolicyEngine
 from app.providers.attendance_provider import AttendanceProvider, RawMeetingAttendance, RawParticipantSession
 
@@ -44,6 +44,14 @@ async def test_attendance_processing_is_idempotent(test_db):
         duration_minutes=60,
     )
     test_db.add(meeting)
+    test_db.add(User(
+        id="hr_attendance",
+        email="hr-attendance@studentops.org",
+        hashed_password="test",
+        full_name="Attendance HR",
+        role="committee_hr_member",
+        is_active=True,
+    ))
 
     student1 = Student(
         id="std_1",
@@ -52,6 +60,7 @@ async def test_attendance_processing_is_idempotent(test_db):
         arabic_name="أحمد محمد",
         email="ahmed@studentops.org",
         phone="+201012345678",
+        assigned_hr_id="hr_attendance",
     )
     student2 = Student(
         id="std_2",
@@ -60,6 +69,7 @@ async def test_attendance_processing_is_idempotent(test_db):
         arabic_name="سارة علي",
         email="sara@studentops.org",
         phone="+201098765432",
+        assigned_hr_id="hr_attendance",
     )
     test_db.add(student1)
     test_db.add(student2)
@@ -119,8 +129,17 @@ async def test_reprocessing_preserves_excuse(test_db):
         arabic_name="محمود حسن",
         email="mahmoud@studentops.org",
         phone="+201011112222",
+        assigned_hr_id="hr_attendance",
     )
     test_db.add(meeting)
+    test_db.add(User(
+        id="hr_attendance",
+        email="hr-attendance-excuse@studentops.org",
+        hashed_password="test",
+        full_name="Attendance HR",
+        role="committee_hr_member",
+        is_active=True,
+    ))
     test_db.add(student)
     await test_db.commit()
 

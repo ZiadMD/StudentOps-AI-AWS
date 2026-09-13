@@ -51,6 +51,18 @@ class Team(Base):
     students = relationship("Student", back_populates="team")
 
 
+class RefreshSession(Base):
+    __tablename__ = "refresh_sessions"
+
+    id = Column(String(36), primary_key=True, index=True)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    refresh_token_jti = Column(String(36), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="refresh_sessions")
+
 class User(Base):
     __tablename__ = "users"
 
@@ -67,6 +79,7 @@ class User(Base):
 
     # Relationships
     team = relationship("Team", back_populates="members")
+    refresh_sessions = relationship("RefreshSession", back_populates="user", cascade="all, delete-orphan")
     student = relationship("Student", foreign_keys=[student_id])
 
 
@@ -469,3 +482,65 @@ class CommitteeReport(Base):
 
     team = relationship("Team", foreign_keys=[team_id])
     submitted_by = relationship("User", foreign_keys=[submitted_by_user_id])
+from sqlalchemy import event, DDL
+
+trigger_ddl_sqlite_delete = DDL("""
+CREATE TRIGGER IF NOT EXISTS prevent_agent_action_audits_delete
+BEFORE DELETE ON agent_action_audits
+BEGIN
+    SELECT RAISE(ABORT, 'Delete not allowed on audit logs');
+END;
+""")
+
+trigger_ddl_sqlite_update = DDL("""
+CREATE TRIGGER IF NOT EXISTS prevent_agent_action_audits_update
+BEFORE UPDATE ON agent_action_audits
+BEGIN
+    SELECT RAISE(ABORT, 'Update not allowed on critical audit logs fields')
+    WHERE OLD.id != NEW.id 
+       OR OLD.action_id != NEW.action_id 
+       OR OLD.intent != NEW.intent 
+       OR OLD.tool_name != NEW.tool_name 
+       OR OLD.parameters != NEW.parameters;
+END;
+""")
+
+trigger_ddl_pg_func = DDL("""
+CREATE OR REPLACE FUNCTION prevent_audit_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'Audit logs are immutable';
+    END IF;
+    IF TG_OP = 'UPDATE' THEN
+        IF OLD.id != NEW.id 
+           OR OLD.action_id != NEW.action_id 
+           OR OLD.intent != NEW.intent 
+           OR OLD.tool_name != NEW.tool_name 
+           OR OLD.parameters != NEW.parameters THEN
+            RAISE EXCEPTION 'Update not allowed on critical audit logs fields';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+""")
+
+trigger_ddl_pg_delete = DDL("""
+CREATE TRIGGER prevent_agent_action_audits_delete
+BEFORE DELETE ON agent_action_audits
+FOR EACH ROW EXECUTE FUNCTION prevent_audit_mutation();
+""")
+
+trigger_ddl_pg_update = DDL("""
+CREATE TRIGGER prevent_agent_action_audits_update
+BEFORE UPDATE ON agent_action_audits
+FOR EACH ROW EXECUTE FUNCTION prevent_audit_mutation();
+""")
+
+event.listen(AgentActionAudit.__table__, "after_create", trigger_ddl_sqlite_delete.execute_if(dialect="sqlite"))
+event.listen(AgentActionAudit.__table__, "after_create", trigger_ddl_sqlite_update.execute_if(dialect="sqlite"))
+event.listen(AgentActionAudit.__table__, "after_create", trigger_ddl_pg_func.execute_if(dialect="postgresql"))
+event.listen(AgentActionAudit.__table__, "after_create", trigger_ddl_pg_delete.execute_if(dialect="postgresql"))
+event.listen(AgentActionAudit.__table__, "after_create", trigger_ddl_pg_update.execute_if(dialect="postgresql"))
+

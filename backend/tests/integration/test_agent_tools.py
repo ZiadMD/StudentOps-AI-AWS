@@ -12,6 +12,7 @@ from app.agent.tools import (
     tool_send_reminder,
     tool_get_student_score
 )
+from app.models.schemas import PermissionContext
 
 
 @pytest.mark.asyncio
@@ -23,8 +24,13 @@ async def test_meeting_attendance_tool_returns_grounded_data():
     SessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
     async with SessionLocal() as db:
         await seed_all(db)
+        context = PermissionContext(
+            user_id="integration_admin",
+            role="hr_admin",
+            is_admin_override=True,
+        )
 
-        res = await tool_get_meeting_attendance(db=db, meeting_id="today_sync")
+        res = await tool_get_meeting_attendance(db=db, context=context, meeting_id="today_sync")
         assert res["success"] is True
         assert res["summary"]["present_count"] >= 2
         assert res["summary"]["absent_count"] >= 1
@@ -42,10 +48,16 @@ async def test_send_reminder_requires_confirmation():
     SessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
     async with SessionLocal() as db:
         await seed_all(db)
+        context = PermissionContext(
+            user_id="integration_admin",
+            role="hr_admin",
+            is_admin_override=True,
+        )
 
         # Calling send_reminder without is_confirmed=True MUST be intercepted
         res = await tool_send_reminder(
             db=db,
+            context=context,
             student_ids=["std_salma"],
             is_confirmed=False
         )
@@ -56,6 +68,7 @@ async def test_send_reminder_requires_confirmation():
         # Calling with is_confirmed=True executes successfully
         exec_res = await tool_send_reminder(
             db=db,
+            context=context.model_copy(update={"is_confirmed_action": True}),
             student_ids=["std_salma"],
             is_confirmed=True
         )

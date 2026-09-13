@@ -55,6 +55,7 @@ class StudentScoreSummary(BaseModel):
     pending_task_count: int
     average_task_quality: float  # out of 10.0 (graded by Committee Head)
     group_interaction_score: float  # /5 (graded by HR Member)
+    interaction_score: float  # /5, separate from behavior /23
     social_media_score: float  # /5
     hierarchy_rules_score: float  # /5
     polite_conduct_score: float  # /8
@@ -245,6 +246,7 @@ class BehaviorScoreUpdate(BaseModel):
     social_media: float = Field(..., ge=0.0, le=5.0)
     hierarchy_rules: float = Field(..., ge=0.0, le=5.0)
     polite_conduct: float = Field(..., ge=0.0, le=8.0)
+    interaction: float = Field(default=5.0, ge=0.0, le=5.0)
     notes: Optional[str] = ""
 
 
@@ -364,8 +366,23 @@ class ReminderResult(BaseModel):
 
 
 # =========================================================
-# Agent Chat & Confirmation Schemas
+# Agent Chat, Confirmation & Authorization Schemas
 # =========================================================
+
+class PermissionContext(BaseModel):
+    """
+    Trusted server-side authorization context injected into tools.
+    Must never be constructable or modifiable by the AI agent.
+    """
+    user_id: str
+    role: str
+    team_id: Optional[str] = None
+    student_id: Optional[str] = None
+    is_admin_override: bool = False
+    is_confirmed_action: bool = False
+    
+    model_config = ConfigDict(frozen=True)  # Prevent modification
+
 
 class AgentChatMessage(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000, description="Chat query for the AI agent")

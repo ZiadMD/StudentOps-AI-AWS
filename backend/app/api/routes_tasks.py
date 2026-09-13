@@ -8,10 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.core.time import as_utc
 from app.core.dependencies import get_current_active_user, require_roles
 import uuid
 from sqlalchemy import func
 from app.models.entities import Task, Submission, Student, User, TaskAssignment, utcnow
+from app.services.audit_service import AuditService
 from app.models.schemas import (
     TaskSchema,
     SubmissionSchema,
@@ -81,7 +83,14 @@ async def list_tasks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    res = await db.execute(select(Task).order_by(Task.task_number.asc()))
+    task_query = select(Task).order_by(Task.task_number.asc())
+    scoped_roles = ("committee_head", "team_lead", "committee_hr_leader", "committee_hr_member")
+    if current_user.role in scoped_roles:
+        if not current_user.team_id:
+            return []
+        task_query = task_query.where(Task.team_id == current_user.team_id)
+
+    res = await db.execute(task_query)
     tasks = res.scalars().all()
     results = []
 
@@ -191,6 +200,52 @@ async def create_task(
     )
 
 
+@router.get("/{task_id}", response_model=TaskSchema)
+async def get_task(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    res = await db.execute(select(Task).where(Task.id == task_id))
+    task = res.scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    is_member = current_user.role in ("committee_member", "member")
+    
+    if current_user.role not in ("hr_admin", "region_hr_head"):
+        if not current_user.team_id or task.team_id != current_user.team_id:
+            raise HTTPException(status_code=403, detail="Task belongs to another committee")
+
+    if is_member and current_user.student_id:
+        assign_res = await db.execute(
+            select(TaskAssignment.task_id).where(TaskAssignment.student_id == current_user.student_id, TaskAssignment.task_id == task_id)
+        )
+        if not assign_res.scalar_one_or_none():
+            task_assign_count = await db.execute(select(func.count(TaskAssignment.id)).where(TaskAssignment.task_id == task_id))
+            if (task_assign_count.scalar() or 0) > 0:
+                raise HTTPException(status_code=403, detail="Not assigned to this task")
+
+    sub_res = await db.execute(select(Submission).where(Submission.task_id == task_id))
+    submissions = sub_res.scalars().all()
+    
+    assign_res = await db.execute(select(func.count(TaskAssignment.id)).where(TaskAssignment.task_id == task_id))
+    assigned_count = assign_res.scalar() or 0
+
+    return TaskSchema(
+        id=task.id,
+        task_number=task.task_number,
+        title=task.title,
+        description=task.description,
+        deadline=task.deadline,
+        max_score=None if is_member else task.max_score,
+        score_rule=None if is_member else task.score_rule,
+        submission_count=sum(1 for s in submissions if s.status != "PENDING"),
+        pending_count=sum(1 for s in submissions if s.status == "PENDING"),
+        assigned_count=assigned_count
+    )
+
+
 @router.post("/{task_id}/assign")
 async def assign_students_to_task(
     task_id: str,
@@ -203,6 +258,18 @@ async def assign_students_to_task(
     task = task_res.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    if current_user.role != "hr_admin":
+        if not current_user.team_id or task.team_id != current_user.team_id:
+            raise HTTPException(status_code=403, detail="Task belongs to another committee")
+
+    requested_student_ids = set(body.student_ids)
+    students_res = await db.execute(select(Student).where(Student.id.in_(requested_student_ids)))
+    students = list(students_res.scalars().all())
+    if len(students) != len(requested_student_ids):
+        raise HTTPException(status_code=404, detail="One or more students not found")
+    if current_user.role != "hr_admin" and any(student.team_id != current_user.team_id for student in students):
+        raise HTTPException(status_code=403, detail="Cannot assign students outside your assigned committee")
 
     added_count = 0
     for sid in set(body.student_ids):
@@ -321,6 +388,15 @@ async def list_submissions_for_task(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    task_res = await db.execute(select(Task).where(Task.id == task_id))
+    task = task_res.scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if current_user.role not in ("hr_admin", "region_hr_head") and task.team_id:
+        if task.team_id != current_user.team_id:
+            raise HTTPException(status_code=403, detail="Task belongs to another committee")
+
     """
     Lists task submissions scoped by role:
     - committee_head / team_lead: sees submissions only for members of their assigned committee.
@@ -551,6 +627,16 @@ async def review_submission(
     await db.commit()
     await db.refresh(submission)
 
+    await AuditService.record_action(
+        db=db,
+        intent="REVIEW_TASK_SUBMISSION",
+        tool_name="api_routes_tasks",
+        parameters={"submission_id": submission_id, "score": body.score, "task_id": task.id},
+        result={"status": "SUCCESS"},
+        user_id=current_user.id,
+        status="EXECUTED"
+    )
+
     return SubmissionSchema(
         id=submission.id,
         task_id=submission.task_id,
@@ -600,9 +686,9 @@ async def submit_task(
     deadline = task.deadline
     if deadline is not None:
         if deadline.tzinfo is None and now.tzinfo is not None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
+            deadline = as_utc(deadline)
         elif deadline.tzinfo is not None and now.tzinfo is None:
-            now = now.replace(tzinfo=timezone.utc)
+            now = as_utc(now)
         status_str = "LATE" if now > deadline else "ON_TIME"
     else:
         status_str = "ON_TIME"
