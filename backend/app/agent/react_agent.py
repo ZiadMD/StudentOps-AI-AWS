@@ -3,19 +3,151 @@ ReAct AI Agent Loop with OpenRouter LLM (streaming) and Deterministic Grounding.
 """
 from typing import Any, AsyncIterator, Optional
 import json
+import re
 import httpx
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.agent.tools import TOOL_REGISTRY
+from app.agent.tools import TOOL_REGISTRY, tool_get_student
 from app.services.audit_service import AuditService
 from app.models.schemas import (
     AgentChatResponse, ToolCallExecution, PendingConfirmation
 )
 
-# In-memory conversational state per conversation_id
-CONVERSATION_STATE: dict[str, dict[str, Any]] = {}
+from collections import OrderedDict
+import time
+
+
+class BoundedConversationState:
+    """
+    Thread-safe, bounded, in-memory conversation state store.
+    Features:
+    - LRU eviction when size exceeds max_entries.
+    - TTL expiry per conversation entry (lazy eviction on access + eager cleanup when full).
+    - Dict-like interface (`setdefault`, `get`, `__getitem__`, `__setitem__`, `__contains__`, `pop`, `clear`)
+      preserving 100% backward compatibility with existing code.
+    """
+
+    def __init__(self, max_entries: Optional[int] = None, ttl_seconds: Optional[float] = None):
+        self._max_entries = max_entries
+        self._ttl_seconds = ttl_seconds
+        self._data: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        self._timestamps: dict[str, float] = {}
+
+    @property
+    def max_entries(self) -> int:
+        if self._max_entries is not None:
+            return self._max_entries
+        return getattr(settings, "AGENT_CONVERSATION_STATE_MAX_ENTRIES", 1000)
+
+    @property
+    def ttl_seconds(self) -> float:
+        if self._ttl_seconds is not None:
+            return self._ttl_seconds
+        return float(getattr(settings, "AGENT_CONVERSATION_STATE_TTL_SECONDS", 86400))
+
+    def _is_expired(self, key: str, now: Optional[float] = None) -> bool:
+        if self.ttl_seconds <= 0:
+            return False
+        now_ts = now if now is not None else time.time()
+        last_time = self._timestamps.get(key, 0.0)
+        return (now_ts - last_time) > self.ttl_seconds
+
+    def _evict_expired(self) -> None:
+        if self.ttl_seconds <= 0:
+            return
+        now = time.time()
+        expired_keys = [k for k in list(self._data.keys()) if self._is_expired(k, now)]
+        for k in expired_keys:
+            self._data.pop(k, None)
+            self._timestamps.pop(k, None)
+
+    def _evict_lru(self) -> None:
+        limit = self.max_entries
+        if limit <= 0:
+            return
+        while len(self._data) > limit:
+            oldest_key, _ = self._data.popitem(last=False)
+            self._timestamps.pop(oldest_key, None)
+
+    def setdefault(self, key: str, default: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        now = time.time()
+        if key in self._data:
+            if self._is_expired(key, now):
+                # Expired: discard and recreate default
+                self._data.pop(key, None)
+                self._timestamps.pop(key, None)
+            else:
+                self._data.move_to_end(key)
+                self._timestamps[key] = now
+                return self._data[key]
+
+        val = default if default is not None else {}
+        self._evict_expired()
+        self._data[key] = val
+        self._timestamps[key] = now
+        self._evict_lru()
+        return val
+
+    def get(self, key: str, default: Any = None) -> Any:
+        now = time.time()
+        if key in self._data:
+            if self._is_expired(key, now):
+                self._data.pop(key, None)
+                self._timestamps.pop(key, None)
+                return default
+            self._data.move_to_end(key)
+            self._timestamps[key] = now
+            return self._data[key]
+        return default
+
+    def __getitem__(self, key: str) -> dict[str, Any]:
+        val = self.get(key)
+        if val is None and key not in self:
+            raise KeyError(key)
+        return val
+
+    def __setitem__(self, key: str, val: dict[str, Any]) -> None:
+        now = time.time()
+        self._evict_expired()
+        self._data[key] = val
+        self._data.move_to_end(key)
+        self._timestamps[key] = now
+        self._evict_lru()
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        if key in self._data:
+            if self._is_expired(key):
+                self._data.pop(key, None)
+                self._timestamps.pop(key, None)
+                return False
+            return True
+        return False
+
+    def __len__(self) -> int:
+        self._evict_expired()
+        return len(self._data)
+
+    def pop(self, key: str, default: Any = None) -> Any:
+        self._timestamps.pop(key, None)
+        return self._data.pop(key, default)
+
+    def clear(self) -> None:
+        self._data.clear()
+        self._timestamps.clear()
+
+    def cleanup_expired(self) -> int:
+        """Explicitly run expired entry cleanup and return count of evicted items."""
+        before = len(self._data)
+        self._evict_expired()
+        return before - len(self._data)
+
+
+# Bounded in-memory conversational state per conversation_id
+CONVERSATION_STATE = BoundedConversationState()
 
 
 async def stream_groq(messages: list[dict], system: str = "") -> AsyncIterator[str]:
@@ -185,6 +317,104 @@ class ReActAgent:
         except Exception as e:
             return {"error": str(e)}, "FAILED"
 
+    @staticmethod
+    def extract_student_query(query: str) -> str:
+        """
+        Extracts student name, student code, or student ID from a score-intent query.
+        Removes intent trigger words and filler phrases while preserving the student target.
+        """
+        q = query.strip()
+
+        # 1. Check for explicit student code (e.g. CORE-2026-001, ST-2026-101, TEST-2026-001) or ID (e.g. std_...)
+        code_match = re.search(r'\b(std_[a-zA-Z0-9_]+|[A-Za-z0-9]+-\d{4}-\d{3,4})\b', q, re.IGNORECASE)
+        if code_match:
+            return code_match.group(1).strip()
+
+        # 2. Normalize punctuation (strip apostrophe-s, quotes, question marks)
+        cleaned = re.sub(r"['’]s\b", " ", q, flags=re.IGNORECASE)
+        cleaned = re.sub(r'[\?؟!،,\.:"\'`]', " ", cleaned)
+
+        # 3. Pattern: "What is <NAME>'s evaluation score?" or "Show <NAME>'s score"
+        m_en_suffix = re.search(
+            r'^(?:what\s+is\s+)?(?:show\s+)?(?:get\s+)?(?:view\s+)?(?:check\s+)?(?:tell\s+me\s+)?(?:can\s+you\s+)?(?:please\s+)?(.+?)\s+(?:evaluation\s+score|evaluation\s+scores|evaluation\s+summary|scorecard|evaluation|scores|score|behavior|points)$',
+            cleaned,
+            re.IGNORECASE
+        )
+        if m_en_suffix and m_en_suffix.group(1).strip():
+            candidate = m_en_suffix.group(1).strip()
+            candidate = re.sub(r'^(?:the\s+|a\s+|an\s+|student\s+|member\s+)', '', candidate, flags=re.IGNORECASE).strip()
+            if candidate:
+                return candidate
+
+        # 4. Pattern: "Score for <NAME>" or "Evaluation of <NAME>"
+        m_en_prefix = re.search(
+            r'(?:evaluation\s+score|evaluation\s+summary|scorecard|evaluation|scores|score|behavior|points)\s+(?:for|of|about)\s+(.+)$',
+            cleaned,
+            re.IGNORECASE
+        )
+        if m_en_prefix and m_en_prefix.group(1).strip():
+            candidate = m_en_prefix.group(1).strip()
+            candidate = re.sub(r'^(?:the\s+|student\s+|member\s+)', '', candidate, flags=re.IGNORECASE).strip()
+            if candidate:
+                return candidate
+
+        # 5. Arabic Pattern: "تقييم <NAME>" or "درجات <NAME>"
+        m_ar_prefix = re.search(
+            r'^(?:عرض|ماهو|ما\s+هو|ما\s+هي|ماهي|عايز|اريد|أريد|أظهر|اظهر)?\s*(?:تقييم|درجات|درجة|نقاط|سلوك|سجل|بطاقة\s+تقييم)\s*(?:الطالب|العضو|للطالب|للعضو|لـ|ل)?\s*(.+)$',
+            cleaned
+        )
+        if m_ar_prefix and m_ar_prefix.group(1).strip():
+            candidate = m_ar_prefix.group(1).strip()
+            candidate = re.sub(r'^(?:الطالب|العضو)\s+', '', candidate).strip()
+            if candidate:
+                return candidate
+
+        # 6. Arabic Suffix: "<NAME> تقييم" or "<NAME> درجات"
+        m_ar_suffix = re.search(
+            r'^(.+?)\s+(?:تقييم|درجات|درجة|نقاط|سلوك)$',
+            cleaned
+        )
+        if m_ar_suffix and m_ar_suffix.group(1).strip():
+            return m_ar_suffix.group(1).strip()
+
+        # 7. Fallback: remove stop/trigger words from sentence
+        stop_words = {
+            "what", "is", "the", "show", "get", "check", "view", "evaluation",
+            "score", "scorecard", "scores", "points", "behavior", "discipline",
+            "for", "of", "about", "please", "can", "you", "tell", "me", "student", "member",
+            "عرض", "ماهو", "ما", "هو", "هي", "ماهي", "تقييم", "درجة", "درجات",
+            "نقاط", "سلوك", "الطالب", "العضو", "للطالب", "للعضو", "عن"
+        }
+        words = [w for w in cleaned.split() if w.lower() not in stop_words]
+        return " ".join(words).strip()
+
+    @staticmethod
+    def extract_meeting_query(query: str) -> Optional[str]:
+        """
+        Extracts explicit meeting ID or meeting code from query if present.
+        Returns None for generic queries like "today's meeting", "the meeting", etc.,
+        indicating that dynamic/latest resolution should be used.
+        """
+        q = query.strip()
+        # 1. Match standard meeting entity IDs or seeded codes (meet_..., today_sync, camp_day_...)
+        m = re.search(r'\b(meet_[a-zA-Z0-9_]+|today_sync|camp_day_\d+)\b', q, re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+
+        # 2. Match explicit "meeting <CODE>" or "session <CODE>" where CODE is not a generic/filler word
+        m_code = re.search(r'\b(?:meeting|session|ميتينج|جلسة|اجتماع)\s+([a-zA-Z0-9_-]+)\b', q, re.IGNORECASE)
+        if m_code:
+            candidate = m_code.group(1).strip()
+            generic_words = {
+                "today", "yesterday", "tomorrow", "now", "last", "latest", "next", "upcoming",
+                "attendance", "sync", "call", "النهاردة", "اليوم", "امس", "أمس", "السابق", "القادم", "حضور",
+                "اخر", "آخر", "الاخير", "الأخير", "الاخيرة", "الأخيرة", "امبارح", "الماضي", "السابقة", "فات"
+            }
+            if candidate.lower() not in generic_words:
+                return candidate
+
+        return None
+
     async def run_step(
         self,
         query: str,
@@ -209,7 +439,7 @@ class ReActAgent:
         state = CONVERSATION_STATE.setdefault(scoped_state_key, {
             "last_absent_student_ids": [],
             "last_absent_students": [],
-            "last_meeting_id": "today_sync",
+            "last_meeting_id": None,
             "history": []
         })
 
@@ -273,7 +503,7 @@ class ReActAgent:
         stats_triggers = ["stats", "overview", "summary", "dashboard", "احصائيات", "إحصائيات", "ملخص", "تقرير شامل"]
         if any(s in query_clean.lower() for s in stats_triggers):
             tool_name = "get_meeting_attendance"
-            att_params = {"meeting_id": "today_sync"}
+            att_params = {"meeting_id": "latest"}
             if user_role == "team_lead" and team_id:
                 att_params["team_id"] = team_id
             att_result, att_status = await self.execute_tool(tool_name, att_params, db)
@@ -309,9 +539,14 @@ class ReActAgent:
             return AgentChatResponse(conversation_id=conversation_id, response=resp_text, tool_executions=tool_executions)
 
         # ── INTENT 1: Attendance ──────────────────────────────────────────
-        elif any(w in query_clean.lower() for w in ["absent", "غياب", "غائب", "غاب", "attendance", "حضور", "حضر", "مين غايب", "مين حضر"]):
+        elif any(w in query_clean.lower() for w in [
+            "absent", "absence", "attendance", "attended", "present",
+            "غياب", "غائب", "غايب", "غاب",
+            "حضور", "حضر", "حاضر"
+        ]):
             tool_name = "get_meeting_attendance"
-            params = {"meeting_id": "today_sync"}
+            explicit_meeting = self.extract_meeting_query(query_clean)
+            params = {"meeting_id": explicit_meeting if explicit_meeting else "latest"}
             if user_role == "team_lead" and team_id:
                 params["team_id"] = team_id
             result, status = await self.execute_tool(tool_name, params, db)
@@ -322,11 +557,17 @@ class ReActAgent:
             absent_list = result.get("absent_students", []) if isinstance(result, dict) else []
             state["last_absent_student_ids"] = [s["student_id"] for s in absent_list]
             state["last_absent_students"] = absent_list
-            state["last_meeting_id"] = result.get("meeting", {}).get("id", "today_sync")
+            state["last_meeting_id"] = result.get("meeting", {}).get("id") if isinstance(result, dict) else None
             audit_entry = await AuditService.record_action(
                 db=db, intent="QUERY_ATTENDANCE", tool_name=tool_name,
                 parameters=params, result=result, user_id=acting_user, status="EXECUTED"
             )
+            if isinstance(result, dict) and not result.get("success", True):
+                err_msg = result.get("message", "Meeting not found.")
+                resp_text = f"تعذر جلب سجل الحضور: {err_msg}" if is_arabic else f"Could not retrieve attendance: {err_msg}"
+                return AgentChatResponse(conversation_id=conversation_id, response=resp_text,
+                                         tool_executions=tool_executions, audit_id=audit_entry.id)
+
             if is_arabic:
                 absent_names = [f"• {s['arabic_name']} ({s['phone']})" for s in absent_list]
                 names_str = "\n".join(absent_names) if absent_names else "لا يوجد غائبون اليوم!"
@@ -353,7 +594,7 @@ class ReActAgent:
         elif any(w in query_clean.lower() for w in ["remind", "ذكر", "تذكير", "رسالة", "message", "فكرهم", "ابعت", "notify"]):
             target_ids = state.get("last_absent_student_ids", [])
             if not target_ids:
-                att_p = {"meeting_id": "today_sync"}
+                att_p = {"meeting_id": "latest"}
                 if user_role == "team_lead" and team_id:
                     att_p["team_id"] = team_id
                 att_res, _ = await self.execute_tool("get_meeting_attendance", att_p, db)
@@ -408,25 +649,74 @@ class ReActAgent:
 
         # ── INTENT 3: Score / Evaluation ──────────────────────────────────
         elif any(w in query_clean.lower() for w in ["score", "درجة", "درجات", "تقييم", "points", "نقاط", "evaluation", "behavior", "سلوك"]):
-            target_name = "std_ziad"
-            if "ali" in query_clean.lower() or "علي" in query_clean or "alaa" in query_clean.lower():
-                target_name = "std_ali"
-            elif "salma" in query_clean.lower() or "سلمى" in query_clean or "hanan" in query_clean.lower():
-                target_name = "std_salma"
-            params = {"student_id_or_name": target_name}
+            target_name = self.extract_student_query(query_clean)
+            if not target_name:
+                resp_text = (
+                    "يرجى تحديد اسم الطالب أو كود الطالب لعرض التقييم (مثال: 'تقييم زياد محمد' أو 'تقييم CORE-2026-001')."
+                    if is_arabic else
+                    "Please specify the student's name or student code to view their evaluation score (e.g., 'Show score for Ziad Mohamed' or 'Score for CORE-2026-001')."
+                )
+                return AgentChatResponse(conversation_id=conversation_id, response=resp_text, tool_executions=[])
+
+            # Dynamic identity resolution via tool_get_student / IdentityMatcher
+            lookup_res = await tool_get_student(db, target_name)
+
+            # Handle Ambiguous resolution
+            if lookup_res.get("ambiguous"):
+                matches = lookup_res.get("matches", [])
+                if is_arabic:
+                    names = [f"• {m.get('arabic_name') or m.get('name')} (كود: {m.get('student_code') or m.get('id')})" for m in matches]
+                    names_str = "\n".join(names)
+                    resp_text = (
+                        f"تم العثور على أكثر من طالب يطابق '{target_name}':\n{names_str}\n\n"
+                        f"يرجى إعادة المحاولة مع تحديد الاسم بالكامل أو كود الطالب بدقة."
+                    )
+                else:
+                    names = [f"• {m.get('name')} ({m.get('arabic_name')}) — Code: {m.get('student_code') or m.get('id')}" for m in matches]
+                    names_str = "\n".join(names)
+                    resp_text = (
+                        f"Multiple students found matching '{target_name}':\n{names_str}\n\n"
+                        f"Please re-try with the student's full name or exact student code."
+                    )
+                return AgentChatResponse(conversation_id=conversation_id, response=resp_text, tool_executions=[])
+
+            # Handle Not Found
+            if not lookup_res.get("found"):
+                resp_text = (
+                    f"لم يتم العثور على طالب يطابق '{target_name}'. يرجى التحقق من الاسم أو كود الطالب."
+                    if is_arabic else
+                    f"Student '{target_name}' not found. Please verify the student name or code."
+                )
+                return AgentChatResponse(conversation_id=conversation_id, response=resp_text, tool_executions=[])
+
+            # Resolved successfully to a single student
+            resolved_student = lookup_res["student"]
+            resolved_student_id = resolved_student["id"]
+
+            params = {"student_id_or_name": resolved_student_id}
             result, status = await self.execute_tool("get_student_score", params, db)
             tool_executions.append(ToolCallExecution(
                 tool_name="get_student_score", parameters=params, result=result, status=status,
-                reasoning_summary="Retrieving official evaluation scorecard..."
+                reasoning_summary=f"Retrieving official evaluation scorecard for {resolved_student.get('full_name')}..."
             ))
             audit_entry = await AuditService.record_action(
                 db=db, intent="GET_STUDENT_SCORE", tool_name="get_student_score",
                 parameters=params, result=result, user_id=acting_user, status="EXECUTED"
             )
+
+            if not result.get("found"):
+                resp_text = (
+                    f"لا يوجد سجل تقييم متاح للطالب {resolved_student.get('arabic_name') or resolved_student.get('full_name')}."
+                    if is_arabic else
+                    f"No score summary available for {resolved_student.get('full_name')}."
+                )
+                return AgentChatResponse(conversation_id=conversation_id, response=resp_text,
+                                         tool_executions=tool_executions, audit_id=audit_entry.id)
+
             sc = result.get("score_summary", {})
             if is_arabic:
                 resp_text = (
-                    f"**تقييم: {sc.get('arabic_name')}**\n\n"
+                    f"**تقييم: {sc.get('arabic_name') or sc.get('student_name')}**\n\n"
                     f"• الحضور: {sc.get('on_time_attendance_count')} في الميعاد | {sc.get('late_attendance_count')} متأخر | {sc.get('absence_count')} غياب\n"
                     f"• متوسط التاسكات: {sc.get('average_task_quality')} / 10\n"
                     f"• السلوك: {sc.get('total_behavior_score')} / 23\n"
@@ -542,7 +832,8 @@ class ReActAgent:
 
         # Core HR Operations
         return any(w in q for w in [
-            "absent", "غياب", "غائب", "غاب", "attendance", "حضور", "حضر", "مين غايب", "مين حضر",
+            "absent", "absence", "attendance", "attended", "present",
+            "غياب", "غائب", "غايب", "غاب", "حضور", "حضر", "حاضر",
             "remind", "ذكر", "تذكير", "فكرهم", "ابعت", "رسالة", "message", "notify",
             "score", "درجة", "درجات", "تقييم", "points", "نقاط", "evaluation", "behavior", "سلوك",
             "task", "تاسك", "تاسكات", "submission", "تسليم", "واجب", "pending",
