@@ -88,17 +88,45 @@ class IdentityMatcher:
 
         # Tier 2: Arabic / Normalized Name Match
         norm_name = cls.normalize_text(display_name)
-        if norm_name:
-            for s in students:
-                norm_arabic = cls.normalize_text(s.get("arabic_name", ""))
-                matched, conf = cls._match_name_tokens(norm_name, norm_arabic)
-                if matched:
-                    return MatchResult(student_id=s["id"], confidence=conf, matched_by="ARABIC_NAME")
-                
-                norm_full = cls.normalize_text(s.get("full_name", ""))
-                matched, conf = cls._match_name_tokens(norm_name, norm_full)
-                if matched:
-                    return MatchResult(student_id=s["id"], confidence=conf, matched_by="LATIN_NAME")
+        if not norm_name:
+            return MatchResult(student_id=None, confidence=0.0, matched_by="NONE")
+
+        best_candidates = []
+        highest_conf = 0.0
+
+        for s in students:
+            student_best_conf = 0.0
+            student_matched_by = ""
+
+            norm_arabic = cls.normalize_text(s.get("arabic_name", ""))
+            matched_ar, conf_ar = cls._match_name_tokens(norm_name, norm_arabic)
+            if matched_ar and conf_ar > student_best_conf:
+                student_best_conf = conf_ar
+                student_matched_by = "ARABIC_NAME"
+
+            norm_full = cls.normalize_text(s.get("full_name", ""))
+            matched_en, conf_en = cls._match_name_tokens(norm_name, norm_full)
+            if matched_en and conf_en > student_best_conf:
+                student_best_conf = conf_en
+                student_matched_by = "LATIN_NAME"
+
+            if student_best_conf > 0.0:
+                # Epsilon for float comparison
+                if student_best_conf > highest_conf + 0.001:
+                    highest_conf = student_best_conf
+                    best_candidates = [(s["id"], student_best_conf, student_matched_by)]
+                elif abs(student_best_conf - highest_conf) <= 0.001:
+                    best_candidates.append((s["id"], student_best_conf, student_matched_by))
+
+        if best_candidates:
+            if len(best_candidates) == 1:
+                return MatchResult(
+                    student_id=best_candidates[0][0],
+                    confidence=best_candidates[0][1],
+                    matched_by=best_candidates[0][2]
+                )
+            else:
+                return MatchResult(student_id=None, confidence=highest_conf, matched_by="AMBIGUOUS")
 
         return MatchResult(student_id=None, confidence=0.0, matched_by="NONE")
 

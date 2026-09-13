@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 import json
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
+from app.services.identity_matcher import IdentityMatcher
 from app.models.entities import Student, Meeting, Event, Task, Submission, AttendanceRecord, ScoreRecord
 from app.services.attendance_service import AttendanceService, AttendancePolicyEngine
 from app.services.scoring_service import ScoringService
@@ -44,34 +45,182 @@ def escape_like(val: str) -> str:
 # =========================================================
 
 async def tool_get_student(db: AsyncSession, student_id_or_name: str) -> dict:
-    """Retrieve full student profile by ID, email, or name."""
-    query = student_id_or_name.strip().lower()
+    """Retrieve full student profile by ID, code, email, or name with dynamic identity resolution."""
+    raw_query = student_id_or_name.strip()
+    if not raw_query:
+        return {"found": False, "message": "No student identifier provided."}
+
+    query = raw_query.lower()
     escaped = escape_like(query)
+
+    # 1. Direct match by ID (primary key) or exact student_code
+    exact_res = await db.execute(
+        select(Student).where(
+            (Student.id == raw_query) |
+            (func.lower(Student.student_code) == query)
+        )
+    )
+    exact_student = exact_res.scalar_one_or_none()
+    if exact_student:
+        return {
+            "found": True,
+            "student": {
+                "id": exact_student.id,
+                "student_code": exact_student.student_code,
+                "full_name": exact_student.full_name,
+                "arabic_name": exact_student.arabic_name,
+                "email": exact_student.email,
+                "phone": exact_student.phone,
+                "role": exact_student.role,
+                "status": exact_student.status,
+                "university": exact_student.university
+            }
+        }
+
+    # 2. Exact email match
+    email_res = await db.execute(
+        select(Student).where(func.lower(Student.email) == query)
+    )
+    email_student = email_res.scalar_one_or_none()
+    if email_student:
+        return {
+            "found": True,
+            "student": {
+                "id": email_student.id,
+                "student_code": email_student.student_code,
+                "full_name": email_student.full_name,
+                "arabic_name": email_student.arabic_name,
+                "email": email_student.email,
+                "phone": email_student.phone,
+                "role": email_student.role,
+                "status": email_student.status,
+                "university": email_student.university
+            }
+        }
+
+    # 3. Dynamic multi-tier name resolution using IdentityMatcher across students
+    all_res = await db.execute(select(Student))
+    all_students = all_res.scalars().all()
+    if not all_students:
+        return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
+
+    norm_query = IdentityMatcher.normalize_text(raw_query)
+
+    exact_name_matches = []
+    token_matches = []
+
+    for s in all_students:
+        norm_ar = IdentityMatcher.normalize_text(s.arabic_name or "")
+        norm_en = IdentityMatcher.normalize_text(s.full_name or "")
+
+        # Check exact normalized full name match
+        if norm_query and (norm_query == norm_ar or norm_query == norm_en):
+            exact_name_matches.append(s)
+            continue
+
+        # Check token matching via IdentityMatcher
+        matched_ar, conf_ar = IdentityMatcher._match_name_tokens(norm_query, norm_ar)
+        matched_en, conf_en = IdentityMatcher._match_name_tokens(norm_query, norm_en)
+
+        if matched_ar or matched_en:
+            conf = max(conf_ar, conf_en)
+            token_matches.append((s, conf))
+
+    # Evaluate exact normalized name matches first
+    if len(exact_name_matches) == 1:
+        s = exact_name_matches[0]
+        return {
+            "found": True,
+            "student": {
+                "id": s.id,
+                "student_code": s.student_code,
+                "full_name": s.full_name,
+                "arabic_name": s.arabic_name,
+                "email": s.email,
+                "phone": s.phone,
+                "role": s.role,
+                "status": s.status,
+                "university": s.university
+            }
+        }
+    elif len(exact_name_matches) > 1:
+        return {
+            "found": False,
+            "ambiguous": True,
+            "matches": [
+                {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
+                for s in exact_name_matches
+            ],
+            "message": f"Multiple students found matching '{student_id_or_name}'."
+        }
+
+    # Evaluate token matches
+    if len(token_matches) == 1:
+        s = token_matches[0][0]
+        return {
+            "found": True,
+            "student": {
+                "id": s.id,
+                "student_code": s.student_code,
+                "full_name": s.full_name,
+                "arabic_name": s.arabic_name,
+                "email": s.email,
+                "phone": s.phone,
+                "role": s.role,
+                "status": s.status,
+                "university": s.university
+            }
+        }
+    elif len(token_matches) > 1:
+        return {
+            "found": False,
+            "ambiguous": True,
+            "matches": [
+                {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
+                for s, _ in token_matches
+            ],
+            "message": f"Multiple students found matching '{student_id_or_name}'."
+        }
+
+    # 4. Fallback SQL ILIKE substring search (safety net for partial codes or IDs)
     res = await db.execute(
         select(Student).where(
-            (Student.id == student_id_or_name) |
+            (Student.id.ilike(f"%{escaped}%")) |
+            (Student.student_code.ilike(f"%{escaped}%")) |
             (Student.email.ilike(f"%{escaped}%")) |
             (Student.full_name.ilike(f"%{escaped}%")) |
             (Student.arabic_name.ilike(f"%{escaped}%"))
         )
     )
-    student = res.scalar_one_or_none()
-    if not student:
-        return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
-    return {
-        "found": True,
-        "student": {
-            "id": student.id,
-            "student_code": student.student_code,
-            "full_name": student.full_name,
-            "arabic_name": student.arabic_name,
-            "email": student.email,
-            "phone": student.phone,
-            "role": student.role,
-            "status": student.status,
-            "university": student.university
+    like_students = res.scalars().all()
+    if len(like_students) == 1:
+        s = like_students[0]
+        return {
+            "found": True,
+            "student": {
+                "id": s.id,
+                "student_code": s.student_code,
+                "full_name": s.full_name,
+                "arabic_name": s.arabic_name,
+                "email": s.email,
+                "phone": s.phone,
+                "role": s.role,
+                "status": s.status,
+                "university": s.university
+            }
         }
-    }
+    elif len(like_students) > 1:
+        return {
+            "found": False,
+            "ambiguous": True,
+            "matches": [
+                {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "student_code": s.student_code}
+                for s in like_students
+            ],
+            "message": f"Multiple students found matching '{student_id_or_name}'."
+        }
+
+    return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
 
 
 async def tool_search_students(db: AsyncSession, query: str) -> dict:
@@ -355,6 +504,13 @@ async def tool_get_student_score(db: AsyncSession, student_id_or_name: str) -> d
     # Find student ID first
     s_lookup = await tool_get_student(db, student_id_or_name)
     if not s_lookup.get("found"):
+        if s_lookup.get("ambiguous"):
+            return {
+                "found": False,
+                "ambiguous": True,
+                "matches": s_lookup.get("matches", []),
+                "message": s_lookup.get("message", f"Multiple students found matching '{student_id_or_name}'.")
+            }
         return {"found": False, "message": f"Student '{student_id_or_name}' not found."}
     
     student_id = s_lookup["student"]["id"]
