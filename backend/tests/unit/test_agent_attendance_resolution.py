@@ -277,3 +277,200 @@ async def test_arabic_attendance_queries_route_to_get_meeting_attendance(populat
     assert call.parameters.get("meeting_id") == "latest"
     assert call.result["meeting"]["id"] == "meet_media_sync"
 
+
+# ---------------------------------------------------------------------------
+# Test 7: Student-specific attendance by full student name
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_student_attendance_by_full_name(populated_db: AsyncSession):
+    """
+    Asking for a specific student's attendance by name routes to get_student_attendance
+    via tool_get_student identity resolution and returns their full attendance history.
+    """
+    agent_resp = await agent_engine.run_step(
+        query="What is Student One's attendance?",
+        conversation_id="test_conv_stu_name",
+        db=populated_db,
+        user_role="HR_LEAD"
+    )
+    assert agent_resp is not None
+    assert len(agent_resp.tool_executions) == 1
+    call = agent_resp.tool_executions[0]
+    assert call.tool_name == "get_student_attendance"
+    assert call.parameters.get("student_id") == "std_test_1"
+    assert call.status == "SUCCESS"
+    assert "Student One" in agent_resp.response
+    assert "Attendance History" in agent_resp.response
+    assert "Session 2: Architecture Review" in agent_resp.response
+
+
+# ---------------------------------------------------------------------------
+# Test 8: Student-specific attendance by student code
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("query_text", [
+    "What is TEST-001's attendance?",
+    "Attendance for TEST-001",
+    "TEST-001 attendance"
+])
+async def test_student_attendance_by_student_code(populated_db: AsyncSession, query_text: str):
+    """
+    Queries using standard student codes (e.g. TEST-001) route directly to get_student_attendance.
+    """
+    agent_resp = await agent_engine.run_step(
+        query=query_text,
+        conversation_id=f"test_conv_code_{hash(query_text)}",
+        db=populated_db,
+        user_role="HR_LEAD"
+    )
+    assert agent_resp is not None
+    assert len(agent_resp.tool_executions) == 1
+    call = agent_resp.tool_executions[0]
+    assert call.tool_name == "get_student_attendance"
+    assert call.parameters.get("student_id") == "std_test_1"
+    assert call.status == "SUCCESS"
+
+
+# ---------------------------------------------------------------------------
+# Test 9: Arabic student-specific attendance queries
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("query_text", [
+    "حضور طالب واحد",
+    "سجل حضور طالب واحد",
+    "ما هو حضور طالب واحد؟"
+])
+async def test_arabic_student_specific_attendance(populated_db: AsyncSession, query_text: str):
+    """
+    Arabic student attendance queries route to get_student_attendance and return
+    Arabic localized attendance records.
+    """
+    agent_resp = await agent_engine.run_step(
+        query=query_text,
+        conversation_id=f"test_conv_ar_stu_{hash(query_text)}",
+        db=populated_db,
+        user_role="HR_LEAD"
+    )
+    assert agent_resp is not None
+    assert len(agent_resp.tool_executions) == 1
+    call = agent_resp.tool_executions[0]
+    assert call.tool_name == "get_student_attendance"
+    assert call.parameters.get("student_id") == "std_test_1"
+    assert call.status == "SUCCESS"
+    assert "سجل حضور الطالب" in agent_resp.response
+    assert "طالب واحد" in agent_resp.response
+
+
+# ---------------------------------------------------------------------------
+# Test 10: Unknown student returns clear feedback without crashing
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_student_attendance_unknown_student(populated_db: AsyncSession):
+    """
+    When asking for a nonexistent student's attendance, a clear error response is
+    returned and no secondary tool is executed.
+    """
+    agent_resp = await agent_engine.run_step(
+        query="What is Nonexistent Person's attendance?",
+        conversation_id="test_conv_unknown_stu",
+        db=populated_db,
+        user_role="HR_LEAD"
+    )
+    assert agent_resp is not None
+    assert len(agent_resp.tool_executions) == 0
+    assert "not found" in agent_resp.response.lower()
+
+
+# ---------------------------------------------------------------------------
+# Test 11: Ambiguous student name returns disambiguation prompt
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_student_attendance_ambiguous_name(populated_db: AsyncSession):
+    """
+    When multiple students match a name query, return an ambiguity disambiguation
+    list without executing get_student_attendance.
+    """
+    # Add two students with the same first name
+    db = populated_db
+    ambig_1 = Student(
+        id="std_ambig_1", student_code="AMB-001", full_name="Karim Tarek",
+        arabic_name="كريم طارق", email="karim.t@test.org", phone="+201099990001",
+        team_id="team_tech", status="ACTIVE"
+    )
+    ambig_2 = Student(
+        id="std_ambig_2", student_code="AMB-002", full_name="Karim Mohamed",
+        arabic_name="كريم محمد", email="karim.m@test.org", phone="+201099990002",
+        team_id="team_tech", status="ACTIVE"
+    )
+    db.add_all([ambig_1, ambig_2])
+    await db.commit()
+
+    agent_resp = await agent_engine.run_step(
+        query="What is Karim's attendance?",
+        conversation_id="test_conv_ambig_stu",
+        db=populated_db,
+        user_role="HR_LEAD"
+    )
+    assert agent_resp is not None
+    assert len(agent_resp.tool_executions) == 0
+    assert "Multiple students found matching 'Karim'" in agent_resp.response
+    assert "AMB-001" in agent_resp.response
+    assert "AMB-002" in agent_resp.response
+
+
+# ---------------------------------------------------------------------------
+# Test 12: General meeting-level attendance regression guard
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("query_text", [
+    "Who was absent from today's meeting?",
+    "Who attended the meeting?",
+    "Show attendance report",
+    "مين غايب النهاردة؟"
+])
+async def test_general_meeting_queries_do_not_route_to_student_attendance(populated_db: AsyncSession, query_text: str):
+    """
+    Ensures that general attendance inquiries continue to route to get_meeting_attendance
+    and are NOT accidentally captured by student-specific routing.
+    """
+    agent_resp = await agent_engine.run_step(
+        query=query_text,
+        conversation_id=f"test_conv_regr_{hash(query_text)}",
+        db=populated_db,
+        user_role="HR_LEAD"
+    )
+    assert agent_resp is not None
+    assert len(agent_resp.tool_executions) == 1
+    call = agent_resp.tool_executions[0]
+    assert call.tool_name == "get_meeting_attendance"
+
+
+# ---------------------------------------------------------------------------
+# Test 13: Student attendance query with meeting qualifier
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_student_attendance_with_meeting_qualifier(populated_db: AsyncSession):
+    """
+    Queries like 'Student One's attendance in Session 2' should still identify
+    Student One and return their attendance history.
+    """
+    agent_resp = await agent_engine.run_step(
+        query="What is Student One's attendance in Session 2?",
+        conversation_id="test_conv_qualifier",
+        db=populated_db,
+        user_role="HR_LEAD"
+    )
+    assert agent_resp is not None
+    assert len(agent_resp.tool_executions) == 1
+    call = agent_resp.tool_executions[0]
+    assert call.tool_name == "get_student_attendance"
+    assert call.parameters.get("student_id") == "std_test_1"
+    assert call.status == "SUCCESS"
+
