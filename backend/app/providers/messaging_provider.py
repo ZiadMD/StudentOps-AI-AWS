@@ -100,3 +100,22 @@ class MockMessagingProvider(MessagingProvider):
 
     def get_history(self) -> list[dict]:
         return list(self.sent_messages)
+
+
+def get_messaging_provider(provider_type: Optional[str] = None) -> MessagingProvider:
+    """
+    Factory function returning the configured MessagingProvider.
+    Allowed values: "mock" and "openwa".
+    Defaults to settings.MESSAGING_PROVIDER (default: "mock").
+    """
+    from app.core.config import settings
+
+    target = (provider_type or settings.MESSAGING_PROVIDER or "mock").strip().lower()
+
+    if target == "mock":
+        return MockMessagingProvider()
+    elif target == "openwa":
+        from app.providers.openwa_provider import OpenWAProvider
+        return OpenWAProvider()
+    else:
+        raise ValueError(f"Unsupported messaging provider: '{target}'. Allowed values are 'mock' and 'openwa'.")

@@ -1,4 +1,3 @@
-from app.models.schemas import PermissionContext
 """
 Agent Tool Registry and Controlled Execution Handlers.
 """
@@ -7,8 +6,10 @@ from datetime import datetime, timezone
 import json
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
+from app.models.schemas import PermissionContext
+from app.core.config import settings
 from app.services.identity_matcher import IdentityMatcher
 from app.models.entities import Student, Meeting, Event, Task, Submission, AttendanceRecord, ScoreRecord
 from app.core.time import as_utc
@@ -16,10 +17,9 @@ from app.services.attendance_service import AttendanceService, AttendancePolicyE
 from app.services.scoring_service import ScoringService
 from app.services.calendar_service import CalendarService
 from app.services.reminder_service import ReminderService
-from app.core.config import settings
 from app.providers.attendance_provider import GoogleMeetAttendanceProvider, MockAttendanceProvider
 from app.providers.calendar_provider import GoogleCalendarProvider, MockCalendarProvider
-from app.providers.messaging_provider import MockMessagingProvider
+from app.providers.messaging_provider import get_messaging_provider, MockMessagingProvider
 from app.providers.openwa_provider import OpenWAProvider
 
 
@@ -33,11 +33,17 @@ class ToolCategory:
 use_live_providers = settings.ENVIRONMENT.lower() == "production" or settings.MESSAGING_PROVIDER.lower() == "openwa"
 meet_provider = GoogleMeetAttendanceProvider() if use_live_providers else MockAttendanceProvider()
 cal_provider = GoogleCalendarProvider() if use_live_providers else MockCalendarProvider()
-msg_provider = OpenWAProvider() if use_live_providers else MockMessagingProvider()
 
 attendance_service = AttendanceService(meet_provider)
 calendar_service = CalendarService(cal_provider)
-reminder_service = ReminderService(msg_provider)
+
+
+def get_reminder_service() -> ReminderService:
+    """Returns a ReminderService configured with the current messaging provider factory."""
+    return ReminderService(get_messaging_provider())
+
+
+reminder_service = get_reminder_service()
 
 
 def escape_like(val: str) -> str:
@@ -286,7 +292,8 @@ async def tool_get_student(
             "message": f"Multiple students found matching '{raw_query}'."
         }
 
-    return {"found": False, "message": f"Student '{raw_query}' not found or outside your team scope."}
+    msg = f"Student '{raw_query}' not found or outside your team scope." if (real_context and not real_context.is_admin_override and real_context.team_id) else f"Student '{raw_query}' not found."
+    return {"found": False, "message": msg}
 
 
 async def tool_search_students(db: AsyncSession, context: PermissionContext, query: str) -> dict:
@@ -419,37 +426,63 @@ async def tool_get_meeting(db: AsyncSession, context: PermissionContext, meeting
     }
 
 
-async def tool_get_meeting_attendance(db: AsyncSession, context: PermissionContext, meeting_id: Optional[str] = None) -> dict:
+async def tool_get_meeting_attendance(
+    db: AsyncSession,
+    context: Any = None,
+    meeting_id: Optional[str] = None,
+    team_id: Optional[str] = None,
+    **kwargs
+) -> dict:
     """
     Retrieve or compute deterministic attendance for a meeting.
-    Defaults to the latest relevant meeting. Enforces context team_id.
+    Defaults to the latest relevant meeting. Enforces context team_id and parameters team_id.
     """
-    if not meeting_id or meeting_id in ("today", "latest"):
-        meeting_query = select(Meeting).order_by(Meeting.start_time.desc())
-        if not context.is_admin_override:
-            if not context.team_id:
-                return {"success": False, "message": "Unauthorized: Missing team scope."}
-            meeting_query = meeting_query.where(Meeting.team_id == context.team_id)
+    if isinstance(context, str) and meeting_id is None:
+        real_meeting_id = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        real_meeting_id = meeting_id or kwargs.get("meeting_id")
+    else:
+        real_context = kwargs.get("context")
+        real_meeting_id = meeting_id or (context if isinstance(context, str) else None)
+
+    target_team_id = None
+    if real_context and not real_context.is_admin_override:
+        if not real_context.team_id:
+            return {"success": False, "message": "Unauthorized: Missing team scope."}
+        target_team_id = real_context.team_id
+    elif team_id:
+        target_team_id = team_id
+
+    clean_id = (real_meeting_id or "").strip()
+    if not clean_id or clean_id.lower() in ("today", "latest"):
+        meeting_query = select(Meeting)
+        if target_team_id:
+            meeting_query = meeting_query.where((Meeting.team_id == target_team_id) | (Meeting.team_id.is_(None)))
+        meeting_query = meeting_query.order_by(Meeting.start_time.desc())
         meeting_res = await db.execute(meeting_query)
         meetings = list(meeting_res.scalars().all())
         if not meetings:
-            return {"success": False, "message": "No relevant meeting found."}
+            return {"success": False, "message": "No relevant meeting found." if real_context else "No meetings found."}
         now = datetime.now(timezone.utc)
         current = [
             m for m in meetings
             if as_utc(m.start_time) <= now
         ]
-        meeting_id = (current or list(reversed(meetings)))[0].id
-
-    # Find meeting
-    res = await db.execute(
-        select(Meeting).where((Meeting.id == meeting_id) | (Meeting.meeting_code == meeting_id))
-    )
-    meeting = res.scalar_one_or_none()
-    if not meeting:
-        return {"success": False, "message": f"Meeting '{meeting_id}' not found."}
-
-    target_team_id = None if context.is_admin_override else context.team_id
+        meeting = (current or list(meetings))[0]
+    else:
+        # Find meeting by explicit ID, meeting_code, or numeric session_number
+        conditions = [(Meeting.id == clean_id), (Meeting.meeting_code == clean_id)]
+        if clean_id.isdigit():
+            conditions.append(Meeting.session_number == int(clean_id))
+        stmt = select(Meeting).where(or_(*conditions))
+        if target_team_id:
+            stmt = stmt.where((Meeting.team_id == target_team_id) | (Meeting.team_id.is_(None)))
+        res = await db.execute(stmt)
+        meeting = res.scalar_one_or_none()
+        if not meeting:
+            return {"success": False, "message": f"Meeting '{clean_id}' not found."}
 
     # Fetch attendance records
     att_res = await db.execute(
@@ -642,8 +675,8 @@ async def tool_get_student_score(
                 "matches": s_lookup.get("matches", []),
                 "message": s_lookup.get("message", f"Multiple students found matching '{real_query}'.")
             }
-        return {"found": False, "message": s_lookup.get("message", f"Student '{real_query}' not found or outside your team scope.")}
-    
+        return {"found": False, "message": s_lookup.get("message", f"Student '{real_query}' not found.")}
+
     student_id = s_lookup["student"]["id"]
     summary = await ScoringService.get_student_score_summary(student_id, db)
     if not summary:
@@ -671,20 +704,36 @@ async def tool_get_scores(db: AsyncSession, context: PermissionContext) -> dict:
     }
 
 
-async def tool_prepare_reminder(db: AsyncSession, context: PermissionContext,
-    student_ids: list[str],
+async def tool_prepare_reminder(
+    db: AsyncSession,
+    context: Any = None,
+    student_ids: Optional[list[str]] = None,
     event_id: Optional[str] = None,
-    custom_message: Optional[str] = None
+    custom_message: Optional[str] = None,
+    team_id: Optional[str] = None,
+    **kwargs
 ) -> dict:
     """
     Drafts a reminder message for specified students without sending.
     Enforces context team scope.
     """
-    query = select(Student).where(Student.id.in_(student_ids))
-    if not context.is_admin_override:
-        if not context.team_id:
+    if isinstance(context, list) and student_ids is None:
+        student_ids = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        student_ids = student_ids or kwargs.get("student_ids", [])
+    else:
+        real_context = kwargs.get("context")
+        student_ids = student_ids or (context if isinstance(context, list) else []) or kwargs.get("student_ids", [])
+
+    query = select(Student).where(Student.id.in_(student_ids or []))
+    if real_context and not real_context.is_admin_override:
+        if not real_context.team_id:
             return {"success": False, "message": "Unauthorized: Missing team scope."}
-        query = query.where(Student.team_id == context.team_id)
+        query = query.where(Student.team_id == real_context.team_id)
+    elif team_id:
+        query = query.where(Student.team_id == team_id)
         
     res = await db.execute(query)
     students = res.scalars().all()
@@ -698,70 +747,84 @@ async def tool_prepare_reminder(db: AsyncSession, context: PermissionContext,
             select(Meeting).where((Meeting.id == event_id) | (Meeting.meeting_code == event_id))
         )
         event = evt_res.scalar_one_or_none()
+        if not event:
+            ev_res = await db.execute(select(Event).where(Event.id == event_id))
+            event = ev_res.scalar_one_or_none()
+    if not event:
+        event_schema = await calendar_service.get_next_meeting(db)
+        if event_schema:
+            ev_res = await db.execute(select(Event).where(Event.id == event_schema.id))
+            event = ev_res.scalar_one_or_none()
         
-    # Generate generic draft
-    msg = custom_message if custom_message else "This is an automated reminder regarding your upcoming tasks or meetings. Please check your dashboard."
+    if custom_message:
+        msg = custom_message
+    elif event:
+        service = get_reminder_service()
+        msg = service.generate_meeting_reminder_text(
+            student_name=students[0].arabic_name or students[0].full_name,
+            event_title=event.title,
+            event_time=getattr(event, "start_time", datetime.now(timezone.utc)),
+            meet_url=getattr(event, "meet_url", "") or ""
+        )
+    else:
+        msg = "This is an automated reminder regarding your upcoming tasks or meetings. Please check your dashboard."
     
     return {
         "success": True,
         "target_count": len(students),
         "event": {"id": event.id, "title": event.title} if event else None,
         "message_preview": msg,
-        "student_ids_verified": [s.id for s in students]
-    }
-
-    # Fetch event
-    event = None
-    if event_id:
-        ev_res = await db.execute(select(Event).where(Event.id == event_id))
-        event = ev_res.scalar_one_or_none()
-    if not event:
-        # Fallback to next meeting
-        event_schema = await calendar_service.get_next_meeting(db)
-        if event_schema:
-            ev_res = await db.execute(select(Event).where(Event.id == event_schema.id))
-            event = ev_res.scalar_one_or_none()
-
-    preview_text = reminder_service.generate_meeting_reminder_text(
-        student_name=students[0].arabic_name or students[0].full_name,
-        event_title=event.title if event else "الاجتماع القادم",
-        event_time=event.start_time if event else datetime.now(timezone.utc),
-        meet_url=event.meet_url if event else ""
-    )
-
-    return {
-        "success": True,
-        "target_count": len(students),
+        "student_ids_verified": [s.id for s in students],
         "recipients": [
             {"id": s.id, "name": s.full_name, "arabic_name": s.arabic_name, "phone": s.phone}
             for s in students
         ],
-        "event": {
-            "id": event.id if event else None,
-            "title": event.title if event else None,
-            "time": event.start_time.isoformat() if event else None,
-            "meet_url": event.meet_url if event else None
-        } if event else None,
-        "message_preview": preview_text,
         "channel": "WHATSAPP",
         "requires_confirmation": True
     }
 
 
-async def tool_send_reminder(db: AsyncSession, context: PermissionContext,
-    student_ids: list[str],
+async def tool_send_reminder(
+    db: AsyncSession,
+    context: Any = None,
+    student_ids: Optional[list[str]] = None,
     event_id: Optional[str] = None,
     custom_message: Optional[str] = None,
     channel: str = "WHATSAPP",
-    is_confirmed: bool = False
+    is_confirmed: bool = False,
+    team_id: Optional[str] = None,
+    **kwargs
 ) -> dict:
     """
     Sends reminders to students.
     EXTERNAL ACTION: Requires confirmation before sending. Enforces context team scope.
     """
-    if not context.is_confirmed_action:
+    if isinstance(context, list) and student_ids is None:
+        student_ids = context
+        real_context = kwargs.get("context")
+    elif isinstance(context, PermissionContext):
+        real_context = context
+        student_ids = student_ids or kwargs.get("student_ids", [])
+    else:
+        real_context = kwargs.get("context")
+        student_ids = student_ids or (context if isinstance(context, list) else []) or kwargs.get("student_ids", [])
+
+    is_confirmed_action = False
+    if real_context:
+        is_confirmed_action = real_context.is_confirmed_action
+    if is_confirmed:
+        is_confirmed_action = True
+
+    if not is_confirmed_action:
         # Intercept and demand confirmation
-        prep = await tool_prepare_reminder(db, context, student_ids, event_id, custom_message)
+        prep = await tool_prepare_reminder(
+            db=db,
+            context=real_context,
+            student_ids=student_ids,
+            event_id=event_id,
+            custom_message=custom_message,
+            team_id=team_id
+        )
         if not prep.get("success"):
             return prep
         return {
@@ -771,11 +834,13 @@ async def tool_send_reminder(db: AsyncSession, context: PermissionContext,
         }
 
     # Fetch students
-    query = select(Student).where(Student.id.in_(student_ids))
-    if not context.is_admin_override:
-        if not context.team_id:
+    query = select(Student).where(Student.id.in_(student_ids or []))
+    if real_context and not real_context.is_admin_override:
+        if not real_context.team_id:
             return {"success": False, "message": "Unauthorized: Missing team scope."}
-        query = query.where(Student.team_id == context.team_id)
+        query = query.where(Student.team_id == real_context.team_id)
+    elif team_id:
+        query = query.where(Student.team_id == team_id)
         
     res = await db.execute(query)
     students = res.scalars().all()
@@ -784,10 +849,16 @@ async def tool_send_reminder(db: AsyncSession, context: PermissionContext,
 
     event = None
     if event_id:
-        ev_res = await db.execute(select(Event).where(Event.id == event_id))
-        event = ev_res.scalar_one_or_none()
+        evt_res = await db.execute(
+            select(Meeting).where((Meeting.id == event_id) | (Meeting.meeting_code == event_id))
+        )
+        event = evt_res.scalar_one_or_none()
+        if not event:
+            ev_res = await db.execute(select(Event).where(Event.id == event_id))
+            event = ev_res.scalar_one_or_none()
 
-    result = await reminder_service.send_reminders(
+    service = get_reminder_service()
+    result = await service.send_reminders(
         students=list(students),
         event=event,
         custom_message=custom_message,
@@ -804,13 +875,16 @@ async def tool_send_reminder(db: AsyncSession, context: PermissionContext,
 TOOL_DEFINITIONS = [
     {
         "name": "get_meeting_attendance",
-        "description": "Retrieves the deterministic attendance record for a meeting.",
+        "description": "Retrieves the deterministic attendance record for a meeting (defaults to latest meeting). Identifies present, late, and absent students.",
         "category": ToolCategory.READ_ONLY,
         "required_roles": ["region_hr_head", "hr_admin", "committee_head", "committee_hr_leader", "committee_hr_member", "team_lead"],
         "parameters": {
             "type": "object",
             "properties": {
-                "meeting_id": {"type": "string"}
+                "meeting_id": {
+                    "type": "string",
+                    "description": "The ID or code of the meeting (e.g., 'meet_21_08', or omit for latest meeting)."
+                }
             }
         }
     },

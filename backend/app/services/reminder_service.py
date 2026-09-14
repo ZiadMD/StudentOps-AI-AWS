@@ -15,8 +15,12 @@ from app.providers.messaging_provider import MessagingProvider, OutgoingMessage
 class ReminderService:
     """Handles targeting students who need reminders and executing notifications."""
 
-    def __init__(self, provider: MessagingProvider):
-        self.provider = provider
+    def __init__(self, provider: Optional[MessagingProvider] = None):
+        if provider is None:
+            from app.providers.messaging_provider import get_messaging_provider
+            self.provider = get_messaging_provider()
+        else:
+            self.provider = provider
 
     async def find_absent_students_for_meeting(self, meeting_id: str, db: AsyncSession) -> list[Student]:
         """Finds all students who were absent from a specific meeting."""
@@ -108,19 +112,31 @@ class ReminderService:
                     recipient_phone=s.phone,
                     channel=channel,
                     message_content=msg_body,
-                    status="SENT",
+                    status="PENDING",
                     trigger_source=trigger_source
                 )
                 db.add(reminder_log)
 
         delivery_results = await self.provider.send_batch(outgoing_msgs)
+
         if db:
+            for s, res in zip(students, delivery_results):
+                log_status = "SENT"
+                if not res.success:
+                    if getattr(res, "is_uncertain", False) or getattr(res, "delivery_status", "") == "UNKNOWN_PENDING":
+                        log_status = "UNKNOWN_PENDING"
+                    else:
+                        log_status = "FAILED"
+                for obj in db.new:
+                    if isinstance(obj, ReminderLog) and obj.recipient_id == s.id:
+                        obj.status = log_status
             await db.commit()
 
         preview = outgoing_msgs[0].content if outgoing_msgs else ""
+        all_failed = len(delivery_results) > 0 and all(not r.success for r in delivery_results)
         return ReminderResult(
-            success=True,
-            sent_count=len(delivery_results),
+            success=not all_failed,
+            sent_count=sum(1 for r in delivery_results if r.success),
             recipients=recipients_data,
             message_preview=preview,
             channel=channel

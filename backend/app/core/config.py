@@ -22,10 +22,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    
+
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./studentops.db"
-    
+
     # Supabase PostgreSQL & Cloud Configuration (configured via environment)
     SUPABASE_URL: Optional[str] = None
     SUPABASE_PUBLISHABLE_KEY: Optional[str] = None
@@ -46,24 +46,28 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000",
         "https://studentops-ai.vercel.app",
     ]
-    
+
     # OpenRouter LLM
     OPENROUTER_API_KEY: Optional[str] = None
     OPENROUTER_MODEL: str = "nvidia/nemotron-3-super-120b-a12b:free"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    
+
     # Groq LLM (High-speed streaming & fallback)
     GROQ_API_KEY: Optional[str] = None
     GROQ_MODEL: str = "openai/gpt-oss-120b"
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
-    
+
     # Google Workspace / APIs
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_CALENDAR_ID: Optional[str] = "primary"
-    
+
+    # Agent Conversation State
+    AGENT_CONVERSATION_STATE_MAX_ENTRIES: int = 1000
+    AGENT_CONVERSATION_STATE_TTL_SECONDS: int = 86400  # 24 hours
+
     # Messaging
-    MESSAGING_PROVIDER: str = "mock"  # "mock" | "whatsapp" | "sms" | "openwa"
+    MESSAGING_PROVIDER: str = "mock"  # "mock" | "openwa"
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_PHONE_NUMBER: Optional[str] = None
@@ -74,16 +78,16 @@ class Settings(BaseSettings):
     OPENWA_WEBHOOK_SECRET: Optional[str] = None
     OPENWA_SESSION_ID: str = "ops_official"
     OPENWA_OFFICIAL_PHONE: Optional[str] = "+201000000000"  # Fallback display / configured official number
-    
+
     # Policy Thresholds
     ATTENDANCE_LATE_THRESHOLD_MINUTES: int = 10
     ATTENDANCE_MIN_PRESENT_PERCENT: float = 70.0
     ATTENDANCE_MIN_LATE_PERCENT: float = 50.0
-    
+
     # Scoring thresholds
     BEHAVIOR_MAX_SCORE: int = 23
     TASK_MAX_SCORE: int = 10
-    
+
     # JWT Authentication
     JWT_SECRET_KEY: str = "studentops-super-secret-jwt-key-for-dev-only-change-in-prod-12345"
     JWT_ALGORITHM: str = "HS256"
