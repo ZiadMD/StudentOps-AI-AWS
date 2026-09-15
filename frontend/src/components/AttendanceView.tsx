@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { api } from '../api/client';
 import { MeetingDetail, UserProfile } from '../types';
 import { Video, ArrowUpRight, Search, Plus, RefreshCw } from 'lucide-react';
 import { ProgressBar } from './ui/ProgressBar';
 import { Modal } from './ui/Modal';
+import { Skeleton, SkeletonCard } from './ui/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { useCachedData } from '../hooks/useCachedData';
 
 interface AttendanceViewProps {
   currentUser?: UserProfile | null;
@@ -12,9 +14,19 @@ interface AttendanceViewProps {
 
 export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) => {
   const toast = useToast();
-  const [meetings, setMeetings] = useState<MeetingDetail[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+
+  // Secure In-Memory Cached Meetings with SWR
+  const {
+    data: cachedMeetings,
+    loading,
+    refresh: loadMeetings,
+  } = useCachedData<MeetingDetail[]>(
+    'attendance_sessions',
+    () => api.getMeetings(),
+    { userId: currentUser?.id }
+  );
+  const meetings = cachedMeetings || [];
 
   // Schedule Session Modal (Committee Head)
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -40,21 +52,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
     currentUser?.role === 'region_hr_head' ||
     currentUser?.role === 'hr_admin';
 
-  const loadMeetings = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getMeetings();
-      setMeetings(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    loadMeetings();
-  }, []);
 
   const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,7 +143,58 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
 
       <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 text-sm">Loading attendance sessions…</div>
+          <div>
+            {/* Desktop Table Skeletons */}
+            <div className="hidden md:block">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3.5">Session / Event</th>
+                    <th className="px-5 py-3.5">Date &amp; Duration</th>
+                    <th className="px-5 py-3.5 w-72">Attendance Health</th>
+                    <th className="px-5 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i} className="border-b border-slate-100">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center space-x-3">
+                          <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                          <div className="space-y-1.5 flex-1 max-w-[220px]">
+                            <Skeleton className="h-4 w-3/4 rounded" />
+                            <Skeleton className="h-3 w-1/2 rounded" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="space-y-1.5 max-w-[150px]">
+                          <Skeleton className="h-3.5 w-4/5 rounded" />
+                          <Skeleton className="h-3 w-3/5 rounded" />
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="space-y-2 max-w-[240px]">
+                          <Skeleton className="h-3 w-full rounded-full" />
+                          <Skeleton className="h-3 w-1/2 rounded" />
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <Skeleton className="h-7 w-20 rounded-lg ml-auto" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card Skeletons */}
+            <div className="block md:hidden p-3 space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
         ) : (
           <>
             {/* Desktop Table View (hidden on mobile) */}
