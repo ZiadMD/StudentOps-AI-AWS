@@ -86,6 +86,7 @@ def upgrade() -> None:
         sa.Column('student_id', sa.String(length=36), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(['student_id'], ['students.id'], ),
         sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
         sa.PrimaryKeyConstraint('id')
         )
@@ -118,15 +119,6 @@ def upgrade() -> None:
         op.create_index(op.f('ix_students_id'), 'students', ['id'], unique=False)
         op.create_index(op.f('ix_students_student_code'), 'students', ['student_code'], unique=True)
         op.create_index(op.f('ix_students_team_id'), 'students', ['team_id'], unique=False)
-
-    if 'users' not in existing_tables and 'students' not in existing_tables:
-        op.create_foreign_key(
-            'fk_users_student_id_students',
-            'users',
-            'students',
-            ['student_id'],
-            ['id'],
-        )
 
     if 'automation_settings' not in existing_tables:
         op.create_table('automation_settings',
@@ -562,9 +554,6 @@ def downgrade() -> None:
         op.drop_index(op.f('ix_automation_settings_user_id'), table_name='automation_settings')
         op.drop_index(op.f('ix_automation_settings_id'), table_name='automation_settings')
         op.drop_table('automation_settings')
-
-    if 'users' in existing_tables and 'students' in existing_tables:
-        op.drop_constraint('fk_users_student_id_students', 'users', type_='foreignkey')
 
     if 'students' in existing_tables:
         op.drop_index(op.f('ix_students_team_id'), table_name='students')

@@ -504,6 +504,153 @@ class ReActAgent:
 
         return None
 
+    @staticmethod
+    def extract_student_attendance_query(query: str) -> Optional[str]:
+        """
+        Detects whether an attendance query targets a specific student.
+        Returns the student name/code if found, or None for general meeting queries.
+
+        Positive examples:
+          - "What is Karim Tarek's attendance?"       -> "Karim Tarek"
+          - "Show attendance for Karim Tarek"         -> "Karim Tarek"
+          - "Karim Tarek attendance"                  -> "Karim Tarek"
+          - "What is ST-2026-101's attendance?"        -> "ST-2026-101"
+          - "Attendance for ST-2026-101"              -> "ST-2026-101"
+          - "ST-2026-101 attendance"                  -> "ST-2026-101"
+          - "حضور كريم طارق"                           -> "كريم طارق"
+          - "سجل حضور كريم طارق"                      -> "كريم طارق"
+          - "حضور ST-2026-101"                        -> "ST-2026-101"
+
+        Negative examples (returns None for general meeting/roster questions):
+          - "Who was absent from today's meeting?"     -> None
+          - "Who attended the meeting?"                -> None
+          - "Show attendance"                          -> None
+          - "مين غايب النهاردة؟"                        -> None
+          - "مين كان غايب في آخر ميتينج؟"              -> None
+          - "غياب آخر ميتينج"                          -> None
+        """
+        q = query.strip()
+
+        # 1. Match explicit student entity ID (std_..., stu_...) or student code (e.g. ST-2026-101, TEST-001, CORE-2026-001)
+        code_match = re.search(
+            r'\b(std_[a-zA-Z0-9_]+|stu_[a-zA-Z0-9_]+|[A-Za-z]{2,5}-\d{4}-\d{3,4}|[A-Za-z]{2,5}-\d{3,4})\b',
+            q,
+            re.IGNORECASE
+        )
+        if code_match:
+            candidate_code = code_match.group(1).strip()
+            # Ensure it is not a meeting ID/code
+            if not candidate_code.lower().startswith(("meet_", "ev_", "camp_")):
+                return candidate_code
+
+        # 2. Normalize punctuation and remove trailing meeting/session qualifiers
+        cleaned = re.sub(r"['’]s\b", " ", q, flags=re.IGNORECASE)
+        cleaned = re.sub(r'[\?؟!،,\.:"\'`]', " ", cleaned).strip()
+
+        meeting_fillers = {
+            "today", "yesterday", "tomorrow", "now", "meeting", "session", "the", "this",
+            "last", "latest", "next", "upcoming", "who", "was", "were", "is", "are",
+            "from", "in", "at", "for", "of", "to", "all", "everyone", "anyone",
+            "someone", "rate", "report", "summary", "overview", "stats", "attendance",
+            "absence", "present", "absent", "attended", "records", "record", "history",
+            "show", "get", "check", "tell", "me", "please", "can", "you", "what"
+        }
+        meeting_fillers_ar = {
+            "في", "آخر", "اخر", "النهاردة", "اليوم", "امس", "أمس", "ميتينج", "اجتماع",
+            "جلسة", "السابق", "القادم", "حضور", "غياب", "حضر", "غاب", "حاضر", "غايب",
+            "الكل", "كل", "الجميع", "كام", "كم", "نسبة", "تقرير", "سجل", "سجلات",
+            "مين", "من", "هل", "كان", "كانت", "عرض", "ماهو", "ما", "هو", "هي"
+        }
+
+        # Strip trailing meeting qualifiers so "Karim Tarek's attendance in Session 2" leaves "Karim Tarek"
+        cleaned_no_meeting = re.sub(
+            r'\s+(?:in|at|during|for)\s+(?:the\s+)?(?:meeting|session|last\s+meeting|today\'?s?\s+meeting|sync|call).*$',
+            '', cleaned, flags=re.IGNORECASE
+        )
+        cleaned_no_meeting = re.sub(
+            r'\s+(?:في|خلال)\s+(?:الميتينج|الاجتماع|الجلسة|آخر\s+ميتينج|اجتماع\s+اليوم).*$',
+            '', cleaned_no_meeting
+        ).strip()
+
+        # 3. English Patterns
+        # Pattern A: "<NAME> attendance / <NAME>'s attendance"
+        m_suffix = re.search(
+            r'^(?:what\s+is\s+)?(?:show\s+)?(?:get\s+)?(?:view\s+)?(?:check\s+)?(?:tell\s+me\s+)?(?:can\s+you\s+)?(?:please\s+)?(.+?)\s+(?:attendance(?:\s+(?:record|records|history|report))?|presence|absence)\b',
+            cleaned_no_meeting,
+            re.IGNORECASE
+        )
+        if m_suffix:
+            candidate = m_suffix.group(1).strip()
+            candidate = re.sub(r'^(?:the\s+|a\s+|an\s+|student\s+|member\s+)', '', candidate, flags=re.IGNORECASE).strip()
+            words = [w.lower() for w in candidate.split()]
+            if words and not all(w in meeting_fillers for w in words):
+                return candidate
+
+        # Pattern B: "attendance for/of <NAME>"
+        m_prefix = re.search(
+            r'(?:attendance|presence|absence)(?:\s+(?:record|records|history|report))?\s+(?:for|of|about)\s+(.+)$',
+            cleaned_no_meeting,
+            re.IGNORECASE
+        )
+        if m_prefix:
+            candidate = m_prefix.group(1).strip()
+            candidate = re.sub(r'^(?:the\s+|a\s+|an\s+|student\s+|member\s+)', '', candidate, flags=re.IGNORECASE).strip()
+            words = [w.lower() for w in candidate.split()]
+            if words and not all(w in meeting_fillers for w in words):
+                return candidate
+
+        # Pattern C: "Did <NAME> attend? / Was <NAME> absent?"
+        m_did = re.search(
+            r'(?:did|was|is|has)\s+(.+?)\s+(?:attend|attended|absent|present|missed)\b',
+            cleaned_no_meeting,
+            re.IGNORECASE
+        )
+        if m_did:
+            candidate = m_did.group(1).strip()
+            candidate = re.sub(r'^(?:the\s+|a\s+|an\s+|student\s+|member\s+)', '', candidate, flags=re.IGNORECASE).strip()
+            words = [w.lower() for w in candidate.split()]
+            if words and not all(w in meeting_fillers for w in words):
+                return candidate
+
+        # 4. Arabic Patterns
+        # Pattern A: "حضور <NAME>" / "سجل حضور <NAME>" / "غياب <NAME>"
+        m_ar_prefix = re.search(
+            r'^(?:عرض\s+|ما\s+هو\s+|ماهو\s+|عايز\s+|اريد\s+|أريد\s+|أظهر\s+|اظهر\s+)?(?:سجل\s+)?(?:حضور|غياب)\s+(?:الطالب|العضو|للطالب|للعضو|لـ|ل)?\s*(.+)$',
+            cleaned_no_meeting
+        )
+        if m_ar_prefix:
+            candidate = m_ar_prefix.group(1).strip()
+            candidate = re.sub(r'^(?:الطالب|العضو)\s+', '', candidate).strip()
+            words = candidate.split()
+            if words and not all(w in meeting_fillers_ar for w in words):
+                return candidate
+
+        # Pattern B: "<NAME> حضور" / "<NAME> غياب"
+        m_ar_suffix = re.search(
+            r'^(.+?)\s+(?:حضور|غياب|سجل\s+حضور)$',
+            cleaned_no_meeting
+        )
+        if m_ar_suffix:
+            candidate = m_ar_suffix.group(1).strip()
+            candidate = re.sub(r'^(?:الطالب|العضو)\s+', '', candidate).strip()
+            words = candidate.split()
+            if words and not all(w in meeting_fillers_ar for w in words):
+                return candidate
+
+        # Pattern C: "هل حضر <NAME>" / "هل كان <NAME> حاضر"
+        m_ar_did = re.search(
+            r'(?:هل\s+)?(?:كان\s+)?(.+?)\s+(?:حاضر|حاضرا|غائب|غايب|حضر|غاب)\b',
+            cleaned_no_meeting
+        )
+        if m_ar_did:
+            candidate = m_ar_did.group(1).strip()
+            candidate = re.sub(r'^(?:الطالب|العضو)\s+', '', candidate).strip()
+            words = candidate.split()
+            if words and not all(w in meeting_fillers_ar for w in words):
+                return candidate
+
+        return None
+
     async def run_step(
         self,
         query: str,
@@ -641,6 +788,104 @@ class ReActAgent:
             "غياب", "غائب", "غايب", "غاب",
             "حضور", "حضر", "حاضر"
         ]):
+            # ── SUB-INTENT 1A: Student-specific attendance ────────────────
+            student_target = self.extract_student_attendance_query(query_clean)
+            if student_target:
+                lookup_res = await tool_get_student(db=db, context=context, student_id_or_name=student_target)
+
+                # Handle Ambiguous resolution
+                if lookup_res.get("ambiguous"):
+                    matches = lookup_res.get("matches", [])
+                    if is_arabic:
+                        match_names = [f"• {m.get('arabic_name') or m.get('name')} (كود: {m.get('student_code') or m.get('id')})" for m in matches]
+                        resp_text = (
+                            f"تم العثور على أكثر من طالب يطابق '{student_target}':\n" +
+                            "\n".join(match_names) +
+                            f"\n\nيرجى إعادة المحاولة مع تحديد الاسم بالكامل أو كود الطالب بدقة."
+                        )
+                    else:
+                        match_names = [f"• {m.get('name')} ({m.get('arabic_name')}) — Code: {m.get('student_code') or m.get('id')}" for m in matches]
+                        resp_text = (
+                            f"Multiple students found matching '{student_target}':\n" +
+                            "\n".join(match_names) +
+                            f"\n\nPlease re-try with the student's full name or exact student code."
+                        )
+                    return AgentChatResponse(conversation_id=conversation_id, response=resp_text, tool_executions=[])
+
+                # Handle Not Found resolution
+                if not lookup_res.get("found"):
+                    resp_text = (
+                        f"لم يتم العثور على طالب يطابق '{student_target}'. يرجى التحقق من الاسم أو كود الطالب."
+                        if is_arabic else
+                        f"Student '{student_target}' not found. Please verify the student name or code."
+                    )
+                    return AgentChatResponse(conversation_id=conversation_id, response=resp_text, tool_executions=[])
+
+                resolved_student = lookup_res["student"]
+                resolved_student_id = resolved_student["id"]
+
+                tool_name = "get_student_attendance"
+                params = {"student_id": resolved_student_id}
+                result, status = await self.execute_tool(tool_name, params, db, context)
+                tool_executions.append(ToolCallExecution(
+                    tool_name=tool_name, parameters=params, result=result, status=status,
+                    reasoning_summary=f"Retrieving attendance history for {resolved_student.get('full_name')}..."
+                ))
+                audit_entry = await AuditService.record_action(
+                    db=db, intent="QUERY_STUDENT_ATTENDANCE", tool_name=tool_name,
+                    parameters=params, result=result, user_id=acting_user, status="EXECUTED"
+                )
+
+                history = result.get("history", []) if isinstance(result, dict) else []
+                student_name = resolved_student.get("full_name") or student_target
+                arabic_name = resolved_student.get("arabic_name") or student_name
+
+                if not history:
+                    resp_text = (
+                        f"لا يوجد سجل حضور مسجل للطالب {arabic_name}."
+                        if is_arabic else
+                        f"No attendance records found for {student_name}."
+                    )
+                else:
+                    present_count = sum(1 for h in history if h.get("status") == "PRESENT")
+                    late_count = sum(1 for h in history if h.get("status") == "LATE")
+                    absent_count = sum(1 for h in history if h.get("status") in ("ABSENT", "UNEXCUSED_ABSENT", "EXCUSED_ABSENT"))
+                    total = len(history)
+
+                    if is_arabic:
+                        status_ar_map = {
+                            "PRESENT": "حاضر",
+                            "LATE": "متأخر",
+                            "ABSENT": "غائب",
+                            "UNEXCUSED_ABSENT": "غياب بدون عذر",
+                            "EXCUSED_ABSENT": "غياب بعذر"
+                        }
+                        records_str = "\n".join([
+                            f"• {h.get('title', 'جلسة')} ({h.get('date', '—')}): {status_ar_map.get(h.get('status'), h.get('status'))}"
+                            for h in history
+                        ])
+                        resp_text = (
+                            f"**سجل حضور الطالب: {arabic_name}**\n\n"
+                            f"• **إجمالي الجلسات:** {total}\n"
+                            f"• **حضور:** {present_count} | **متأخر:** {late_count} | **غياب:** {absent_count}\n\n"
+                            f"**تفاصيل الجلسات:**\n{records_str}"
+                        )
+                    else:
+                        records_str = "\n".join([
+                            f"• {h.get('title', 'Session')} ({h.get('date', '—')}): {h.get('status')}"
+                            for h in history
+                        ])
+                        resp_text = (
+                            f"**Attendance History for {student_name}:**\n\n"
+                            f"• **Total Sessions:** {total}\n"
+                            f"• **Present:** {present_count} | **Late:** {late_count} | **Absent:** {absent_count}\n\n"
+                            f"**Session Records:**\n{records_str}"
+                        )
+
+                return AgentChatResponse(conversation_id=conversation_id, response=resp_text,
+                                         tool_executions=tool_executions, audit_id=audit_entry.id)
+
+            # ── SUB-INTENT 1B: General meeting attendance ─────────────────
             tool_name = "get_meeting_attendance"
             explicit_meeting = self.extract_meeting_query(query_clean)
             params = {"meeting_id": explicit_meeting if explicit_meeting else "latest"}
