@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { api } from '../api/client';
 import { StudentScoreSummary, UserProfile } from '../types';
 import {
@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { Modal } from './ui/Modal';
+import { SkeletonTableRow, SkeletonCard } from './ui/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { useCachedData } from '../hooks/useCachedData';
 
 interface StudentScoreboardProps {
   currentUser?: UserProfile | null;
@@ -20,9 +22,30 @@ interface StudentScoreboardProps {
 
 export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUser }) => {
   const toast = useToast();
-  const [data, setData] = useState<StudentScoreSummary[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+
+  const isCommitteeMember = currentUser?.role === 'committee_member' || currentUser?.role === 'member';
+  const isCommitteeHead = currentUser?.role === 'committee_head' || currentUser?.role === 'team_lead';
+  const isHrLeader =
+    currentUser?.role === 'committee_hr_leader' ||
+    currentUser?.role === 'hr_admin';
+  const canEditBehavior =
+    currentUser?.role === 'committee_hr_member' ||
+    currentUser?.role === 'committee_hr_leader' ||
+    currentUser?.role === 'region_hr_head' ||
+    currentUser?.role === 'hr_admin';
+
+  // Secure In-Memory Cached Scoreboard with SWR
+  const {
+    data: cachedData,
+    loading,
+    refresh: loadData,
+  } = useCachedData<StudentScoreSummary[]>(
+    'scoreboard_list',
+    () => api.getScoreboard(),
+    { enabled: !isCommitteeMember, userId: currentUser?.id }
+  );
+  const data = cachedData || [];
 
   // Editing state for HR members
   const [editingStudent, setEditingStudent] = useState<StudentScoreSummary | null>(null);
@@ -40,37 +63,6 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
   const [bonusPoints, setBonusPoints] = useState<number>(2.0);
   const [bonusReason, setBonusReason] = useState<string>('');
   const [awardingBonus, setAwardingBonus] = useState(false);
-
-  const isCommitteeMember = currentUser?.role === 'committee_member' || currentUser?.role === 'member';
-  const isCommitteeHead = currentUser?.role === 'committee_head' || currentUser?.role === 'team_lead';
-  const isHrLeader =
-    currentUser?.role === 'committee_hr_leader' ||
-    currentUser?.role === 'hr_admin';
-  const canEditBehavior =
-    currentUser?.role === 'committee_hr_member' ||
-    currentUser?.role === 'committee_hr_leader' ||
-    currentUser?.role === 'region_hr_head' ||
-    currentUser?.role === 'hr_admin';
-
-  const loadData = async () => {
-    if (isCommitteeMember) {
-      setLoading(false);
-      return;
-    }
-    try {
-      setLoading(true);
-      const board = await api.getScoreboard();
-      setData(board);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [currentUser?.role]);
 
   const handleOpenEdit = (student: StudentScoreSummary) => {
     setEditingStudent(student);
@@ -176,7 +168,37 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
 
       <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 text-sm">Loading evaluations…</div>
+          <div>
+            {/* Desktop Table Skeletons */}
+            <div className="hidden md:block">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3.5 w-16">Rank</th>
+                    <th className="px-5 py-3.5">Member</th>
+                    <th className="px-5 py-3.5 text-right">Attendance</th>
+                    <th className="px-5 py-3.5 text-right">Task Quality</th>
+                    <th className="px-5 py-3.5 text-right">Behavior Score</th>
+                    <th className="px-5 py-3.5 text-right">Bonus</th>
+                    <th className="px-5 py-3.5 text-center">Rating Tier</th>
+                    {(canEditBehavior || isHrLeader) && <th className="px-5 py-3.5 text-right">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody className="text-sm divide-y divide-slate-100">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <SkeletonTableRow key={i} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card Skeletons */}
+            <div className="block md:hidden p-3 space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
         ) : (
           <>
             {/* Desktop Table View (hidden on mobile) */}

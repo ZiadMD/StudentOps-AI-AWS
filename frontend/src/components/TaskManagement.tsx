@@ -11,6 +11,7 @@ import {
 import { api } from '../api/client';
 import { TaskItem, SubmissionItem, UserProfile } from '../types';
 import { Modal } from './ui/Modal';
+import { Skeleton } from './ui/Skeleton';
 import { useToast } from '../context/ToastContext';
 
 interface TaskManagementProps {
@@ -175,7 +176,30 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
       </div>
 
       {loading ? (
-        <div className="p-12 text-center text-slate-500 text-sm">Loading workspace tasks...</div>
+        <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <Skeleton className="h-3.5 w-48 rounded" />
+            <Skeleton className="h-3.5 w-16 rounded" />
+          </div>
+          <div className="divide-y divide-slate-100">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5">
+                <div className="flex items-center space-x-3 w-full sm:w-1/2 min-w-0">
+                  <Skeleton className="w-5 h-5 rounded-full shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-4 w-3/5 rounded" />
+                    <Skeleton className="h-3 w-4/5 rounded" />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <Skeleton className="h-3.5 w-24 rounded" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-7 w-24 rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden flex flex-col">
           <div className="px-4 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">

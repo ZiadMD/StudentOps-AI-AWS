@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { api } from '../api/client';
 import { Student, StudentCreatePayload, TeamItem, UserProfile } from '../types';
 import { useToast } from '../context/ToastContext';
 import { Modal } from './ui/Modal';
+import { SkeletonTableRow, SkeletonCard } from './ui/Skeleton';
+import { useCachedData } from '../hooks/useCachedData';
 import { 
   Search, Plus, MoreHorizontal, 
   UserCheck, UserX, Mail, Phone, University,
@@ -14,29 +16,8 @@ interface StudentsPageProps {
 }
 
 export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState('');
+  const [search, setSearch]             = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  // Modal & Form State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [teams, setTeams] = useState<TeamItem[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-
-  // Form Fields
-  const [fullName, setFullName] = useState('');
-  const [arabicName, setArabicName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [university, setUniversity] = useState('Faculty of Engineering');
-  const [role, setRole] = useState('Member');
-  const [status, setStatus] = useState('ACTIVE');
-  const [studentCode, setStudentCode] = useState('');
-  const [selectedTeamId, setSelectedTeamId] = useState('');
-
-  const toast = useToast();
 
   const canAddMember = !currentUser || [
     'region_hr_head',
@@ -49,27 +30,42 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
   const canSelectTeam = currentUser?.role === 'hr_admin' || currentUser?.role === 'region_hr_head';
 
-  useEffect(() => {
-    async function load() {
-      try { 
-        const data = await api.getStudents();
-        setStudents(data); 
-      } catch (err) { 
-        console.error('Failed to load students', err); 
-      } finally { 
-        setLoading(false); 
-      }
-    }
-    load();
-  }, []);
+  // Secure In-Memory Cached Data with SWR
+  const {
+    data: cachedStudents,
+    loading,
+    mutate: mutateStudents,
+  } = useCachedData<Student[]>(
+    'students_list',
+    () => api.getStudents(),
+    { userId: currentUser?.id }
+  );
+  const students = cachedStudents || [];
 
-  useEffect(() => {
-    if (canSelectTeam) {
-      api.getTeams().then(setTeams).catch(err => {
-        console.error('Failed to load teams', err);
-      });
-    }
-  }, [canSelectTeam]);
+  const { data: cachedTeams } = useCachedData<TeamItem[]>(
+    'teams_list',
+    () => api.getTeams(),
+    { enabled: canSelectTeam, userId: currentUser?.id }
+  );
+  const teams = cachedTeams || [];
+
+  // Modal & Form State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [submitting, setSubmitting]         = useState(false);
+  const [formError, setFormError]           = useState<string | null>(null);
+
+  // Form Fields
+  const [fullName, setFullName]             = useState('');
+  const [arabicName, setArabicName]         = useState('');
+  const [email, setEmail]                   = useState('');
+  const [phone, setPhone]                   = useState('');
+  const [university, setUniversity]         = useState('Faculty of Engineering');
+  const [role, setRole]                     = useState('Member');
+  const [status, setStatus]                 = useState('ACTIVE');
+  const [studentCode, setStudentCode]       = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+
+  const toast = useToast();
 
   const resetForm = () => {
     setFullName('');
@@ -108,7 +104,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
       };
 
       const newStudent = await api.createStudent(payload);
-      setStudents(prev => [newStudent, ...prev]);
+      mutateStudents(prev => [newStudent, ...(prev || [])]);
       toast.success(`Member ${newStudent.full_name} enrolled successfully.`);
       setIsAddModalOpen(false);
       resetForm();
@@ -189,7 +185,34 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
       {/* Table Container */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
         {loading ? (
-          <div className="p-16 text-center text-slate-400 text-sm">Loading member registry…</div>
+          <div>
+            {/* Desktop Table Skeletons */}
+            <div className="hidden md:block">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3.5">Member Identity</th>
+                    <th className="px-5 py-3.5">Contact Details</th>
+                    <th className="px-5 py-3.5">Role & University</th>
+                    <th className="px-5 py-3.5 text-center">Status</th>
+                    <th className="px-5 py-3.5 text-right"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <SkeletonTableRow key={i} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card Skeletons */}
+            <div className="block md:hidden p-3 space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
         ) : (
           <>
             {/* Desktop Table View (hidden on mobile, zero overflow bugs) */}

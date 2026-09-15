@@ -23,6 +23,8 @@ import {
   CommitteeReportItem,
 } from '../types';
 
+import { memoryCache } from './cache';
+
 export const API_BASE = ((import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, '')) || '/api';
 const TOKEN_KEY = 'studentops_access_token';
 const USER_KEY = 'studentops_user';
@@ -61,6 +63,7 @@ export function clearStoredAuth(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   } catch {}
+  memoryCache.clear();
 }
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -141,16 +144,22 @@ export const api = {
       body: JSON.stringify({ action_id: actionId, confirmed }),
     }),
 
+  // In-memory Cache
+  cache: memoryCache,
+
   // Students & Scoreboards
   getStudents: (assignedOnly: boolean = false) =>
     fetchJson<Student[]>(`/students${assignedOnly ? '?assigned_only=true' : ''}`),
-  createStudent: (payload: StudentCreatePayload) =>
-    fetchJson<Student>('/students', {
+  createStudent: async (payload: StudentCreatePayload) => {
+    const res = await fetchJson<Student>('/students', {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
+    });
+    memoryCache.invalidate('students');
+    return res;
+  },
   getScoreboard: () => fetchJson<StudentScoreSummary[]>('/students/scoreboard/all'),
-  updateBehaviorScore: (
+  updateBehaviorScore: async (
     studentId: string,
     payload: {
       group_interaction: number;
@@ -160,21 +169,31 @@ export const api = {
       notes?: string;
       month?: string;
     }
-  ) =>
-    fetchJson<StudentScoreSummary>(`/students/${studentId}/behavior-score`, {
+  ) => {
+    const res = await fetchJson<StudentScoreSummary>(`/students/${studentId}/behavior-score`, {
       method: 'PUT',
       body: JSON.stringify({ student_id: studentId, ...payload }),
-    }),
-  assignCohort: (payload: { student_ids: string[]; hr_member_id: string }) =>
-    fetchJson<{ status: string; assigned_count: number }>('/students/assign-cohort', {
+    });
+    memoryCache.invalidate('scoreboard');
+    memoryCache.invalidate('students');
+    return res;
+  },
+  assignCohort: async (payload: { student_ids: string[]; hr_member_id: string }) => {
+    const res = await fetchJson<{ status: string; assigned_count: number }>('/students/assign-cohort', {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
-  updateStudentPhone: (studentId: string, phone: string) =>
-    fetchJson<Student>(`/students/${studentId}/phone`, {
+    });
+    memoryCache.invalidate('students');
+    return res;
+  },
+  updateStudentPhone: async (studentId: string, phone: string) => {
+    const res = await fetchJson<Student>(`/students/${studentId}/phone`, {
       method: 'PATCH',
       body: JSON.stringify({ phone }),
-    }),
+    });
+    memoryCache.invalidate('students');
+    return res;
+  },
 
   awardBonus: (
     studentId: string,
