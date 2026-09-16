@@ -3,7 +3,8 @@ OpenWA Provider for StudentOps AI.
 Integrates with headless OpenWA Docker container for official organization notifications,
 and provides zero-trust wa.me deep links for personal HR follow-ups.
 """
-from typing import Optional
+from __future__ import annotations
+from typing import Optional, Any
 from datetime import datetime, timezone
 import urllib.parse
 import re
