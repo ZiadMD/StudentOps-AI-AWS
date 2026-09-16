@@ -37,6 +37,7 @@ from app.models.schemas import (
     WhatsAppEditMessageRequest,
     WhatsAppThreadSummary,
     OpenWAWebhookPayload,
+    WhatsAppSyncResponse,
 )
 from app.providers.openwa_provider import OpenWAProvider, generate_wa_me_link, format_phone_international
 from app.providers.messaging_provider import OutgoingMessage
@@ -346,6 +347,29 @@ async def get_thread_messages(
     Enforces strict server-side access isolation (HTTP 403 if HR member is not assigned).
     """
     return await WhatsAppService.get_thread_messages(student_id, current_user, db)
+
+
+@router.post("/threads/{student_id}/sync", response_model=WhatsAppSyncResponse)
+async def sync_thread_messages(
+    student_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_hr_member", "committee_hr_leader", "region_hr_head", "hr_admin"])),
+    openwa: OpenWAProvider = Depends(get_openwa)
+):
+    """
+    On-demand catch-up chat sync:
+    Pulls recent messages from OpenWA for this student (<phone>@c.us),
+    reconciles and upserts into whatsapp_chat_messages with openwa_message_id deduplication,
+    and returns full updated conversation history.
+    """
+    return await WhatsAppService.sync_chat_messages(
+        student_id=student_id,
+        current_user=current_user,
+        db=db,
+        openwa=openwa,
+        limit=limit,
+    )
 
 
 @router.post("/threads/{student_id}/messages", response_model=WhatsAppMessageResponse)

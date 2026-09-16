@@ -337,3 +337,205 @@ async def test_webhook_media_url_sanitization(client, monkeypatch):
     assert sanitize_media_url("https://example.com/safe.jpg") == "https://example.com/safe.jpg"
     assert sanitize_media_url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==") == "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
 
+
+@pytest.mark.asyncio
+async def test_webhook_external_hr_device_message_resolution(client, test_db_session, monkeypatch):
+    """
+    Verifies that when an HR coordinator sends a message from a physical phone or WhatsApp Web,
+    OpenWA sends fromMe: true and the webhook resolves the student from data.to / data.chatId,
+    attributing sender_type='HR'.
+    """
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "OPENWA_WEBHOOK_SECRET", "test-secret")
+
+    payload = {
+        "event": "onAnyMessage",
+        "data": {
+            "id": "true_201012345678@c.us_EXT_DEV_01",
+            "from": "201000000000@c.us",
+            "to": "201012345678@c.us",
+            "fromMe": True,
+            "chatId": "201012345678@c.us",
+            "body": "Follow-up sent directly from physical device.",
+            "type": "chat",
+            "timestamp": 1710000000,
+            "ack": 1,
+        }
+    }
+
+    res = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "test-secret"},
+        json=payload,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["student_id"] == "std_ziad"
+    assert data["sender_type"] == "HR"
+
+    # Verify message in database
+    db_res = await test_db_session.execute(
+        select(WhatsAppChatMessage).where(WhatsAppChatMessage.openwa_message_id == "true_201012345678@c.us_EXT_DEV_01")
+    )
+    saved_msg = db_res.scalar_one_or_none()
+    assert saved_msg is not None
+    assert saved_msg.sender_type == "HR"
+    assert saved_msg.student_id == "std_ziad"
+    assert saved_msg.assigned_hr_id == "usr_hr_member"
+    assert saved_msg.recipient_phone == "201012345678"
+    assert saved_msg.content == "Follow-up sent directly from physical device."
+
+    # Duplicate submission of the same webhook is safely skipped
+    res_dup = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "test-secret"},
+        json=payload,
+    )
+    assert res_dup.status_code == 200
+    assert res_dup.json()["status"] == "duplicate_skipped"
+
+
+@pytest.mark.asyncio
+async def test_webhook_group_message_ignored(client, test_db_session, monkeypatch):
+    """Verifies that group messages (@g.us) are dropped gracefully without errors."""
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "OPENWA_WEBHOOK_SECRET", "test-secret")
+
+    payload = {
+        "event": "onMessage",
+        "data": {
+            "id": "group_msg_123",
+            "from": "120363024828192038@g.us",
+            "chatId": "120363024828192038@g.us",
+            "body": "Broadcast in WhatsApp group",
+            "type": "chat",
+            "isGroupMsg": True,
+        }
+    }
+
+    res = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "test-secret"},
+        json=payload,
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "ignored"
+
+
+@pytest.mark.asyncio
+async def test_webhook_ambiguous_phone_fails_closed(client, test_db_session, monkeypatch):
+    """Verifies that if multiple students share an identical normalized phone, webhook fails closed safely."""
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "OPENWA_WEBHOOK_SECRET", "test-secret")
+
+    # Add duplicate student with same phone as std_ziad
+    dup_student = Student(
+        id="std_duplicate_phone",
+        student_code="CS-9999",
+        full_name="Duplicate Ziad",
+        arabic_name="زياد مكرر",
+        email="dup.ziad@studentops.org",
+        phone="01012345678",  # Identical Egyptian mobile
+        team_id="team_tech",
+        assigned_hr_id="usr_hr_member",
+    )
+    test_db_session.add(dup_student)
+    await test_db_session.commit()
+
+    payload = {
+        "event": "onMessage",
+        "data": {
+            "id": "openwa_ambiguous_msg_1",
+            "from": "201012345678@c.us",
+            "body": "Hello from ambiguous number",
+            "type": "chat",
+        }
+    }
+
+    res = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "test-secret"},
+        json=payload,
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "unregistered_sender"
+
+
+@pytest.mark.asyncio
+async def test_sync_chat_messages_endpoint_and_deduplication(client, test_db_session):
+    """
+    Verifies on-demand sync via POST /api/whatsapp/threads/{student_id}/sync:
+    - Calls OpenWA get_chat_messages
+    - Reconciles and upserts new messages into DB with openwa_message_id deduplication
+    - Updates ACK/status on existing messages
+    """
+    hr_token = await get_token(client, "hr.member@studentops.org", "hrmember123")
+    headers = {"Authorization": f"Bearer {hr_token}"}
+
+    mock_openwa_messages = [
+        {
+            "id": "sync_owa_inbound_001",
+            "from": "201012345678@c.us",
+            "to": "201000000000@c.us",
+            "fromMe": False,
+            "body": "Synced reply from student on WhatsApp",
+            "type": "chat",
+            "timestamp": 1710000000,
+            "ack": 2,
+        },
+        {
+            "id": "sync_owa_outbound_002",
+            "from": "201000000000@c.us",
+            "to": "201012345678@c.us",
+            "fromMe": True,
+            "body": "Synced reply from HR on physical phone",
+            "type": "chat",
+            "timestamp": 1710000060,
+            "ack": 3,
+        },
+    ]
+
+    with patch("app.providers.openwa_provider.OpenWAProvider.get_chat_messages", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_openwa_messages
+
+        # 1. First sync: should insert 2 new messages
+        res = await client.post("/api/whatsapp/threads/std_ziad/sync?limit=50", headers=headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+        assert data["student_id"] == "std_ziad"
+        assert data["synced_count"] == 2
+        assert data["new_messages_count"] == 2
+        assert data["updated_messages_count"] == 0
+        assert any(m["openwa_message_id"] == "sync_owa_inbound_001" for m in data["messages"])
+        assert any(m["openwa_message_id"] == "sync_owa_outbound_002" for m in data["messages"])
+
+        # 2. Second sync with same messages: should insert 0 new messages
+        res_repeat = await client.post("/api/whatsapp/threads/std_ziad/sync?limit=50", headers=headers)
+        assert res_repeat.status_code == 200
+        data_repeat = res_repeat.json()
+        assert data_repeat["new_messages_count"] == 0
+        assert data_repeat["synced_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_sync_chat_messages_scoping_forbidden(client, test_db_session):
+    """Verifies that an HR Member cannot sync chat history for an unassigned member (HTTP 403)."""
+    hr_token = await get_token(client, "hr.member@studentops.org", "hrmember123")
+    headers = {"Authorization": f"Bearer {hr_token}"}
+
+    # Find unassigned student
+    st_res = await test_db_session.execute(
+        select(Student).where(
+            or_(Student.assigned_hr_id != "usr_hr_member", Student.assigned_hr_id.is_(None))
+        )
+    )
+    unassigned_student = st_res.scalars().first()
+    assert unassigned_student is not None
+
+    res = await client.post(f"/api/whatsapp/threads/{unassigned_student.id}/sync", headers=headers)
+    assert res.status_code == 403
+    assert "not assigned" in res.json()["detail"].lower()
+
+

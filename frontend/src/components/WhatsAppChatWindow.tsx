@@ -80,6 +80,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
   const [activeMediaModal, setActiveMediaModal] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -196,6 +197,11 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
               setMessages((prev) =>
                 prev.map((m) => (m.id === updated.id ? { ...m, content: updated.content, is_edited: true } : m))
               );
+            } else if (type === 'messages_synced') {
+              const syncData = data as { student_id?: string };
+              if (syncData?.student_id === activeStudentId) {
+                fetchMessages(activeStudentId);
+              }
             }
           } catch (e) {
             console.error('Error parsing WS message', e);
@@ -235,6 +241,31 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
       wsRef.current?.close();
     };
   }, [activeStudentId]);
+
+  // On-demand chat synchronization with OpenWA
+  const handleSyncChat = async () => {
+    if (!activeStudentId || syncing) return;
+    try {
+      setSyncing(true);
+      const res = await api.syncThreadMessages(activeStudentId);
+      setMessages(res.messages);
+      if (res.new_messages_count > 0) {
+        toast.success(`Synced ${res.new_messages_count} new message${res.new_messages_count > 1 ? 's' : ''}`);
+      } else {
+        toast.info('Chat history is up to date');
+      }
+      if (res.messages && res.messages.length > 0) {
+        const last = res.messages[res.messages.length - 1];
+        setThreads((prev) =>
+          prev.map((t) => (t.student_id === activeStudentId ? { ...t, last_message: last } : t))
+        );
+      }
+    } catch (err: any) {
+      toast.error(`Chat sync failed: ${err.message || 'Check gateway connection'}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Send message handler
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -546,6 +577,17 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleSyncChat}
+                    disabled={syncing}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 rounded-lg transition-colors border border-slate-200"
+                    title="Sync with WhatsApp"
+                    aria-label="Sync chat with WhatsApp"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-slate-900' : 'text-slate-500'}`} />
+                    <span className="hidden md:inline">{syncing ? 'Syncing…' : 'Sync Chat'}</span>
+                  </button>
                   <a
                     href={`tel:${activeThread.phone}`}
                     className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"

@@ -16,6 +16,7 @@ from app.models.entities import Student, User, WhatsAppChatMessage, utcnow
 from app.models.schemas import (
     WhatsAppMessageResponse,
     WhatsAppThreadSummary,
+    WhatsAppSyncResponse,
 )
 from app.providers.openwa_provider import (
     OpenWAProvider,
@@ -422,7 +423,8 @@ class WhatsAppService:
     ) -> dict[str, Any]:
         """
         Ingests OpenWA webhook events:
-        - Resolves sender's phone -> assigned Student.
+        - Resolves sender / recipient phone -> assigned Student.
+        - Supports directional resolution: fromMe=True handles external device / WhatsApp Web messages.
         - Resolves Student -> assigned HR Member.
         - Persists message / ack / reaction / edit in DB.
         - Pushes real-time event to that HR Member's connected socket session.
@@ -430,90 +432,8 @@ class WhatsAppService:
         event_name = (payload.get("event") or payload.get("type") or "").lower()
         data = payload.get("data") or payload
 
-        # 1. Handle Incoming Message (onMessage / message / message.received)
-        if (
-            "message" in event_name
-            or event_name in ("onmessage", "message.received")
-            or ("from" in data and "body" in data)
-        ):
-            raw_sender = str(data.get("from") or data.get("sender", {}).get("id") or "")
-            clean_digits = format_phone_international(raw_sender)
-            if not clean_digits:
-                return {"status": "ignored", "reason": "No sender phone"}
-
-            # Match only one student by exact normalized international number.
-            # Ambiguous normalized duplicates fail closed instead of selecting the first row.
-            st_res = await db.execute(select(Student))
-            matches = [
-                candidate for candidate in st_res.scalars().all()
-                if format_phone_international(candidate.phone) == clean_digits
-            ]
-            student = matches[0] if len(matches) == 1 else None
-
-            if not student:
-                logger.info("WhatsApp webhook: incoming message from unregistered phone %s", clean_digits)
-                return {"status": "unregistered_sender", "phone": clean_digits}
-
-            assigned_hr_id = student.assigned_hr_id
-            openwa_id = str(data.get("id") or f"openwa_{uuid.uuid4().hex[:8]}")
-
-            # Check deduplication
-            dup_res = await db.execute(
-                select(WhatsAppChatMessage).where(WhatsAppChatMessage.openwa_message_id == openwa_id)
-            )
-            if dup_res.scalar_one_or_none():
-                return {"status": "duplicate_skipped"}
-
-            content = data.get("body") or data.get("text") or data.get("caption") or ""
-            msg_type = data.get("type") or "text"
-            media_url = data.get("url") or data.get("deprecatedMmsUrl") or data.get("mediaUrl")
-            mimetype = data.get("mimetype")
-            filename = data.get("filename")
-
-            now = utcnow()
-            new_msg = WhatsAppChatMessage(
-                id=f"cmsg_{uuid.uuid4().hex[:12]}",
-                openwa_message_id=openwa_id,
-                student_id=student.id,
-                assigned_hr_id=assigned_hr_id,
-                sender_type="STUDENT",
-                sender_id=student.id,
-                sender_phone=clean_digits,
-                recipient_phone=settings.OPENWA_OFFICIAL_PHONE or "+201000000000",
-                message_type=msg_type if msg_type in ("image", "video", "document", "audio") else "text",
-                content=content,
-                media_url=sanitize_media_url(media_url),
-                media_filename=filename,
-                media_mimetype=mimetype,
-                status="delivered",
-                ack_status=2,
-                reactions="[]",
-                created_at=now,
-                delivered_at=now,
-            )
-            db.add(new_msg)
-            await db.commit()
-            await db.refresh(new_msg)
-
-            # Push live event scoped to assigned HR Member
-            resp = cls._message_to_response(new_msg)
-            if assigned_hr_id:
-                await ws_manager.send_to_user(assigned_hr_id, "incoming_message", resp.model_dump(mode="json"))
-            else:
-                # If unassigned, broadcast to committee HR leader or admins for assignment
-                leaders_res = await db.execute(
-                    select(User.id).where(
-                        User.team_id == student.team_id,
-                        User.role == "committee_hr_leader"
-                    )
-                )
-                leader_ids = list(leaders_res.scalars().all())
-                await ws_manager.broadcast_to_users(leader_ids, "unassigned_incoming_message", resp.model_dump(mode="json"))
-
-            return {"status": "success", "message_id": new_msg.id, "student_id": student.id}
-
-        # 2. Handle Message Status / Ack (onAck / message.ack)
-        elif "ack" in event_name or "ack" in data:
+        # 1. Handle Message Status / Ack (onAck / message.ack / ack)
+        if "ack" in event_name or ("ack" in data and "body" not in data and "text" not in data):
             target_id = str(data.get("id") or data.get("messageId") or "")
             ack_val = data.get("ack", 1)  # 1: sent, 2: delivered, 3: read
             if target_id:
@@ -540,6 +460,311 @@ class WhatsAppService:
                     resp = cls._message_to_response(msg)
                     if msg.assigned_hr_id:
                         await ws_manager.send_to_user(msg.assigned_hr_id, "message_ack", resp.model_dump(mode="json"))
+                    logger.info("WhatsApp webhook: ack updated msg_id=%s openwa_id=%s ack=%s", msg.id, target_id, ack_val)
                     return {"status": "ack_updated", "message_id": msg.id, "ack": ack_val}
+            return {"status": "ignored", "reason": "Ack event missing target id"}
+
+        # 2. Handle Messages (onMessage / onAnyMessage / message / message_create / message.received)
+        elif (
+            "message" in event_name
+            or event_name in ("onmessage", "onanymessage", "message.received", "message_create")
+            or ("from" in data and ("body" in data or "text" in data or "caption" in data))
+        ):
+            # Guard against group messages
+            chat_id_raw = str(data.get("chatId") or data.get("from") or data.get("to") or "")
+            if "@g.us" in chat_id_raw or data.get("isGroupMsg") or data.get("chat", {}).get("isGroup"):
+                logger.info("WhatsApp webhook: group message dropped chatId=%s", chat_id_raw)
+                return {"status": "ignored", "reason": "Group messages not supported"}
+
+            # Determine direction: fromMe=True indicates message sent from connected device / WhatsApp Web
+            from_me = bool(
+                data.get("fromMe")
+                or payload.get("fromMe")
+                or str(data.get("id", "")).startswith("true_")
+            )
+
+            if from_me:
+                raw_target = str(data.get("to") or data.get("chatId") or data.get("chat", {}).get("id") or "")
+                clean_digits = format_phone_international(raw_target)
+                raw_sender = str(data.get("from") or settings.OPENWA_OFFICIAL_PHONE or "+201000000000")
+            else:
+                raw_sender = str(data.get("from") or data.get("sender", {}).get("id") or data.get("chatId") or "")
+                clean_digits = format_phone_international(raw_sender)
+
+            if not clean_digits:
+                logger.warning("WhatsApp webhook dropped: unable to parse phone number from payload data=%s", data)
+                return {"status": "ignored", "reason": "No valid phone number found"}
+
+            # Match student by normalized phone number
+            st_res = await db.execute(select(Student))
+            matches = [
+                candidate for candidate in st_res.scalars().all()
+                if format_phone_international(candidate.phone) == clean_digits
+            ]
+
+            if len(matches) > 1:
+                logger.error(
+                    "WhatsApp webhook: ambiguous student match for phone %s (%d candidates found), failing closed",
+                    clean_digits, len(matches)
+                )
+
+            student = matches[0] if len(matches) == 1 else None
+
+            if not student:
+                logger.warning(
+                    "WhatsApp webhook: unregistered or ambiguous phone %s (fromMe=%s, event=%s)",
+                    clean_digits, from_me, event_name
+                )
+                return {
+                    "status": "unregistered_sender" if not from_me else "unregistered_recipient",
+                    "phone": clean_digits,
+                }
+
+            assigned_hr_id = student.assigned_hr_id
+            openwa_id = str(data.get("id") or f"openwa_{uuid.uuid4().hex[:8]}")
+
+            # Check deduplication
+            dup_res = await db.execute(
+                select(WhatsAppChatMessage).where(WhatsAppChatMessage.openwa_message_id == openwa_id)
+            )
+            existing_msg = dup_res.scalar_one_or_none()
+            if existing_msg:
+                logger.info("WhatsApp webhook: duplicate message skipped openwa_id=%s", openwa_id)
+                # Reconcile ack if newer
+                ack_val = data.get("ack")
+                if ack_val and int(ack_val) > (existing_msg.ack_status or 0):
+                    existing_msg.ack_status = int(ack_val)
+                    if int(ack_val) == 2 and not existing_msg.delivered_at:
+                        existing_msg.delivered_at = utcnow()
+                        existing_msg.status = "delivered"
+                    elif int(ack_val) == 3 and not existing_msg.read_at:
+                        existing_msg.read_at = utcnow()
+                        existing_msg.status = "read"
+                    await db.commit()
+                return {"status": "duplicate_skipped", "message_id": existing_msg.id}
+
+            content = data.get("body") or data.get("text") or data.get("caption") or ""
+            raw_msg_type = str(data.get("type") or "text").lower()
+            msg_type = "audio" if raw_msg_type == "ptt" else (
+                raw_msg_type if raw_msg_type in ("image", "video", "document", "audio") else "text"
+            )
+            media_url = data.get("url") or data.get("deprecatedMmsUrl") or data.get("mediaUrl")
+            mimetype = data.get("mimetype")
+            filename = data.get("filename")
+
+            ts = data.get("timestamp") or data.get("t")
+            msg_time = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else utcnow()
+
+            sender_type = "HR" if from_me else "STUDENT"
+            sender_id = assigned_hr_id if from_me else student.id
+            sender_phone = (
+                format_phone_international(raw_sender) or settings.OPENWA_OFFICIAL_PHONE or "+201000000000"
+            ) if from_me else clean_digits
+            recipient_phone = clean_digits if from_me else (settings.OPENWA_OFFICIAL_PHONE or "+201000000000")
+            status_val = "sent" if from_me else "delivered"
+            ack_val = int(data.get("ack", 1 if from_me else 2))
+
+            new_msg = WhatsAppChatMessage(
+                id=f"cmsg_{uuid.uuid4().hex[:12]}",
+                openwa_message_id=openwa_id,
+                student_id=student.id,
+                assigned_hr_id=assigned_hr_id,
+                sender_type=sender_type,
+                sender_id=sender_id,
+                sender_phone=sender_phone,
+                recipient_phone=recipient_phone,
+                message_type=msg_type,
+                content=content,
+                media_url=sanitize_media_url(media_url),
+                media_filename=filename,
+                media_mimetype=mimetype,
+                status=status_val,
+                ack_status=ack_val,
+                reactions="[]",
+                raw_payload=json.dumps(data) if isinstance(data, dict) else None,
+                created_at=msg_time,
+                delivered_at=msg_time if ack_val >= 2 else None,
+                read_at=msg_time if ack_val >= 3 else None,
+            )
+            db.add(new_msg)
+            await db.commit()
+            await db.refresh(new_msg)
+
+            logger.info(
+                "WhatsApp webhook: persisted message id=%s openwa_id=%s student_id=%s sender_type=%s from_me=%s",
+                new_msg.id, openwa_id, student.id, sender_type, from_me
+            )
+
+            # Broadcast real-time WebSocket update
+            resp = cls._message_to_response(new_msg)
+            event_ws_type = "message_sent" if from_me else "incoming_message"
+
+            if assigned_hr_id:
+                await ws_manager.send_to_user(assigned_hr_id, event_ws_type, resp.model_dump(mode="json"))
+            else:
+                leaders_res = await db.execute(
+                    select(User.id).where(
+                        User.team_id == student.team_id,
+                        User.role.in_(["committee_hr_leader", "committee_head", "team_lead"])
+                    )
+                )
+                leader_ids = list(leaders_res.scalars().all())
+                await ws_manager.broadcast_to_users(
+                    leader_ids, f"unassigned_{event_ws_type}", resp.model_dump(mode="json")
+                )
+
+            return {
+                "status": "success",
+                "message_id": new_msg.id,
+                "student_id": student.id,
+                "sender_type": sender_type,
+            }
 
         return {"status": "unhandled_event", "event": event_name}
+
+    @classmethod
+    async def sync_chat_messages(
+        cls,
+        student_id: str,
+        current_user: User,
+        db: AsyncSession,
+        openwa: OpenWAProvider,
+        limit: int = 50,
+    ) -> WhatsAppSyncResponse:
+        """
+        On-demand catch-up synchronization:
+        Pulls recent messages from OpenWA, reconciles with database via openwa_message_id deduplication,
+        updates status/acks, persists new messages, broadcasts WebSocket events, and returns updated thread history.
+        """
+        student = await cls.verify_chat_access(student_id, current_user, db)
+        clean_phone = format_phone_international(student.phone)
+        chat_id = f"{clean_phone}@c.us"
+
+        logger.info(
+            "WhatsApp sync started for student %s (phone=%s, limit=%d) by user %s",
+            student.id, clean_phone, limit, current_user.id
+        )
+
+        raw_messages = await openwa.get_chat_messages(chat_id=chat_id, count=limit)
+
+        new_count = 0
+        updated_count = 0
+        now = utcnow()
+
+        for raw_msg in raw_messages:
+            openwa_id = str(raw_msg.get("id") or "")
+            if not openwa_id:
+                continue
+
+            from_me = bool(
+                raw_msg.get("fromMe")
+                or str(openwa_id).startswith("true_")
+            )
+            content = raw_msg.get("body") or raw_msg.get("text") or raw_msg.get("caption") or ""
+            raw_type = str(raw_msg.get("type") or "text").lower()
+            msg_type = "audio" if raw_type == "ptt" else (
+                raw_type if raw_type in ("image", "video", "document", "audio") else "text"
+            )
+            media_url = sanitize_media_url(raw_msg.get("url") or raw_msg.get("deprecatedMmsUrl") or raw_msg.get("mediaUrl"))
+            filename = raw_msg.get("filename")
+            mimetype = raw_msg.get("mimetype")
+
+            ts = raw_msg.get("timestamp") or raw_msg.get("t")
+            msg_time = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else now
+
+            ack = int(raw_msg.get("ack", 1 if from_me else 2))
+            if ack == 3:
+                status_val = "read"
+            elif ack == 2:
+                status_val = "delivered"
+            else:
+                status_val = "sent" if from_me else "delivered"
+
+            # Check if exists in DB
+            existing_res = await db.execute(
+                select(WhatsAppChatMessage).where(WhatsAppChatMessage.openwa_message_id == openwa_id)
+            )
+            existing = existing_res.scalar_one_or_none()
+
+            if existing:
+                changed = False
+                if ack > (existing.ack_status or 0):
+                    existing.ack_status = ack
+                    if ack == 3 and not existing.read_at:
+                        existing.read_at = msg_time
+                        existing.status = "read"
+                    elif ack == 2 and not existing.delivered_at:
+                        existing.delivered_at = msg_time
+                        existing.status = "delivered"
+                    changed = True
+                if media_url and not existing.media_url:
+                    existing.media_url = media_url
+                    changed = True
+                if changed:
+                    updated_count += 1
+            else:
+                sender_type = "HR" if from_me else "STUDENT"
+                sender_id = student.assigned_hr_id if from_me else student.id
+                sender_phone = (
+                    settings.OPENWA_OFFICIAL_PHONE or "+201000000000"
+                ) if from_me else clean_phone
+                recipient_phone = clean_phone if from_me else (
+                    settings.OPENWA_OFFICIAL_PHONE or "+201000000000"
+                )
+
+                new_msg = WhatsAppChatMessage(
+                    id=f"cmsg_{uuid.uuid4().hex[:12]}",
+                    openwa_message_id=openwa_id,
+                    student_id=student.id,
+                    assigned_hr_id=student.assigned_hr_id,
+                    sender_type=sender_type,
+                    sender_id=sender_id,
+                    sender_phone=sender_phone,
+                    recipient_phone=recipient_phone,
+                    message_type=msg_type,
+                    content=content,
+                    media_url=media_url,
+                    media_filename=filename,
+                    media_mimetype=mimetype,
+                    status=status_val,
+                    ack_status=ack,
+                    reactions="[]",
+                    raw_payload=json.dumps(raw_msg) if isinstance(raw_msg, dict) else None,
+                    created_at=msg_time,
+                    delivered_at=msg_time if ack >= 2 else None,
+                    read_at=msg_time if ack >= 3 else None,
+                )
+                db.add(new_msg)
+                new_count += 1
+
+        if new_count > 0 or updated_count > 0:
+            await db.commit()
+            logger.info(
+                "WhatsApp sync for student %s completed: %d new, %d updated",
+                student.id, new_count, updated_count
+            )
+
+        # Retrieve updated full history
+        all_msgs = await cls.get_thread_messages(student_id, current_user, db)
+
+        # Notify via WebSocket if any changes occurred
+        if (new_count > 0 or updated_count > 0) and student.assigned_hr_id:
+            await ws_manager.send_to_user(
+                student.assigned_hr_id,
+                "messages_synced",
+                {
+                    "student_id": student.id,
+                    "new_count": new_count,
+                    "updated_count": updated_count,
+                }
+            )
+
+        return WhatsAppSyncResponse(
+            success=True,
+            student_id=student.id,
+            synced_count=len(raw_messages),
+            new_messages_count=new_count,
+            updated_messages_count=updated_count,
+            messages=all_msgs,
+        )
+

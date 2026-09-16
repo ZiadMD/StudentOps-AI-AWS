@@ -346,6 +346,16 @@ class OpenWAWebhookPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class WhatsAppSyncResponse(BaseModel):
+    success: bool
+    student_id: str
+    synced_count: int
+    new_messages_count: int
+    updated_messages_count: int
+    messages: list[WhatsAppMessageResponse] = []
+    model_config = ConfigDict(from_attributes=True)
+
+
 # =========================================================
 # Reminder & Action Schemas
 # =========================================================

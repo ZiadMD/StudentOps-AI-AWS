@@ -511,3 +511,91 @@ class OpenWAProvider(MessagingProvider):
                 return resp.status_code in (200, 201)
         except Exception:
             return False
+
+    async def get_chat_messages(
+        self,
+        chat_id: str,
+        count: int = 50,
+        session_name: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieves recent chat messages from OpenWA Gateway or legacy daemon.
+        Attempts Gateway chat endpoints first, then falls back to daemon getChatMessages.
+        """
+        clean_chat_id = chat_id if "@" in chat_id else f"{format_phone_international(chat_id)}@c.us"
+
+        def _extract_message_list(raw_data: Any) -> list[dict[str, Any]]:
+            if isinstance(raw_data, list):
+                return [m for m in raw_data if isinstance(m, dict)]
+            if isinstance(raw_data, dict):
+                for key in ("response", "data", "messages", "result"):
+                    val = raw_data.get(key)
+                    if isinstance(val, list):
+                        return [m for m in val if isinstance(m, dict)]
+            return []
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # 1. OpenWA Gateway
+                session = await self._resolve_session(client, session_name=session_name)
+                if session:
+                    session_id = session.get("id")
+                    # Try Gateway REST chats/:id/messages
+                    urls_to_try = [
+                        (f"{self.base_url}/api/sessions/{session_id}/chats/{clean_chat_id}/messages", {"limit": count}),
+                        (f"{self.base_url}/api/sessions/{session_id}/messages", {"chatId": clean_chat_id, "limit": count}),
+                    ]
+                    for url, params in urls_to_try:
+                        try:
+                            resp = await client.get(url, params=params, headers=self.headers)
+                            if resp.status_code == 200:
+                                extracted = _extract_message_list(resp.json())
+                                if extracted:
+                                    return extracted
+                        except Exception:
+                            continue
+
+                    # Try Gateway POST getChatMessages
+                    try:
+                        resp = await client.post(
+                            f"{self.base_url}/api/sessions/{session_id}/getChatMessages",
+                            json={"chatId": clean_chat_id, "count": count, "includeMe": True},
+                            headers=self.headers,
+                        )
+                        if resp.status_code == 200:
+                            extracted = _extract_message_list(resp.json())
+                            if extracted:
+                                return extracted
+                    except Exception:
+                        pass
+
+                # 2. Legacy OpenWA daemon fallback
+                try:
+                    resp = await client.post(
+                        f"{self.base_url}/getChatMessages",
+                        json={"chatId": clean_chat_id, "count": count, "includeMe": True},
+                        headers=self.headers,
+                    )
+                    if resp.status_code == 200:
+                        extracted = _extract_message_list(resp.json())
+                        if extracted:
+                            return extracted
+                except Exception:
+                    pass
+
+                try:
+                    resp = await client.post(
+                        f"{self.base_url}/getAllMessagesInChat",
+                        json={"chatId": clean_chat_id, "includeMe": True, "limit": count},
+                        headers=self.headers,
+                    )
+                    if resp.status_code == 200:
+                        return _extract_message_list(resp.json())
+                except Exception:
+                    pass
+
+        except Exception:
+            pass
+
+        return []
+

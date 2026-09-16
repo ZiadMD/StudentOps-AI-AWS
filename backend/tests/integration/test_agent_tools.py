@@ -66,11 +66,29 @@ async def test_send_reminder_requires_confirmation():
         assert res["preview_data"]["target_count"] == 1
 
         # Calling with is_confirmed=True executes successfully
-        exec_res = await tool_send_reminder(
-            db=db,
-            context=context.model_copy(update={"is_confirmed_action": True}),
-            student_ids=["std_salma"],
-            is_confirmed=True
-        )
-        assert exec_res["success"] is True
-        assert exec_res["sent_count"] == 1
+        from unittest.mock import patch, AsyncMock
+        from datetime import datetime, timezone
+        from app.providers.openwa_provider import OpenWAProvider
+        from app.providers.messaging_provider import MessageDeliveryResult
+
+        mock_delivery = [
+            MessageDeliveryResult(
+                success=True,
+                message_id="owa_mock_123",
+                recipient_phone="201012345678",
+                channel="WHATSAPP",
+                delivered_at=datetime.now(timezone.utc),
+                delivery_status="DELIVERED",
+            )
+        ]
+        with patch.object(OpenWAProvider, "send_batch", new_callable=AsyncMock) as mock_batch:
+            mock_batch.return_value = mock_delivery
+            exec_res = await tool_send_reminder(
+                db=db,
+                context=context.model_copy(update={"is_confirmed_action": True}),
+                student_ids=["std_salma"],
+                is_confirmed=True
+            )
+            assert exec_res["success"] is True
+            assert exec_res["sent_count"] == 1
+
