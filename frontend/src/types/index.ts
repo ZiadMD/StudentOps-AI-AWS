@@ -349,3 +349,13 @@ export interface WhatsAppSendMessagePayload {
   media_filename?: string | null;
   media_mimetype?: string | null;
 }
+
+export interface WhatsAppSyncResponse {
+  success: boolean;
+  student_id: string;
+  synced_count: number;
+  new_messages_count: number;
+  updated_messages_count: number;
+  messages: WhatsAppChatMessage[];
+}
+

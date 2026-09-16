@@ -18,6 +18,7 @@ import {
   WhatsAppChatMessage,
   WhatsAppThreadSummary,
   WhatsAppSendMessagePayload,
+  WhatsAppSyncResponse,
   MemberFeedbackItem,
   MemberQuestionItem,
   CommitteeReportItem,
@@ -327,6 +328,11 @@ export const api = {
     fetchJson<WhatsAppThreadSummary[]>(`/whatsapp/threads${oversight ? '?oversight=true' : ''}`),
   getThreadMessages: (studentId: string) =>
     fetchJson<WhatsAppChatMessage[]>(`/whatsapp/threads/${encodeURIComponent(studentId)}/messages`),
+  syncThreadMessages: (studentId: string, limit: number = 50) =>
+    fetchJson<WhatsAppSyncResponse>(
+      `/whatsapp/threads/${encodeURIComponent(studentId)}/sync?limit=${encodeURIComponent(limit)}`,
+      { method: 'POST' }
+    ),
   sendThreadMessage: (studentId: string, payload: WhatsAppSendMessagePayload) =>
     fetchJson<WhatsAppChatMessage>(`/whatsapp/threads/${encodeURIComponent(studentId)}/messages`, {
       method: 'POST',
