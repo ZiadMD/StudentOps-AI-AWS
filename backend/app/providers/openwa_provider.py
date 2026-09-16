@@ -82,6 +82,148 @@ def normalize_qr_payload(qr: Optional[str]) -> Optional[str]:
     return f"data:image/png;base64,{qr}"
 
 
+def extract_openwa_message_id(raw_id: Any) -> Optional[str]:
+    """
+    Normalizes message ID from various OpenWA / WAHA / WPPConnect representations
+    into a clean serialized string. Handles nested dictionaries, strings, and legacy stringified dicts.
+    """
+    if raw_id is None:
+        return None
+    if isinstance(raw_id, str):
+        trimmed = raw_id.strip()
+        if not trimmed:
+            return None
+        # Handle stringified Python dictionary representation (e.g. "{'fromMe': True, '_serialized': '...'}")
+        if trimmed.startswith("{") and ("_serialized" in trimmed or "'id'" in trimmed or '"id"' in trimmed):
+            try:
+                import ast
+                parsed = ast.literal_eval(trimmed)
+                if isinstance(parsed, dict):
+                    return extract_openwa_message_id(parsed)
+            except Exception:
+                pass
+        return trimmed
+    if isinstance(raw_id, dict):
+        # 1. Prefer serialized string if present
+        if raw_id.get("_serialized"):
+            return str(raw_id["_serialized"]).strip()
+        # 2. Construct serialized string from composite parts if available
+        remote = raw_id.get("remote") or raw_id.get("remoteJid") or raw_id.get("chatId")
+        short_id = raw_id.get("id")
+        if remote and short_id and isinstance(short_id, str):
+            from_me_str = "true" if raw_id.get("fromMe") else "false"
+            return f"{from_me_str}_{remote}_{short_id}"
+        # 3. Check inner id
+        inner_id = raw_id.get("id")
+        if isinstance(inner_id, (dict, str)):
+            extracted_inner = extract_openwa_message_id(inner_id)
+            if extracted_inner:
+                return extracted_inner
+        if short_id:
+            return str(short_id).strip()
+    return str(raw_id).strip() if raw_id else None
+
+
+def extract_message_id_from_response(res_data: Any, fallback: Optional[str] = None) -> str:
+    """
+    Extracts a normalized serialized message ID string from an OpenWA / WAHA / WPPConnect API response.
+    """
+    now_ts = datetime.now(timezone.utc).timestamp()
+    default_fallback = fallback or f"openwa_{now_ts}"
+
+    if not res_data:
+        return default_fallback
+
+    if isinstance(res_data, str):
+        extracted = extract_openwa_message_id(res_data)
+        return extracted or default_fallback
+
+    if isinstance(res_data, dict):
+        # 1. Check direct keys
+        for key in ("_serialized", "id", "messageId"):
+            if res_data.get(key) is not None:
+                extracted = extract_openwa_message_id(res_data[key])
+                if extracted:
+                    return extracted
+
+        # 2. Check common wrapper containers
+        for container_key in ("response", "data", "result", "message"):
+            container = res_data.get(container_key)
+            if isinstance(container, dict):
+                for key in ("_serialized", "id", "messageId"):
+                    if container.get(key) is not None:
+                        extracted = extract_openwa_message_id(container[key])
+                        if extracted:
+                            return extracted
+            elif isinstance(container, list) and len(container) > 0:
+                first_item = container[0]
+                if isinstance(first_item, dict):
+                    for key in ("_serialized", "id", "messageId"):
+                        if first_item.get(key) is not None:
+                            extracted = extract_openwa_message_id(first_item[key])
+                            if extracted:
+                                return extracted
+                elif isinstance(first_item, str):
+                    extracted = extract_openwa_message_id(first_item)
+                    if extracted:
+                        return extracted
+
+    return default_fallback
+
+
+def parse_openwa_message_meta(
+    raw_msg: dict[str, Any],
+    payload: Optional[dict[str, Any]] = None,
+    official_phone: Optional[str] = None,
+) -> tuple[str, bool]:
+    """
+    Extracts normalized openwa_id and accurately resolves from_me direction.
+    Prevents outbound HR messages from ever flipping to incoming student messages.
+    """
+    # 1. Resolve openwa_id
+    raw_id = (
+        raw_msg.get("id")
+        or raw_msg.get("_serialized")
+        or raw_msg.get("messageId")
+        or (raw_msg.get("key", {}).get("id") if isinstance(raw_msg.get("key"), dict) else None)
+    )
+    openwa_id = extract_openwa_message_id(raw_id) or f"openwa_{datetime.now(timezone.utc).timestamp()}"
+
+    # 2. Resolve from_me
+    from_me = False
+
+    # Check top-level boolean in data
+    if raw_msg.get("fromMe") is not None:
+        from_me = bool(raw_msg.get("fromMe"))
+    # Check payload level (for webhooks where data is nested in payload)
+    elif payload and payload.get("fromMe") is not None:
+        from_me = bool(payload.get("fromMe"))
+    # Check nested id dict
+    elif isinstance(raw_msg.get("id"), dict) and raw_msg["id"].get("fromMe") is not None:
+        from_me = bool(raw_msg["id"].get("fromMe"))
+    # Check nested key dict (Baileys / WAHA format)
+    elif isinstance(raw_msg.get("key"), dict) and raw_msg["key"].get("fromMe") is not None:
+        from_me = bool(raw_msg["key"].get("fromMe"))
+
+    # Serialized ID prefix check: true_ indicates fromMe=True in OpenWA/WhatsApp Web protocol
+    if not from_me and openwa_id.startswith("true_"):
+        from_me = True
+
+    # Deterministic phone check: If sender phone matches official phone, it was sent by us!
+    if not from_me and official_phone:
+        raw_sender = str(raw_msg.get("from") or raw_msg.get("sender", {}).get("id") or "")
+        clean_sender = format_phone_international(raw_sender)
+        clean_official = format_phone_international(official_phone)
+        if clean_sender and clean_official and clean_sender == clean_official:
+            raw_to = str(raw_msg.get("to") or raw_msg.get("chatId") or "")
+            clean_to = format_phone_international(raw_to)
+            if clean_to != clean_official:
+                from_me = True
+
+    return openwa_id, from_me
+
+
+
 class OpenWAProvider(MessagingProvider):
     """
     HTTP Client interacting with OpenWA Gateway (NestJS) or headless container for official org broadcasts.
@@ -310,7 +452,7 @@ class OpenWAProvider(MessagingProvider):
                     resp = await client.post(send_url, json=payload, headers=self.headers)
                     if resp.status_code in (200, 201):
                         res_data = resp.json() if resp.text else {}
-                        msg_id = res_data.get("id", res_data.get("messageId", f"openwa_{now.timestamp()}"))
+                        msg_id = extract_message_id_from_response(res_data, fallback=f"openwa_{now.timestamp()}")
                         return MessageDeliveryResult(
                             success=True,
                             message_id=str(msg_id),
@@ -342,7 +484,8 @@ class OpenWAProvider(MessagingProvider):
                 }
                 resp = await client.post(url, json=legacy_payload, headers=self.headers)
                 if resp.status_code in (200, 201):
-                    msg_id = resp.json().get("id", f"openwa_{now.timestamp()}")
+                    res_data = resp.json() if resp.text else {}
+                    msg_id = extract_message_id_from_response(res_data, fallback=f"openwa_{now.timestamp()}")
                     return MessageDeliveryResult(
                         success=True,
                         message_id=str(msg_id),
@@ -427,7 +570,7 @@ class OpenWAProvider(MessagingProvider):
                     resp = await client.post(send_url, json=payload, headers=self.headers)
                     if resp.status_code in (200, 201):
                         res_data = resp.json() if resp.text else {}
-                        msg_id = res_data.get("id", res_data.get("messageId", f"openwa_{now.timestamp()}"))
+                        msg_id = extract_message_id_from_response(res_data, fallback=f"openwa_{now.timestamp()}")
                         return MessageDeliveryResult(
                             success=True,
                             message_id=str(msg_id),
@@ -447,7 +590,8 @@ class OpenWAProvider(MessagingProvider):
                 }
                 resp = await client.post(url, json=legacy_payload, headers=self.headers)
                 if resp.status_code in (200, 201):
-                    msg_id = resp.json().get("id", f"openwa_{now.timestamp()}")
+                    res_data = resp.json() if resp.text else {}
+                    msg_id = extract_message_id_from_response(res_data, fallback=f"openwa_{now.timestamp()}")
                     return MessageDeliveryResult(
                         success=True,
                         message_id=str(msg_id),

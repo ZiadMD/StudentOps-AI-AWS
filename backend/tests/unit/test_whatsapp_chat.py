@@ -539,3 +539,209 @@ async def test_sync_chat_messages_scoping_forbidden(client, test_db_session):
     assert "not assigned" in res.json()["detail"].lower()
 
 
+@pytest.mark.asyncio
+async def test_sync_chat_messages_outbound_deduplication_and_no_sender_flip(client, test_db_session):
+    """
+    REGRESSION TEST (#23):
+    1. HR sends outbound message "test".
+    2. Sync returns the message from OpenWA with nested dict ID and fromMe=True.
+    3. Verifies that the outbound message reconciles without duplicating.
+    4. Verifies that the message remains sender_type="HR" and does NOT flip to "STUDENT".
+    """
+    from datetime import datetime, timezone
+    hr_token = await get_token(client, "hr.member@studentops.org", "hrmember123")
+    headers = {"Authorization": f"Bearer {hr_token}"}
+
+    # Count initial messages
+    initial_res = await client.get("/api/whatsapp/threads/std_ziad/messages", headers=headers)
+    initial_count = len(initial_res.json())
+
+    # Dispatch outbound HR message
+    with patch("app.providers.openwa_provider.OpenWAProvider.send_message", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = MessageDeliveryResult(
+            success=True,
+            message_id="msg_short_dedup_01",
+            recipient_phone="201012345678",
+            channel="WHATSAPP_OFFICIAL",
+            delivered_at=datetime.now(timezone.utc),
+        )
+        send_res = await client.post(
+            "/api/whatsapp/threads/std_ziad/messages",
+            headers=headers,
+            json={"content": "Test outbound message for deduplication"}
+        )
+        assert send_res.status_code == 200
+        sent_data = send_res.json()
+        assert sent_data["sender_type"] == "HR"
+        assert sent_data["openwa_message_id"] == "msg_short_dedup_01"
+
+    # Now simulate OpenWA get_chat_messages returning the serialized version with dict ID
+    openwa_serialized_id = "true_201012345678@c.us_msg_short_dedup_01"
+    mock_openwa_messages = [
+        {
+            "id": {
+                "fromMe": True,
+                "remote": "201012345678@c.us",
+                "id": "msg_short_dedup_01",
+                "_serialized": openwa_serialized_id,
+            },
+            "from": "201000000000@c.us",
+            "to": "201012345678@c.us",
+            "fromMe": True,
+            "body": "Test outbound message for deduplication",
+            "type": "chat",
+            "timestamp": int(datetime.now(timezone.utc).timestamp()),
+            "ack": 3,
+        }
+    ]
+
+    with patch("app.providers.openwa_provider.OpenWAProvider.get_chat_messages", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_openwa_messages
+
+        sync_res = await client.post("/api/whatsapp/threads/std_ziad/sync?limit=50", headers=headers)
+        assert sync_res.status_code == 200
+        sync_data = sync_res.json()
+
+        # Must NOT create a duplicate message!
+        assert sync_data["new_messages_count"] == 0
+        assert sync_data["updated_messages_count"] == 1
+
+        # Total count must be initial_count + 1 (only the single sent message)
+        assert len(sync_data["messages"]) == initial_count + 1
+
+        # Locate the reconciled message
+        reconciled = next(m for m in sync_data["messages"] if m["content"] == "Test outbound message for deduplication")
+        assert reconciled["sender_type"] == "HR"  # Did NOT flip to STUDENT!
+        assert reconciled["openwa_message_id"] == openwa_serialized_id
+        assert reconciled["status"] == "read"
+
+
+@pytest.mark.asyncio
+async def test_sync_chat_messages_outbound_fallback_by_content_and_time(client, test_db_session):
+    """
+    REGRESSION TEST (#23):
+    Verifies that if OpenWA send returned a generic timestamp ID (e.g. openwa_1710...),
+    and sync returns a different serialized ID from WhatsApp server, it reconciles
+    by content + HR sender within recent window rather than inserting a duplicate student message.
+    """
+    from datetime import datetime, timezone
+    hr_token = await get_token(client, "hr.member@studentops.org", "hrmember123")
+    headers = {"Authorization": f"Bearer {hr_token}"}
+
+    # Dispatch outbound message with timestamp fallback ID
+    with patch("app.providers.openwa_provider.OpenWAProvider.send_message", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = MessageDeliveryResult(
+            success=True,
+            message_id="openwa_1710999999.0",
+            recipient_phone="201012345678",
+            channel="WHATSAPP_OFFICIAL",
+            delivered_at=datetime.now(timezone.utc),
+        )
+        send_res = await client.post(
+            "/api/whatsapp/threads/std_ziad/messages",
+            headers=headers,
+            json={"content": "Content-based fallback test question"}
+        )
+        assert send_res.status_code == 200
+
+    # Sync returns true_201012345678@c.us_3EB0SERVERGENERATED
+    server_id = "true_201012345678@c.us_3EB0SERVERGENERATED"
+    mock_openwa_messages = [
+        {
+            "id": server_id,
+            "from": "201000000000@c.us",
+            "to": "201012345678@c.us",
+            "fromMe": True,
+            "body": "Content-based fallback test question",
+            "type": "chat",
+            "timestamp": int(datetime.now(timezone.utc).timestamp()),
+            "ack": 2,
+        }
+    ]
+
+    with patch("app.providers.openwa_provider.OpenWAProvider.get_chat_messages", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_openwa_messages
+
+        sync_res = await client.post("/api/whatsapp/threads/std_ziad/sync?limit=50", headers=headers)
+        assert sync_res.status_code == 200
+        sync_data = sync_res.json()
+
+        assert sync_data["new_messages_count"] == 0
+        assert sync_data["updated_messages_count"] == 1
+
+        reconciled = next(m for m in sync_data["messages"] if m["content"] == "Content-based fallback test question")
+        assert reconciled["sender_type"] == "HR"
+        assert reconciled["openwa_message_id"] == server_id
+
+
+@pytest.mark.asyncio
+async def test_webhook_outbound_reconciliation_with_nested_dict_id(client, test_db_session, monkeypatch):
+    """
+    REGRESSION TEST (#23):
+    Verifies that when webhook delivers an outbound message where `fromMe` is only nested inside `id`
+    and `id` is a dict, it correctly resolves from_me=True, reconciles with the recently sent HR message,
+    and does NOT create a duplicate student message.
+    """
+    from datetime import datetime, timezone
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "OPENWA_WEBHOOK_SECRET", "test-secret")
+
+    hr_token = await get_token(client, "hr.member@studentops.org", "hrmember123")
+    headers = {"Authorization": f"Bearer {hr_token}"}
+
+    # Dispatch outbound message
+    with patch("app.providers.openwa_provider.OpenWAProvider.send_message", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = MessageDeliveryResult(
+            success=True,
+            message_id="openwa_webhook_fallback_01",
+            recipient_phone="201012345678",
+            channel="WHATSAPP_OFFICIAL",
+            delivered_at=datetime.now(timezone.utc),
+        )
+        send_res = await client.post(
+            "/api/whatsapp/threads/std_ziad/messages",
+            headers=headers,
+            json={"content": "Webhook deduplication test message"}
+        )
+        assert send_res.status_code == 200
+
+    # Webhook arrives with nested dict ID and NO top-level fromMe
+    serialized_id = "true_201012345678@c.us_3EB0WEBHOOK01"
+    webhook_payload = {
+        "event": "onAnyMessage",
+        "data": {
+            "id": {
+                "fromMe": True,
+                "remote": "201012345678@c.us",
+                "id": "3EB0WEBHOOK01",
+                "_serialized": serialized_id,
+            },
+            "from": "201000000000@c.us",
+            "to": "201012345678@c.us",
+            "chatId": "201012345678@c.us",
+            "body": "Webhook deduplication test message",
+            "type": "chat",
+            "timestamp": int(datetime.now(timezone.utc).timestamp()),
+            "ack": 2,
+        }
+    }
+
+    res = await client.post(
+        "/api/whatsapp/webhook",
+        headers={"X-Webhook-Secret": "test-secret"},
+        json=webhook_payload,
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "duplicate_skipped"
+
+    # Verify that in database, only ONE message exists with this content, and its sender_type is "HR"
+    db_res = await test_db_session.execute(
+        select(WhatsAppChatMessage).where(WhatsAppChatMessage.content == "Webhook deduplication test message")
+    )
+    matching_msgs = db_res.scalars().all()
+    assert len(matching_msgs) == 1
+    assert matching_msgs[0].sender_type == "HR"
+    assert matching_msgs[0].openwa_message_id == serialized_id
+
+
+
