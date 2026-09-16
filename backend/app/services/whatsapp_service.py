@@ -7,7 +7,7 @@ from typing import Optional, Any
 import uuid
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, desc, func
@@ -22,6 +22,8 @@ from app.providers.openwa_provider import (
     OpenWAProvider,
     format_phone_international,
     OutgoingMessage,
+    extract_openwa_message_id,
+    parse_openwa_message_meta,
 )
 from app.services.whatsapp_connection_manager import ws_manager
 from app.core.config import settings
@@ -434,7 +436,7 @@ class WhatsAppService:
 
         # 1. Handle Message Status / Ack (onAck / message.ack / ack)
         if "ack" in event_name or ("ack" in data and "body" not in data and "text" not in data):
-            target_id = str(data.get("id") or data.get("messageId") or "")
+            target_id = extract_openwa_message_id(data.get("id") or data.get("messageId")) or str(data.get("id") or data.get("messageId") or "")
             ack_val = data.get("ack", 1)  # 1: sent, 2: delivered, 3: read
             if target_id:
                 res = await db.execute(
@@ -442,6 +444,7 @@ class WhatsAppService:
                         or_(
                             WhatsAppChatMessage.openwa_message_id == target_id,
                             WhatsAppChatMessage.id == target_id,
+                            WhatsAppChatMessage.openwa_message_id.endswith(target_id),
                         )
                     )
                 )
@@ -477,18 +480,29 @@ class WhatsAppService:
                 return {"status": "ignored", "reason": "Group messages not supported"}
 
             # Determine direction: fromMe=True indicates message sent from connected device / WhatsApp Web
-            from_me = bool(
-                data.get("fromMe")
-                or payload.get("fromMe")
-                or str(data.get("id", "")).startswith("true_")
+            openwa_id, from_me = parse_openwa_message_meta(
+                data,
+                payload=payload,
+                official_phone=settings.OPENWA_OFFICIAL_PHONE,
             )
 
             if from_me:
-                raw_target = str(data.get("to") or data.get("chatId") or data.get("chat", {}).get("id") or "")
+                raw_target = str(
+                    data.get("to")
+                    or data.get("chatId")
+                    or data.get("chat", {}).get("id")
+                    or (data.get("id", {}).get("remote") if isinstance(data.get("id"), dict) else "")
+                    or ""
+                )
                 clean_digits = format_phone_international(raw_target)
                 raw_sender = str(data.get("from") or settings.OPENWA_OFFICIAL_PHONE or "+201000000000")
             else:
-                raw_sender = str(data.get("from") or data.get("sender", {}).get("id") or data.get("chatId") or "")
+                raw_sender = str(
+                    data.get("from")
+                    or data.get("sender", {}).get("id")
+                    or data.get("chatId")
+                    or ""
+                )
                 clean_digits = format_phone_international(raw_sender)
 
             if not clean_digits:
@@ -521,29 +535,76 @@ class WhatsAppService:
                 }
 
             assigned_hr_id = student.assigned_hr_id
-            openwa_id = str(data.get("id") or f"openwa_{uuid.uuid4().hex[:8]}")
+            content = data.get("body") or data.get("text") or data.get("caption") or ""
+            ts = data.get("timestamp") or data.get("t")
+            msg_time = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else utcnow()
+            ack_val = int(data.get("ack", 1 if from_me else 2))
+            status_val = "sent" if from_me else "delivered"
 
             # Check deduplication
             dup_res = await db.execute(
                 select(WhatsAppChatMessage).where(WhatsAppChatMessage.openwa_message_id == openwa_id)
             )
             existing_msg = dup_res.scalar_one_or_none()
+
+            # Outbound Deduplication Fallback for Webhook:
+            if not existing_msg and from_me:
+                recent_cutoff = msg_time - timedelta(minutes=10)
+                fallback_stmt = (
+                    select(WhatsAppChatMessage)
+                    .where(
+                        WhatsAppChatMessage.student_id == student.id,
+                        WhatsAppChatMessage.sender_type == "HR",
+                        WhatsAppChatMessage.created_at >= recent_cutoff,
+                    )
+                    .order_by(desc(WhatsAppChatMessage.created_at))
+                )
+                candidates_res = await db.execute(fallback_stmt)
+                candidates = candidates_res.scalars().all()
+
+                for cand in candidates:
+                    id_matches = bool(
+                        cand.openwa_message_id
+                        and (
+                            cand.openwa_message_id in openwa_id
+                            or openwa_id.endswith(cand.openwa_message_id)
+                            or extract_openwa_message_id(cand.openwa_message_id) == openwa_id
+                        )
+                    )
+                    content_matches = bool(
+                        cand.content == content
+                        and (
+                            cand.openwa_message_id is None
+                            or cand.openwa_message_id.startswith("openwa_")
+                            or cand.openwa_message_id.startswith("cmsg_")
+                            or not str(cand.openwa_message_id).startswith("true_")
+                        )
+                    )
+                    if id_matches or content_matches:
+                        existing_msg = cand
+                        existing_msg.openwa_message_id = openwa_id
+                        logger.info(
+                            "WhatsApp webhook: reconciled outbound HR message id=%s -> openwa_id=%s",
+                            existing_msg.id, openwa_id
+                        )
+                        break
+
             if existing_msg:
                 logger.info("WhatsApp webhook: duplicate message skipped openwa_id=%s", openwa_id)
                 # Reconcile ack if newer
-                ack_val = data.get("ack")
-                if ack_val and int(ack_val) > (existing_msg.ack_status or 0):
-                    existing_msg.ack_status = int(ack_val)
-                    if int(ack_val) == 2 and not existing_msg.delivered_at:
+                if ack_val > (existing_msg.ack_status or 0):
+                    existing_msg.ack_status = ack_val
+                    if ack_val == 2 and not existing_msg.delivered_at:
                         existing_msg.delivered_at = utcnow()
                         existing_msg.status = "delivered"
-                    elif int(ack_val) == 3 and not existing_msg.read_at:
+                    elif ack_val == 3 and not existing_msg.read_at:
                         existing_msg.read_at = utcnow()
                         existing_msg.status = "read"
-                    await db.commit()
+                if existing_msg.openwa_message_id != openwa_id:
+                    existing_msg.openwa_message_id = openwa_id
+                await db.commit()
                 return {"status": "duplicate_skipped", "message_id": existing_msg.id}
 
-            content = data.get("body") or data.get("text") or data.get("caption") or ""
             raw_msg_type = str(data.get("type") or "text").lower()
             msg_type = "audio" if raw_msg_type == "ptt" else (
                 raw_msg_type if raw_msg_type in ("image", "video", "document", "audio") else "text"
@@ -552,17 +613,12 @@ class WhatsAppService:
             mimetype = data.get("mimetype")
             filename = data.get("filename")
 
-            ts = data.get("timestamp") or data.get("t")
-            msg_time = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else utcnow()
-
             sender_type = "HR" if from_me else "STUDENT"
             sender_id = assigned_hr_id if from_me else student.id
             sender_phone = (
                 format_phone_international(raw_sender) or settings.OPENWA_OFFICIAL_PHONE or "+201000000000"
             ) if from_me else clean_digits
             recipient_phone = clean_digits if from_me else (settings.OPENWA_OFFICIAL_PHONE or "+201000000000")
-            status_val = "sent" if from_me else "delivered"
-            ack_val = int(data.get("ack", 1 if from_me else 2))
 
             new_msg = WhatsAppChatMessage(
                 id=f"cmsg_{uuid.uuid4().hex[:12]}",
@@ -652,14 +708,13 @@ class WhatsAppService:
         now = utcnow()
 
         for raw_msg in raw_messages:
-            openwa_id = str(raw_msg.get("id") or "")
+            openwa_id, from_me = parse_openwa_message_meta(
+                raw_msg,
+                official_phone=settings.OPENWA_OFFICIAL_PHONE,
+            )
             if not openwa_id:
                 continue
 
-            from_me = bool(
-                raw_msg.get("fromMe")
-                or str(openwa_id).startswith("true_")
-            )
             content = raw_msg.get("body") or raw_msg.get("text") or raw_msg.get("caption") or ""
             raw_type = str(raw_msg.get("type") or "text").lower()
             msg_type = "audio" if raw_type == "ptt" else (
@@ -680,11 +735,53 @@ class WhatsAppService:
             else:
                 status_val = "sent" if from_me else "delivered"
 
-            # Check if exists in DB
+            # Check if exists in DB by openwa_message_id
             existing_res = await db.execute(
                 select(WhatsAppChatMessage).where(WhatsAppChatMessage.openwa_message_id == openwa_id)
             )
             existing = existing_res.scalar_one_or_none()
+
+            # Outbound Deduplication Fallback for Sync:
+            if not existing and from_me:
+                recent_cutoff = msg_time - timedelta(minutes=10)
+                fallback_stmt = (
+                    select(WhatsAppChatMessage)
+                    .where(
+                        WhatsAppChatMessage.student_id == student.id,
+                        WhatsAppChatMessage.sender_type == "HR",
+                        WhatsAppChatMessage.created_at >= recent_cutoff,
+                    )
+                    .order_by(desc(WhatsAppChatMessage.created_at))
+                )
+                candidates_res = await db.execute(fallback_stmt)
+                candidates = candidates_res.scalars().all()
+
+                for cand in candidates:
+                    id_matches = bool(
+                        cand.openwa_message_id
+                        and (
+                            cand.openwa_message_id in openwa_id
+                            or openwa_id.endswith(cand.openwa_message_id)
+                            or extract_openwa_message_id(cand.openwa_message_id) == openwa_id
+                        )
+                    )
+                    content_matches = bool(
+                        cand.content == content
+                        and (
+                            cand.openwa_message_id is None
+                            or cand.openwa_message_id.startswith("openwa_")
+                            or cand.openwa_message_id.startswith("cmsg_")
+                            or not str(cand.openwa_message_id).startswith("true_")
+                        )
+                    )
+                    if id_matches or content_matches:
+                        existing = cand
+                        existing.openwa_message_id = openwa_id
+                        logger.info(
+                            "WhatsApp sync: reconciled outbound HR message id=%s -> openwa_id=%s",
+                            existing.id, openwa_id
+                        )
+                        break
 
             if existing:
                 changed = False
@@ -699,6 +796,12 @@ class WhatsAppService:
                     changed = True
                 if media_url and not existing.media_url:
                     existing.media_url = media_url
+                    changed = True
+                if existing.openwa_message_id != openwa_id:
+                    existing.openwa_message_id = openwa_id
+                    changed = True
+                if existing.status == "pending" and status_val != "pending":
+                    existing.status = status_val
                     changed = True
                 if changed:
                     updated_count += 1
