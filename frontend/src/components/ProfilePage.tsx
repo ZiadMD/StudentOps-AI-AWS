@@ -200,14 +200,6 @@ export function ProfilePage({ currentUser }: ProfilePageProps) {
               {validCreatedAt ? <time dateTime={validCreatedAt.toISOString()}>{validCreatedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}</time> : 'Not provided'}
             </ProfileField>
           </dl>
-          <details className="mt-6 border-t border-slate-200">
-            <summary className="min-h-11 cursor-pointer py-4 text-sm font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-700">Account references</summary>
-            <dl className="min-w-0 divide-y divide-slate-200">
-              <ProfileField label="Account ID"><span className="font-mono text-xs">{currentUser.id}</span></ProfileField>
-              <ProfileField label="Committee ID"><span className="font-mono text-xs">{recorded(currentUser.team_id)}</span></ProfileField>
-              <ProfileField label="Member ID"><span className="font-mono text-xs">{recorded(currentUser.student_id)}</span></ProfileField>
-            </dl>
-          </details>
         </section>
       </div>
     </section>

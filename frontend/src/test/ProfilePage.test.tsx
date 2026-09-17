@@ -46,22 +46,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('ProfilePage account visibility', () => {
-  it('switches sections without refetching membership and collapses account references', async () => {
+  it('switches sections without refetching membership or exposing internal IDs', async () => {
     render(<ProfilePage currentUser={user} />);
     await screen.findByText('ST-123');
     const profile = screen.getByRole('button', { name: 'Profile' });
     const settings = screen.getByRole('button', { name: 'Account settings' });
     expect(profile).toHaveAttribute('aria-pressed', 'true');
-    expect(field('Account ID')).not.toBeVisible();
     fireEvent.click(settings);
     expect(settings).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('region', { name: 'Account access' })).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Linked member record' })).not.toBeInTheDocument();
-    const references = screen.getByText('Account references').closest('details');
-    expect(references).not.toHaveAttribute('open');
-    fireEvent.click(screen.getByText('Account references'));
-    expect(references).toHaveAttribute('open');
-    expect(field('Account ID')).toBeVisible();
+    for (const text of ['Account references', 'Account ID', 'Committee ID', 'Member ID', user.id, user.team_id!, user.student_id!]) {
+      expect(screen.queryByText(text, { exact: true })).not.toBeInTheDocument();
+    }
     fireEvent.click(profile);
     expect(screen.getByText('ST-123')).toBeVisible();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -134,7 +131,7 @@ describe('ProfilePage account visibility', () => {
     render(<ProfilePage currentUser={{ ...user, student_id: undefined, team_name: ' ' }} />);
     expect(field('Committee / team')).toHaveTextContent('Name unavailable');
     expect(field('Committee / team')).not.toHaveTextContent('team_design');
-    expect(field('Committee ID')).toHaveTextContent('team_design');
+    expect(screen.queryByText('team_design')).not.toBeInTheDocument();
     expect(field('Committee / team')).not.toHaveTextContent('Not assigned');
   });
 
