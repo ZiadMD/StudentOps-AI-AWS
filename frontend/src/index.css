@@ -24,11 +24,106 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221 83% 53%;
     --radius: 0.75rem;
+    --scrollbar-track: #f1f5f9;
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-hover: #94a3b8;
+    --focus-outline: #0f766e;
+  }
+
+  html.dark {
+    color-scheme: dark;
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 40% 11%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 40% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 25% 73%;
+    --accent: 175 55% 15%;
+    --accent-foreground: 166 76% 80%;
+    --destructive: 350 89% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 27% 25%;
+    --input: 215 27% 25%;
+    --ring: 172 66% 50%;
+    --focus-outline: #5eead4;
+    --scrollbar-track: #111b2b;
+    --scrollbar-thumb: #475569;
+    --scrollbar-hover: #64748b;
+
+    /* RGB channels let Tailwind preserve /opacity, hover, focus and responsive
+       variants. These are property-specific: text-white and media stay intact. */
+    --theme-surface: 17 27 43;
+    --theme-bg-50: 11 18 32;
+    --theme-bg-100: 30 41 59;
+    --theme-bg-200: 42 57 78;
+    --theme-bg-300: 71 85 105;
+    --theme-bg-800: 51 65 85;
+    --theme-bg-900: 37 51 72;
+    --theme-text-400: 148 163 184;
+    --theme-text-500: 165 180 200;
+    --theme-text-600: 184 198 217;
+    --theme-text-700: 203 213 225;
+    --theme-text-800: 226 232 240;
+    --theme-text-900: 241 245 249;
+    --theme-border-50: 30 41 59;
+    --theme-border-100: 39 52 72;
+    --theme-border-200: 47 63 84;
+    --theme-border-300: 71 85 105;
+    --theme-border-400: 100 116 139;
+    --theme-border-500: 148 163 184;
+    --theme-border-800: 71 85 105;
+    --theme-border-900: 100 116 139;
+    --theme-ring-300: 100 116 139;
+    --theme-ring-500: 148 163 184;
+    --theme-ring-900: 94 234 212;
+
+    --theme-blue-soft: 19 39 69;
+    --theme-blue-text: 147 197 253;
+    --theme-blue-border: 42 76 121;
+    --theme-sky-soft: 12 42 60;
+    --theme-sky-text: 125 211 252;
+    --theme-sky-border: 28 81 111;
+    --theme-indigo-soft: 35 36 72;
+    --theme-indigo-text: 165 180 252;
+    --theme-indigo-border: 67 69 120;
+    --theme-purple-soft: 45 29 65;
+    --theme-purple-text: 216 180 254;
+    --theme-purple-border: 91 53 117;
+    --theme-emerald-soft: 12 46 39;
+    --theme-emerald-text: 110 231 183;
+    --theme-emerald-border: 28 88 67;
+    --theme-teal-soft: 14 47 47;
+    --theme-teal-text: 94 234 212;
+    --theme-teal-border: 31 89 84;
+    --theme-amber-soft: 52 38 19;
+    --theme-amber-text: 252 211 77;
+    --theme-amber-border: 104 76 29;
+    --theme-rose-soft: 57 26 39;
+    --theme-rose-text: 253 164 175;
+    --theme-rose-border: 112 47 64;
+    --theme-red-soft: 57 26 26;
+    --theme-red-text: 252 165 165;
+    --theme-red-border: 112 47 47;
+    --theme-green-soft: 19 46 30;
+    --theme-green-text: 134 239 172;
+    --theme-green-border: 38 88 54;
+    --theme-yellow-soft: 48 41 18;
+    --theme-yellow-text: 253 224 71;
+    --theme-yellow-border: 98 85 29;
+    --theme-orange-soft: 55 33 21;
+    --theme-orange-text: 253 186 116;
+    --theme-orange-border: 110 64 35;
   }
 
   body {
-    background-color: #f8fafc;
-    color: #0f172a;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-family: 'Plus Jakarta Sans', 'Inter', 'Cairo', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
@@ -36,7 +131,7 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
     letter-spacing: -0.025em;
-    color: #0f172a;
+    color: hsl(var(--foreground));
   }
 
   code, pre, .font-mono {
@@ -45,30 +140,90 @@
   }
 }
 
-/* Ambient Radial Mesh Background */
-.bg-ambient-mesh {
-  background-color: #f8fafc;
-  background-image: 
-    radial-gradient(at 10% 10%, rgba(37, 99, 235, 0.04) 0px, transparent 50%),
-    radial-gradient(at 90% 10%, rgba(14, 165, 233, 0.04) 0px, transparent 50%),
-    radial-gradient(at 50% 90%, rgba(99, 102, 241, 0.03) 0px, transparent 50%);
+/* Shared layout and interaction standards. */
+.bg-ambient-mesh { background-color: hsl(var(--background)); }
+html { scroll-padding-top: 5rem; }
+body { margin: 0; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 3px;
+}
+:where(p, h1, h2, h3, dd) { overflow-wrap: anywhere; }
+.skip-link {
+  position: fixed; top: -5rem; left: 1rem; z-index: 100;
+  border-radius: .5rem; padding: .75rem 1rem; background: #0f172a; color: white;
+}
+.skip-link:focus { top: 1rem; }
+.workspace-page { min-width: 0; }
+.workspace-page table { font-variant-numeric: tabular-nums; }
+.workspace-page :where(input, select, textarea) { max-width: 100%; }
+.workspace-page :where(button, a) { touch-action: manipulation; }
+#app-sidebar { background: #fff; }
+#app-sidebar > div:first-child > div:first-child { min-height: 4rem; }
+#app-sidebar nav { padding: 1rem .75rem; }
+#app-sidebar nav button { min-height: 2.75rem; margin-bottom: .25rem; border-radius: .5rem; }
+#app-sidebar nav button[aria-current='page'] { background: #f0fdfa; color: #115e59; box-shadow: inset 3px 0 #0f766e; }
+#app-sidebar nav button[aria-current='page'] svg { color: #0f766e; }
+/* Only hardcoded shared styles need selectors; utility colors use the tokens above. */
+html.dark #app-sidebar { background: hsl(var(--card)); }
+html.dark #app-sidebar nav button[aria-current='page'] {
+  background: hsl(var(--accent)); color: hsl(var(--accent-foreground));
+  box-shadow: inset 3px 0 var(--focus-outline);
+}
+html.dark #app-sidebar nav button[aria-current='page'] svg { color: var(--focus-outline); }
+html.dark :where(input, select, textarea) { color-scheme: dark; }
+html.dark :where(input, textarea)::placeholder { color: #94a3b8; opacity: 1; }
+html.dark select option { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+html.dark :where(*, *::before, *::after) { --tw-ring-offset-color: hsl(var(--card)); }
+/* Do not lighten modal/drawer backdrops along with solid slate action buttons. */
+html.dark .bg-slate-900\/40 { background-color: rgb(2 6 23 / .7); }
+html.dark .bg-black\/5 { background-color: rgb(255 255 255 / .04); }
+html.dark .hover\:bg-black\/10:hover { background-color: rgb(255 255 255 / .08); }
+.drawer-close { display: none; }
+@media (min-width: 1024px) {
+  #app-sidebar[data-collapsed='false'] { width: 16rem; }
+}
+/* Tablets use the same accessible drawer as phones, preserving content width. */
+@media (max-width: 1023px) {
+  #app-sidebar {
+    position: fixed; inset: 0 auto 0 0; height: 100dvh; width: min(22rem, 100%);
+    visibility: hidden; transform: translateX(-100%); opacity: 0; pointer-events: none;
+  }
+  #app-sidebar[data-open='true'] { visibility: visible; transform: translateX(0); opacity: 1; pointer-events: auto; }
+  #app-sidebar .md\:hidden { display: block; }
+  #app-sidebar button[aria-label='Close navigation menu'],
+  #app-sidebar button[aria-label='Collapse sidebar'],
+  #app-sidebar button[aria-label='Expand sidebar'] { display: none; }
+  #app-sidebar .drawer-close { display: flex; }
+  #app-sidebar nav button { justify-content: flex-start; padding: .75rem; }
+  #app-sidebar nav button > div { gap: .75rem; }
+  .workspace-page :where(button, select, input:not([type='checkbox']):not([type='radio'])) { min-height: 2.75rem; }
+}
+@media (max-width: 767px) {
+  :where(input, select, textarea) { font-size: 16px !important; }
+  [role='dialog'] { max-height: calc(100dvh - 2rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 
-/* Polished light scrollbar */
+/* Scrollbars follow the same theme as the surfaces they sit on. */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scrollbar-thumb);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--scrollbar-hover);
 }
+

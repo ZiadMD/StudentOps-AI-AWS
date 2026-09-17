@@ -34,6 +34,7 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
   const [reports, setReports] = useState<CommitteeReportItem[]>([]);
   const [summary, setSummary] = useState<ReportMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Submit Report Modal (HR Leader)
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -46,14 +47,15 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
   const loadData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const [reps, commSummary] = await Promise.all([
-        api.getCommitteeReports().catch(() => []),
-        api.getCommitteeSummary().catch(() => null),
+        api.getCommitteeReports(),
+        api.getCommitteeSummary(),
       ]);
       setReports(reps);
       setSummary(commSummary);
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Unable to load committee reports.');
     } finally {
       setLoading(false);
     }
@@ -85,42 +87,42 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
   };
 
   return (
-    <div className="space-y-6">
+    <div className="workspace-page min-w-0 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Executive Committee Reports
+          <h2 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">
+            Committee Reports
           </h2>
-          <p className="text-[12px] text-slate-500 mt-0.5">
-            Social Media Committee performance synthesis from HR Leader to HR Region Head.
+          <p className="text-sm text-slate-600 mt-2">
+            Committee performance summaries and reports submitted to the Region HR Head.
           </p>
         </div>
 
         {isHrLeader && (
           <button
             onClick={() => {
-              setReportTitle(`Social Media Sprint Performance Report — ${new Date().toLocaleDateString([], { month: 'short', year: 'numeric' })}`);
+              setReportTitle(`Committee Report — ${new Date().toLocaleDateString([], { month: 'short', year: 'numeric' })}`);
               setShowSubmitModal(true);
             }}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md shadow-sm text-[13px] font-medium flex items-center space-x-1.5 transition-colors"
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold flex items-center gap-2 shrink-0 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Submit Sprint Report to Head</span>
+            <span>Submit report</span>
           </button>
         )}
       </div>
 
       {/* Real-time Summary Cards */}
-      {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {summary && !loading && !error && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px rounded-xl overflow-hidden border border-slate-200 bg-slate-200 [&>div]:border-0 [&>div]:rounded-none [&>div]:shadow-none [&>div]:p-5 [&_svg]:text-slate-500 [&_.font-mono]:text-slate-900">
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
             <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
               <span>Committee Size</span>
               <Users className="w-4 h-4 text-slate-400" />
             </div>
-            <div className="text-2xl font-bold text-slate-900 font-mono">{summary.total_members}</div>
-            <p className="text-[11px] text-slate-400">Active Social Media Members</p>
+            <div className="text-2xl font-bold text-slate-900 font-mono">{summary.total_members ?? 'Unavailable'}</div>
+            <p className="text-[11px] text-slate-400">Members in report scope</p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
@@ -128,7 +130,7 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
               <span>Average Total Score</span>
               <Award className="w-4 h-4 text-indigo-500" />
             </div>
-            <div className="text-2xl font-bold text-indigo-600 font-mono">{summary.avg_total_score}</div>
+            <div className="text-2xl font-bold text-indigo-600 font-mono">{summary.avg_total_score ?? 'Unavailable'}</div>
             <p className="text-[11px] text-slate-400">Across behavior, quality &amp; attendance</p>
           </div>
 
@@ -137,7 +139,7 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
               <span>Task Quality Avg</span>
               <TrendingUp className="w-4 h-4 text-emerald-500" />
             </div>
-            <div className="text-2xl font-bold text-emerald-600 font-mono">{summary.avg_task_quality} / 10</div>
+            <div className="text-2xl font-bold text-emerald-600 font-mono">{summary.avg_task_quality != null ? `${summary.avg_task_quality} / 10` : 'Unavailable'}</div>
             <p className="text-[11px] text-slate-400">Graded by Committee Head</p>
           </div>
 
@@ -146,7 +148,7 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
               <span>Attendance Rate</span>
               <Calendar className="w-4 h-4 text-blue-500" />
             </div>
-            <div className="text-2xl font-bold text-blue-600 font-mono">{summary.overall_attendance_rate}%</div>
+            <div className="text-2xl font-bold text-blue-600 font-mono">{summary.overall_attendance_rate != null ? `${summary.overall_attendance_rate}%` : 'Unavailable'}</div>
             <p className="text-[11px] text-slate-400">Target baseline: 70%</p>
           </div>
         </div>
@@ -156,11 +158,16 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-900">Submitted Reports to Region Head</h3>
-          <span className="text-xs font-mono text-slate-400">{reports.length} reports logged</span>
+          <span className="text-xs font-mono text-slate-400">{loading ? 'Loading…' : error ? 'Unavailable' : `${reports.length} reports logged`}</span>
         </div>
 
         {loading ? (
           <div className="p-12 text-center text-slate-500 text-sm">Loading executive reports...</div>
+        ) : error ? (
+          <div role="alert" className="rounded-xl border border-rose-200 bg-white p-5 text-sm text-rose-700">
+            <p>{error}</p>
+            <button onClick={loadData} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry reports</button>
+          </div>
         ) : reports.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-500 space-y-2">
             <FileText className="w-8 h-8 text-slate-300 mx-auto" />
@@ -190,11 +197,11 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900">{rep.report_title}</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="break-words text-base font-semibold text-slate-900">{rep.report_title}</span>
                         <Badge variant="success">Submitted to HR Head</Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                         <span>Submitted by {rep.submitted_by_name || 'HR Leader'}</span>
                         <span>•</span>
                         <span>
@@ -215,19 +222,19 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100 font-mono text-xs">
                       <div>
                         <span className="text-slate-500 text-[11px] block">Active Members</span>
-                        <span className="font-bold text-slate-800">{metrics.total_members}</span>
+                        <span className="font-semibold text-slate-900">{metrics.total_members ?? 'Unavailable'}</span>
                       </div>
                       <div>
                         <span className="text-slate-500 text-[11px] block">Avg Total Score</span>
-                        <span className="font-bold text-indigo-600">{metrics.avg_total_score}</span>
+                        <span className="font-semibold text-slate-900">{metrics.avg_total_score ?? 'Unavailable'}</span>
                       </div>
                       <div>
                         <span className="text-slate-500 text-[11px] block">Avg Quality</span>
-                        <span className="font-bold text-emerald-600">{metrics.avg_task_quality} / 10</span>
+                        <span className="font-semibold text-slate-900">{metrics.avg_task_quality != null ? `${metrics.avg_task_quality} / 10` : 'Unavailable'}</span>
                       </div>
                       <div>
                         <span className="text-slate-500 text-[11px] block">Attendance</span>
-                        <span className="font-bold text-blue-600">{metrics.overall_attendance_rate}%</span>
+                        <span className="font-semibold text-slate-900">{metrics.overall_attendance_rate != null ? `${metrics.overall_attendance_rate}%` : 'Unavailable'}</span>
                       </div>
                     </div>
                   )}
@@ -251,7 +258,7 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
         isOpen={showSubmitModal}
         onClose={() => setShowSubmitModal(false)}
         title="Submit Report to HR Head (Region)"
-        description="This compiles current Social Media Committee scores, attendance stats, and member feedback metrics into a formal briefing for the Region HR Head."
+        description="Compile current committee scores, attendance, and member feedback metrics for the Region HR Head."
         size="md"
       >
         <form onSubmit={handleSubmitReport} className="space-y-4">
@@ -291,7 +298,7 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center gap-1.5"
             >
               <Send className="w-3 h-3" />
               <span>{submitting ? 'Transmitting...' : 'Dispatch Report to Region Head'}</span>

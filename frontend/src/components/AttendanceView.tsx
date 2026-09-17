@@ -20,6 +20,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
   const {
     data: cachedMeetings,
     loading,
+    error,
     refresh: loadMeetings,
   } = useCachedData<MeetingDetail[]>(
     'attendance_sessions',
@@ -104,15 +105,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="workspace-page min-w-0 space-y-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Meet Attendance Logs</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Deterministic attendance matching against Google Meet logs and session numbers.
+          <h2 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">Attendance</h2>
+          <p className="text-sm text-slate-600 mt-2">
+            Session rosters matched against Google Meet participation logs.
           </p>
         </div>
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -120,7 +121,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
               placeholder="Search meetings..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full sm:w-64 transition-all"
+              aria-label="Search sessions"
+              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-500 w-full sm:w-64 transition-all"
             />
           </div>
 
@@ -129,10 +131,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
               onClick={() => {
                 const nextNum = meetings.length + 1;
                 setSessionNumber(nextNum);
-                setTitle(`Session ${nextNum}: Social Media Workshop`);
+                setTitle('');
                 setShowScheduleModal(true);
               }}
-              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition-colors"
+              className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold flex items-center space-x-1.5 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>Schedule Session</span>
@@ -141,8 +143,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
-        {loading ? (
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        {error ? (
+          <div role="alert" className="p-5 text-sm text-rose-700"><p>{error.message}</p><button onClick={() => void loadMeetings()} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry sessions</button></div>
+        ) : loading ? (
           <div>
             {/* Desktop Table Skeletons */}
             <div className="hidden md:block">
@@ -220,8 +224,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                         {/* Session Identity */}
                         <td className="px-5 py-3.5">
                           <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                              <Video className="w-4 h-4 text-blue-600" />
+                            <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                              <Video className="w-4 h-4 text-slate-500" />
                             </div>
                             <div>
                               <div className="font-semibold text-slate-900">{m.title}</div>
@@ -285,13 +289,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                               href={m.meet_url}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold text-xs transition-colors"
+                              className="inline-flex items-center space-x-1 text-slate-600 hover:text-slate-900 font-semibold text-xs transition-colors"
                             >
                               <span>Join</span>
                               <ArrowUpRight className="w-3.5 h-3.5" />
                             </a>
                           ) : (
-                            <span className="text-slate-400 text-xs italic">Ended</span>
+                            <span className="text-slate-500 text-xs">No meeting link</span>
                           )}
                         </td>
                       </tr>
@@ -314,8 +318,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                     {/* Session Header */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center space-x-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                          <Video className="w-4 h-4 text-blue-600" />
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                          <Video className="w-4 h-4 text-slate-500" />
                         </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-900 text-sm truncate">{m.title}</div>
@@ -365,13 +369,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                           href={m.meet_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-2xs transition-colors"
+                          className="inline-flex items-center space-x-1 px-3 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-colors"
                         >
                           <span>Join Meet</span>
                           <ArrowUpRight className="w-3.5 h-3.5" />
                         </a>
                       ) : (
-                        <span className="text-xs text-slate-400 italic">Session Concluded</span>
+                        <span className="text-xs text-slate-500">No meeting link</span>
                       )}
                     </div>
                   </div>
@@ -404,7 +408,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
                 placeholder="e.g. Session 7: TikTok Virality"
                 required
               />
@@ -416,7 +420,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                 min={1}
                 value={sessionNumber}
                 onChange={(e) => setSessionNumber(parseInt(e.target.value) || 1)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
                 required
               />
             </div>
@@ -428,7 +432,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
               placeholder="e.g. Hook writing and audience retention metrics"
             />
           </div>
@@ -440,7 +444,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
                 required
               />
             </div>
@@ -452,7 +456,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                 step={15}
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(parseInt(e.target.value) || 60)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
                 required
               />
             </div>
@@ -464,7 +468,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
               type="url"
               value={meetUrl}
               onChange={(e) => setMeetUrl(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
               placeholder="https://meet.google.com/abc-defg-hij"
             />
           </div>
@@ -480,9 +484,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
             <button
               type="submit"
               disabled={scheduling}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold disabled:opacity-50"
             >
-              {scheduling ? 'Scheduling...' : 'Confirm Session'}
+              {scheduling ? 'Scheduling…' : 'Confirm session'}
             </button>
           </div>
         </form>

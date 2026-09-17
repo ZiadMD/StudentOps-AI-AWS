@@ -1,20 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Users, 
-  UserCheck, 
-  Clock, 
-  Calendar, 
-  Bot, 
-  Award, 
-  Video, 
-  ChevronRight, 
-  ArrowRight,
-  ExternalLink,
-  CheckSquare,
-  Activity,
-  AlertCircle,
-  HelpCircle
-} from 'lucide-react';
+import { Bot, ChevronRight, ArrowRight, ExternalLink } from 'lucide-react';
 import { api } from '../api/client';
 import { DashboardStats, MeetingDetail, StudentScoreSummary, EventItem, UserProfile } from '../types';
 import { ProgressBar } from './ui/ProgressBar';
@@ -56,17 +41,12 @@ function formatRelativeEventTime(dateStr: string): string {
   try {
     const target = new Date(dateStr);
     const now = new Date();
-    const diffHours = Math.round((target.getTime() - now.getTime()) / (1000 * 60 * 60));
-    
-    if (diffHours > 0 && diffHours < 24) {
-      return `Today in ${diffHours}h`;
-    } else if (diffHours >= 24 && diffHours < 48) {
-      return 'Tomorrow';
-    } else if (diffHours < 0 && diffHours > -24) {
-      return 'Earlier today';
-    } else {
-      return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
+    if (Number.isNaN(target.getTime())) return 'Date unavailable';
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    if (target.toDateString() === now.toDateString()) return 'Today';
+    if (target.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+    return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   } catch {
     return '';
   }
@@ -104,59 +84,65 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [events, setEvents] = useState<EventItem[]>([]);
   const [scoreboard, setScoreboard] = useState<StudentScoreSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const userRole = currentUser?.role || 'member';
+  const canViewScoreboard = ['region_hr_head', 'hr_admin', 'committee_hr_leader', 'committee_head', 'team_lead', 'committee_hr_member'].includes(userRole);
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setStats(null);
+    setScoreboard([]);
     async function loadData() {
       try {
         const [statsData, meetingsData, eventsData, scoreData] = await Promise.all([
           api.getStats(),
           api.getMeetings(),
           api.getEvents(),
-          api.getScoreboard()
+          canViewScoreboard ? api.getScoreboard() : Promise.resolve([])
         ]);
+        if (!active) return;
         setStats(statsData);
         setMeetings(meetingsData || []);
         setEvents(eventsData || []);
         setScoreboard(scoreData || []);
       } catch (err) {
-        console.error('Failed to load dashboard data', err);
+        if (active) setError(err instanceof Error ? err.message : 'Unable to load the overview.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
-    loadData();
-  }, []);
+    void loadData();
+    return () => { active = false; };
+  }, [currentUser?.id, currentUser?.team_id, userRole, canViewScoreboard, retry]);
 
-  const userRole = currentUser?.role || 'hr_admin';
   const roleInfo = ROLE_DISPLAY_NAMES[userRole] || { en: 'Operations', ar: 'العمليات' };
 
-  // Generate role-specific, functional prompt chips (no fake keyboard shortcuts)
+  // Preserve role-specific assistant actions and their original queries.
   const getContextualPrompts = () => {
     if (userRole === 'committee_head' || userRole === 'team_lead') {
       return [
         {
           title: 'Pending Submissions',
           desc: 'Inspect member tasks awaiting review',
-          prompt: 'Which members currently have pending task submissions awaiting review?',
-          icon: Clock
+          prompt: 'Which members currently have pending task submissions awaiting review?'
         },
         {
           title: 'Committee Attendance',
           desc: 'Analyze participation in our last session',
-          prompt: 'Who was absent from our most recent committee meeting?',
-          icon: UserCheck
+          prompt: 'Who was absent from our most recent committee meeting?'
         },
         {
           title: 'Task Completion Rates',
           desc: 'Review deliverable milestones',
-          prompt: 'Show committee task completion rates and quality averages',
-          icon: CheckSquare
+          prompt: 'Show committee task completion rates and quality averages'
         },
         {
           title: 'Dispatch Meeting Notice',
           desc: 'Coordinate next committee schedule',
-          prompt: 'Draft an attendance reminder for the upcoming committee session',
-          icon: Video
+          prompt: 'Draft an attendance reminder for the upcoming committee session'
         }
       ];
     }
@@ -166,26 +152,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {
           title: 'My Evaluation Summary',
           desc: 'View your behavior points and task quality',
-          prompt: 'What are my current attendance and task evaluation scores?',
-          icon: Award
+          prompt: 'What are my current attendance and task evaluation scores?'
         },
         {
           title: 'Upcoming Deadlines',
           desc: 'Check deliverables due this week',
-          prompt: 'What tasks and meetings are scheduled for me this week?',
-          icon: Calendar
+          prompt: 'What tasks and meetings are scheduled for me this week?'
         },
         {
           title: 'Submit Excuse',
           desc: 'File an excuse for an absence',
-          prompt: 'How do I submit an excuse for an upcoming or missed session?',
-          icon: HelpCircle
+          prompt: 'How do I submit an excuse for an upcoming or missed session?'
         },
         {
           title: 'Ask Operations',
           desc: 'Inquire about committee guidelines',
-          prompt: 'What are the criteria for outstanding performance this semester?',
-          icon: Bot
+          prompt: 'What are the criteria for outstanding performance this semester?'
         }
       ];
     }
@@ -195,47 +177,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {
         title: 'Attendance Discrepancies',
         desc: 'Review members flagged for absence follow-up',
-        prompt: "Who was absent or late in today's sync, and who needs an excuse review?",
-        icon: AlertCircle
+        prompt: "Who was absent or late in today's sync, and who needs an excuse review?"
       },
       {
         title: 'At-Risk Members (< 70%)',
         desc: 'Detect members falling below retention threshold',
-        prompt: 'Which students have an attendance rate below 70%?',
-        icon: UserCheck
+        prompt: 'Which students have an attendance rate below 70%?'
       },
       {
         title: 'Scoreboard Overview',
         desc: 'Summarize top performers and behavior tiers',
-        prompt: 'Provide a summary of student evaluations and top standings by committee',
-        icon: Award
+        prompt: 'Provide a summary of student evaluations and top standings by committee'
       },
       {
         title: 'Pending HR Escalations',
         desc: 'Audit unresolved member outreach actions',
-        prompt: 'Show all open WhatsApp follow-up cases and overdue member inquiries',
-        icon: Clock
+        prompt: 'Show all open WhatsApp follow-up cases and overdue member inquiries'
       }
     ];
   };
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
+      <div className="workspace-page min-w-0 space-y-6" role="status" aria-label="Loading overview">
+        <span className="sr-only">Loading overview</span>
         {/* Skeleton Header */}
         <div className="pb-6 border-b border-slate-200/80 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-2">
             <div className="h-5 w-36 bg-slate-200 rounded" />
             <div className="h-7 w-64 bg-slate-200 rounded" />
-            <div className="h-4 w-96 bg-slate-100 rounded" />
+            <div className="h-4 w-full max-w-96 bg-slate-100 rounded" />
           </div>
           <div className="h-9 w-32 bg-slate-200 rounded" />
         </div>
 
-        {/* Skeleton Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-28 bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+        {/* Skeleton metrics share the loaded strip's role-aware layout. */}
+        <div className={`grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-2 ${canViewScoreboard ? 'xl:grid-cols-4' : ''}`}>
+          {(canViewScoreboard ? [1, 2, 3, 4] : [1, 2]).map(i => (
+            <div key={i} className="h-28 bg-white p-5 space-y-3">
               <div className="h-4 w-24 bg-slate-100 rounded" />
               <div className="h-6 w-16 bg-slate-200 rounded" />
               <div className="h-3 w-32 bg-slate-100 rounded" />
@@ -244,18 +223,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Skeleton Content Split */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-64 bg-white border border-slate-200 rounded-xl" />
-          <div className="h-64 bg-white border border-slate-200 rounded-xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6">
+          <div className="h-80 bg-white border border-slate-200 rounded-xl" />
+          <div className="h-64 border-t-2 border-slate-300 bg-slate-100" />
         </div>
       </div>
     );
   }
 
-  const latestMeeting = meetings[0] || null;
-  const nextEvent = events.find(e => new Date(e.start_time).getTime() >= Date.now() - 3600000) || events[0] || null;
+  if (error) {
+    return (
+      <div className="workspace-page min-w-0 space-y-6">
+        <h1 className="text-[28px] leading-tight font-semibold tracking-tight text-slate-900">Overview unavailable</h1>
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+          <p>{error}</p>
+          <button onClick={() => setRetry(value => value + 1)} className="mt-4 min-h-10 rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-800">Retry overview</button>
+        </div>
+      </div>
+    );
+  }
+
+  const latestMeeting = [...meetings].sort((a, b) => Date.parse(b.start_time) - Date.parse(a.start_time))[0] || null;
+  const upcomingEvents = events.filter(e => Date.parse(e.start_time) >= Date.now()).sort((a, b) => Date.parse(a.start_time) - Date.parse(b.start_time));
+  const nextEvent = upcomingEvents[0] || null;
   const topStudents = scoreboard.slice(0, 4);
   const contextualPrompts = getContextualPrompts();
+  const pendingReviews = stats?.pending_submissions_count;
+  const hasPendingReviews = pendingReviews !== null && pendingReviews !== undefined;
+  const metrics = [
+    ...(canViewScoreboard ? [{
+      label: currentUser?.team_name ? 'Committee Members' : 'Total Members',
+      value: stats?.total_students ?? 0,
+      context: currentUser?.team_name ? `Enrolled in ${currentUser.team_name}` : 'Active in registry',
+      tab: 'students',
+    }] : []),
+    {
+      label: "Today's Attendance",
+      value: `${stats?.attendance_rate_today ?? 0}%`,
+      context: `${stats?.present_today ?? 0} Present · ${stats?.late_today ?? 0} Late · ${stats?.absent_today ?? 0} Absent`,
+      tab: 'attendance',
+    },
+    {
+      label: 'Scheduled Events',
+      value: upcomingEvents.length,
+      context: nextEvent ? `Next: ${nextEvent.title}` : 'No events on schedule',
+      tab: 'calendar',
+    },
+    ...(canViewScoreboard ? [{
+      label: hasPendingReviews ? 'Pending Reviews' : 'Agent Audit Log',
+      value: hasPendingReviews ? pendingReviews : stats?.recent_actions_count ?? 0,
+      context: hasPendingReviews
+        ? pendingReviews === 1 ? '1 task needs grading' : `${pendingReviews} tasks need grading`
+        : 'Audited operations logged',
+      tab: hasPendingReviews
+        ? userRole === 'committee_head' || userRole === 'team_lead' ? 'task-reviews' : 'tasks'
+        : 'audit',
+    }] : []),
+  ];
 
   // Date formatting
   const todayFormatted = new Date().toLocaleDateString('en-US', {
@@ -266,37 +290,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Authentic Domain Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-200/80">
+    <div className="workspace-page min-w-0 space-y-6 [&_button]:focus-visible:outline [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-slate-900 [&_a]:focus-visible:outline [&_a]:focus-visible:outline-2 [&_a]:focus-visible:outline-slate-900">
+      {/* The title leads; role and date remain quiet context. */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold border border-slate-200">
+            <span className="text-xs font-semibold text-slate-700">
               {roleInfo.en}
             </span>
             {currentUser?.arabic_name && (
-              <span className="px-2 py-0.5 rounded-md bg-slate-50 text-slate-600 text-[11px] font-['Cairo'] border border-slate-200/80">
+              <span dir="rtl" className="text-xs text-slate-600 font-['Cairo']">
                 {roleInfo.ar}
               </span>
             )}
-            <span className="text-[11px] font-medium text-slate-400">
+            <span className="text-xs text-slate-500 md:ml-2">
               {todayFormatted}
             </span>
           </div>
 
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-baseline gap-2">
+          <h1 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight flex flex-wrap items-baseline gap-2">
             <span>Operations Overview</span>
             {currentUser?.arabic_name && (
-              <span className="text-lg font-normal text-slate-400 font-['Cairo']">
+              <span dir="rtl" className="text-base font-normal text-slate-600 font-['Cairo']">
                 · {currentUser.arabic_name}
               </span>
             )}
           </h1>
           
           <p className="text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-            {currentUser?.team_name 
-              ? `Operational metrics for ${currentUser.team_name}. Attendance rosters, active task reviews, and cohort schedule.`
-              : 'Cohort-wide attendance rosters, evaluation standings, and operational task tracking.'}
+            {!canViewScoreboard
+              ? 'Your attendance, assigned work, and upcoming committee schedule.'
+              : currentUser?.team_name
+                ? `Attendance, task reviews, and upcoming sessions for ${currentUser.team_name}.`
+                : 'Attendance, member evaluations, and upcoming committee work.'}
           </p>
         </div>
         
@@ -306,155 +332,55 @@ export const Dashboard: React.FC<DashboardProps> = ({
             className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center space-x-2"
           >
             <Bot className="w-3.5 h-3.5 text-slate-200" />
-            <span>Open Agent Console</span>
+            <span>Ask assistant</span>
           </button>
         </div>
       </div>
 
-      {/* Honest Operational Metrics Bar (Grounded ground truth, no fake deltas) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Total Enrolled */}
-        <button
-          onClick={() => onNavigateToTab('students')}
-          className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              {currentUser?.team_name ? 'Committee Members' : 'Total Members'}
-            </span>
-            <Users className="w-4 h-4 text-blue-600 opacity-80 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">
-              {stats?.total_students || 0}
-            </span>
-            <span className="text-[11px] text-slate-500 mt-1 font-medium flex items-center">
-              <span>{currentUser?.team_name ? `Enrolled in ${currentUser.team_name}` : 'Active in registry'}</span>
-              <ChevronRight className="w-3 h-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />
-            </span>
-          </div>
-        </button>
+      {/* One factual strip; member views use two columns without empty staff slots. */}
+      <section aria-label="Operational metrics" className="overflow-hidden rounded-lg border border-slate-200 bg-slate-200">
+        <ul className={`grid grid-cols-1 gap-px sm:grid-cols-2 ${canViewScoreboard ? 'xl:grid-cols-4' : ''}`}>
+          {metrics.map(metric => (
+            <li key={metric.label} className="min-w-0 bg-white">
+              <button onClick={() => onNavigateToTab(metric.tab)} className="group flex h-full w-full min-w-0 flex-col px-5 py-4 text-left transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-900">
+                <span className="flex w-full items-center justify-between gap-2 text-xs font-medium text-slate-600">
+                  {metric.label}
+                  <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-slate-900" />
+                </span>
+                <span className="mt-1 text-3xl font-semibold tracking-tight text-slate-900 tabular-nums">{metric.value}</span>
+                <span className="mt-1 text-xs leading-5 text-slate-600 [overflow-wrap:anywhere]">{metric.context}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
 
-        {/* Metric 2: Today's Attendance */}
-        <button
-          onClick={() => onNavigateToTab('attendance')}
-          className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Today's Attendance
-            </span>
-            <UserCheck className="w-4 h-4 text-emerald-600 opacity-80 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">
-              {stats?.attendance_rate_today ?? 0}%
-            </span>
-            <span className="text-[11px] text-slate-500 mt-1 font-medium">
-              <span className="text-emerald-700 font-semibold">{stats?.present_today || 0}</span> Present ·{' '}
-              <span className="text-amber-700 font-semibold">{stats?.late_today || 0}</span> Late ·{' '}
-              <span className="text-rose-700 font-semibold">{stats?.absent_today || 0}</span> Absent
-            </span>
-          </div>
-        </button>
-
-        {/* Metric 3: Upcoming Sessions */}
-        <button
-          onClick={() => onNavigateToTab('calendar')}
-          className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Scheduled Events
-            </span>
-            <Calendar className="w-4 h-4 text-slate-700 opacity-80 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">
-              {stats?.upcoming_meetings_count ?? events.length}
-            </span>
-            <span className="text-[11px] text-slate-500 mt-1 font-medium truncate">
-              {nextEvent ? (
-                <>Next: {nextEvent.title}</>
-              ) : (
-                'No events on schedule'
-              )}
-            </span>
-          </div>
-        </button>
-
-        {/* Metric 4: Role-Adaptive Focus */}
-        {stats?.pending_submissions_count !== null && stats?.pending_submissions_count !== undefined ? (
-          <button
-            onClick={() => onNavigateToTab(userRole === 'committee_head' || userRole === 'team_lead' ? 'task-reviews' : 'tasks')}
-            className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Pending Reviews
-              </span>
-              <CheckSquare className="w-4 h-4 text-amber-600 opacity-80 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-bold text-slate-900 tracking-tight">
-                {stats.pending_submissions_count}
-              </span>
-              <span className="text-[11px] text-amber-700 font-medium mt-1 flex items-center">
-                <span>{stats.pending_submissions_count === 1 ? '1 task needs grading' : `${stats.pending_submissions_count} tasks need grading`}</span>
-                <ChevronRight className="w-3 h-3 ml-0.5 text-amber-500" />
-              </span>
-            </div>
-          </button>
-        ) : (
-          <button
-            onClick={() => onNavigateToTab('audit')}
-            className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Agent Audit Log
-              </span>
-              <Activity className="w-4 h-4 text-blue-600 opacity-80 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-bold text-slate-900 tracking-tight">
-                {stats?.recent_actions_count || 0}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-1 font-medium">
-                Audited operations logged
-              </span>
-            </div>
-          </button>
-        )}
-      </div>
-
-      {/* Split Views: Operational Telemetry & Standings */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Session detail and role-specific work */}
+      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6 lg:gap-8">
         
-        {/* Left Column: Latest Meeting + Upcoming Schedule */}
-        <div className="space-y-6">
+        {/* A compact session summary precedes the primary schedule surface. */}
+        <div className="min-w-0 flex flex-col gap-5">
           {/* Latest Meeting Roster Card */}
-          <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-slate-700 flex items-center">
-                <Video className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+          <section aria-labelledby="dashboard-session" className="min-w-0 border-l-2 border-slate-300 bg-slate-100/70">
+            <div className="px-5 pt-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 id="dashboard-session" className="text-base font-semibold tracking-tight text-slate-900">
                 Latest Meeting Session
-              </span>
+              </h2>
               <button 
                 onClick={() => onNavigateToTab('attendance')} 
-                className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                className="min-h-9 text-xs text-slate-600 hover:text-slate-900 flex items-center font-medium transition-colors"
               >
                 View Roster <ChevronRight className="w-3 h-3 ml-0.5" />
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="p-5 space-y-4">
               {latestMeeting ? (
                 <>
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">{latestMeeting.title}</h4>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                  <div className="flex flex-wrap justify-between items-start gap-3">
+                    <div className="min-w-0 flex-1 basis-48 [overflow-wrap:anywhere]">
+                      <h3 className="text-sm font-semibold text-slate-900">{latestMeeting.title}</h3>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mt-1">
                         <span className="font-mono">{latestMeeting.meeting_code}</span>
                         <span>·</span>
                         <span>{formatMeetingDate(latestMeeting.start_time)}</span>
@@ -479,16 +405,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     const presentRatio = Math.round(((latestMeeting.present_count || 0) / calculatedMax) * 100);
 
                     return (
-                      <div className="space-y-2 pt-1">
+                      <div className="space-y-2 pt-1 [&>div>div:first-child]:flex-wrap [&>div>div:first-child]:gap-1">
                         <ProgressBar
                           value={latestMeeting.present_count || 0}
                           max={calculatedMax}
                           color="emerald"
                           label={`Cohort Attendance (${presentRatio}%)`}
-                          sublabel={`${latestMeeting.present_count || 0} of ${calculatedMax} members present`}
+                          sublabel={expectedTotal > 0 ? `${latestMeeting.present_count || 0} of ${expectedTotal} members present` : 'No attendance recorded'}
                         />
 
-                        <div className="flex justify-between items-center text-xs font-mono pt-2 border-t border-slate-100 text-slate-600">
+                        <div className="flex flex-wrap justify-between items-center gap-3 text-xs tabular-nums pt-2 border-t border-slate-200 text-slate-600">
                           <span className="flex items-center text-emerald-700 font-semibold">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
                             {latestMeeting.present_count || 0} Present
@@ -521,53 +447,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   )}
                 </>
               ) : (
-                <div className="py-6 text-center text-sm text-slate-400">
+                <div className="py-4 text-sm text-slate-600">
                   No meeting sessions logged yet.
                 </div>
               )}
             </div>
-          </div>
+          </section>
 
-          {/* Upcoming Schedule Card (Utilizing real events!) */}
-          <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-slate-700 flex items-center">
-                <Calendar className="w-3.5 h-3.5 mr-1.5 text-slate-600" />
+          {/* Upcoming schedule uses a chronological list, not event icon tiles. */}
+          <section aria-labelledby="dashboard-schedule" className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="px-5 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+              <h2 id="dashboard-schedule" className="text-lg font-semibold tracking-tight text-slate-900">
                 Upcoming Milestones & Deadlines
-              </span>
+              </h2>
               <button 
                 onClick={() => onNavigateToTab('calendar')} 
-                className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                className="min-h-9 text-xs text-slate-600 hover:text-slate-900 flex items-center font-medium transition-colors"
               >
                 Full Calendar <ChevronRight className="w-3 h-3 ml-0.5" />
               </button>
             </div>
 
             <div className="divide-y divide-slate-100">
-              {events.slice(0, 3).map((evt) => {
+              {upcomingEvents.slice(0, 3).map((evt) => {
                 const isMeeting = evt.event_type === 'meeting';
                 const relativeTime = formatRelativeEventTime(evt.start_time);
 
                 return (
-                  <div key={evt.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50/60 transition-colors">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                        isMeeting 
-                          ? 'bg-blue-50 border-blue-100 text-blue-600' 
-                          : 'bg-amber-50 border-amber-100 text-amber-600'
-                      }`}>
-                        {isMeeting ? <Video className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                      </div>
+                  <div key={evt.id} className="px-5 py-5 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-1 basis-56 items-start gap-4 min-w-0">
+                      <time dateTime={evt.start_time} className="w-16 shrink-0 border-r border-slate-200 pr-3 text-xs font-semibold leading-5 text-slate-700 tabular-nums">
+                        {relativeTime}
+                      </time>
                       <div className="min-w-0">
-                        <div className="text-[13px] font-semibold text-slate-800 truncate">
+                        <h3 className="text-sm font-semibold leading-5 text-slate-900 [overflow-wrap:anywhere]">
                           {evt.title}
-                        </div>
-                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                          <span>{formatMeetingDate(evt.start_time)}</span>
-                          {relativeTime && (
-                            <span className="text-slate-400 font-medium">({relativeTime})</span>
-                          )}
-                        </div>
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">
+                          {formatMeetingDate(evt.start_time)}
+                        </p>
                       </div>
                     </div>
 
@@ -577,7 +495,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           href={evt.meet_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-2.5 py-1 bg-white border border-slate-200 hover:border-blue-300 rounded text-[11px] font-semibold text-slate-700 hover:text-blue-600 transition-colors inline-flex items-center space-x-1 shadow-xs"
+                          className="min-h-9 px-3 py-2 bg-white border border-slate-200 hover:border-slate-400 rounded-md text-xs font-semibold text-slate-700 transition-colors inline-flex items-center space-x-1"
                         >
                           <span>Join</span>
                           <ExternalLink className="w-2.5 h-2.5" />
@@ -592,54 +510,50 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 );
               })}
 
-              {events.length === 0 && (
-                <div className="py-6 text-center text-sm text-slate-400">
+              {upcomingEvents.length === 0 && (
+                <div className="px-5 py-10 text-sm text-slate-600">
                   No upcoming events scheduled.
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </div>
 
-        {/* Right Column: Top Standings + Contextual Prompts */}
-        <div className="space-y-6">
+        {/* Evaluation review and assistant actions form a quieter work column. */}
+        <div className="min-w-0 space-y-7">
           {/* Top Standings / Evaluation Board */}
-          <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-slate-700 flex items-center">
-                <Award className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
-                Member Evaluations & Standings
-              </span>
+          {canViewScoreboard && <section aria-labelledby="dashboard-evaluations" className="border-t-2 border-slate-400">
+            <div className="py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+              <h2 id="dashboard-evaluations" className="text-base font-semibold tracking-tight text-slate-900">
+                Member Evaluations
+              </h2>
               <button 
                 onClick={() => onNavigateToTab('scoreboard')} 
-                className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                className="min-h-9 text-xs text-slate-600 hover:text-slate-900 flex items-center font-medium transition-colors"
               >
                 View All <ChevronRight className="w-3 h-3 ml-0.5" />
               </button>
             </div>
 
             <div className="divide-y divide-slate-100">
-              {topStudents.map((student, idx) => {
+              {topStudents.map((student) => {
                 const badgeVariant = getRatingBadgeVariant(student.overall_rating || '');
                 return (
-                  <div key={student.student_id} className="flex items-center justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
+                  <div key={student.student_id} className="flex flex-wrap items-center justify-between gap-3 py-4">
                     <div className="flex items-center space-x-3 min-w-0">
-                      <span className="font-mono text-[11px] font-bold text-slate-400 w-5">
-                        #{idx + 1}
-                      </span>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-[13px] font-bold text-slate-900 font-['Cairo'] truncate">
+                        <span dir="rtl" className="text-sm font-semibold text-slate-900 font-['Cairo'] [overflow-wrap:anywhere]">
                           {student.arabic_name}
                         </span>
-                        <span className="text-[11px] text-slate-500 truncate">
+                        <span className="text-xs text-slate-600 [overflow-wrap:anywhere]">
                           {student.student_name}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-3 shrink-0 ml-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <Badge variant={badgeVariant} size="sm">
-                        {student.overall_rating || 'Evaluated'}
+                        {student.overall_rating || 'Not rated'}
                       </Badge>
 
                       <div className="text-right flex flex-col min-w-[52px]">
@@ -656,51 +570,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
               })}
 
               {topStudents.length === 0 && (
-                <div className="py-6 text-center text-sm text-slate-400">
+                <div className="py-6 text-sm text-slate-600">
                   No student evaluation records found.
                 </div>
               )}
             </div>
-          </div>
+          </section>}
 
-          {/* Contextual Operations Starters (Functional & Honest, No Fake Shortcuts) */}
-          <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5 uppercase tracking-wider">
-                <Bot className="w-3.5 h-3.5 text-blue-600" />
-                <span>Operational Action Starters</span>
-              </span>
-              <span className="text-[10px] font-medium text-slate-400">
-                Click to query agent
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {contextualPrompts.map((item, idx) => {
-                const IconComponent = item.icon;
-                return (
+          {/* Assistant actions stay secondary to operational records. */}
+          <section aria-labelledby="dashboard-assistant" className="border-t-2 border-slate-900 pt-4">
+            <h2 id="dashboard-assistant" className="text-base font-semibold tracking-tight text-slate-900">Ask about your work</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-600">Choose a question to open with the assistant.</p>
+            <ul className="mt-3 divide-y divide-slate-200">
+              {contextualPrompts.map(item => (
+                <li key={item.title}>
                   <button
-                    key={idx}
                     onClick={() => onSendChatQuery(item.prompt)}
-                    className="p-3 bg-slate-50 hover:bg-white border border-slate-200/80 hover:border-blue-300 rounded-lg text-left transition-all group flex flex-col justify-between shadow-2xs hover:shadow-xs"
+                    className="group flex w-full items-center justify-between gap-4 rounded-sm py-3 text-left transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-900"
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <IconComponent className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-600 transition-colors" />
-                      <ArrowRight className="w-3 h-3 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">
-                        {item.title}
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">
-                        {item.desc}
-                      </div>
-                    </div>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-slate-900">{item.title}</span>
+                      <span className="mt-0.5 block text-xs leading-5 text-slate-600">{item.desc}</span>
+                    </span>
+                    <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-slate-900" />
                   </button>
-                );
-              })}
-            </div>
-          </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
 
       </div>

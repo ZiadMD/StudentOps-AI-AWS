@@ -1,6 +1,7 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { useFocusContainment } from '../../hooks/useFocusContainment';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -64,12 +65,7 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen]);
 
-  // Focus trap / focus management
-  React.useEffect(() => {
-    if (isOpen && dialogRef.current) {
-      dialogRef.current.focus();
-    }
-  }, [isOpen]);
+  useFocusContainment(dialogRef, isOpen);
 
   if (!isOpen) return null;
 

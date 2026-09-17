@@ -12,6 +12,14 @@
     {
       "source": "/api/(.*)",
       "destination": "/api/index.py"
-    }
+    },
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/signup", "destination": "/index.html" },
+    { "source": "/signin", "destination": "/index.html" },
+    { "source": "/sign-in", "destination": "/index.html" },
+    { "source": "/sign-up", "destination": "/index.html" },
+    { "source": "/register", "destination": "/index.html" },
+    { "source": "/app", "destination": "/index.html" },
+    { "source": "/app/(.*)", "destination": "/index.html" }
   ]
 }

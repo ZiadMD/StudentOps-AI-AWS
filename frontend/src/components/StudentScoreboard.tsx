@@ -3,8 +3,6 @@ import { api } from '../api/client';
 import { StudentScoreSummary, UserProfile } from '../types';
 import {
   Search,
-  SlidersHorizontal,
-  Shield,
   Edit3,
   Check,
   Eye,
@@ -39,6 +37,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
   const {
     data: cachedData,
     loading,
+    error,
     refresh: loadData,
   } = useCachedData<StudentScoreSummary[]>(
     'scoreboard_list',
@@ -111,12 +110,9 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
 
   if (isCommitteeMember) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
-        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-          <Shield className="w-6 h-6" />
-        </div>
+      <div className="workspace-page min-w-0 space-y-6">
         <div>
-          <h2 className="text-base font-bold text-slate-900">Scorecards are Confidential</h2>
+          <h2 className="text-[28px] leading-tight font-semibold text-slate-900">Scorecards are Confidential</h2>
           <p className="text-xs text-slate-500 mt-1 leading-relaxed">
             Member behavioral evaluations and scorecards are confidential and only accessible to Committee Heads
             and HR coordinators.
@@ -133,11 +129,11 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
   );
 
   return (
-    <div className="space-y-6">
+    <div className="workspace-page min-w-0 space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Member Evaluations</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">Member Evaluations</h2>
             {isCommitteeHead && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
                 <Eye className="w-3 h-3" />
@@ -145,7 +141,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500 mt-1">Behavior score (/23), interaction score (/5), task quality (/10), and bonuses</p>
+          <p className="text-sm text-slate-500 mt-1">Attendance, behavior (/23), task quality (/10), and awarded bonuses.</p>
         </div>
 
         <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -153,28 +149,27 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search members..."
+              aria-label="Search member evaluations"
+              placeholder="Search members…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full sm:w-64 transition-all"
             />
           </div>
-          <button className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 flex items-center space-x-2 text-sm font-medium transition-colors shrink-0">
-            <SlidersHorizontal className="w-4 h-4" />
-            <span>Filter</span>
-          </button>
+
         </div>
       </div>
 
       <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
-        {loading ? (
+        {error ? (
+          <div role="alert" className="p-5 text-sm text-rose-700"><p>{error.message}</p><button onClick={() => void loadData()} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry evaluations</button></div>
+        ) : loading ? (
           <div>
             {/* Desktop Table Skeletons */}
-            <div className="hidden md:block">
+            <div className="hidden 2xl:block">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                    <th className="px-5 py-3.5 w-16">Rank</th>
                     <th className="px-5 py-3.5">Member</th>
                     <th className="px-5 py-3.5 text-right">Attendance</th>
                     <th className="px-5 py-3.5 text-right">Task Quality</th>
@@ -193,7 +188,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
             </div>
 
             {/* Mobile Card Skeletons */}
-            <div className="block md:hidden p-3 space-y-3">
+            <div className="block 2xl:hidden p-3 space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
@@ -201,12 +196,11 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
           </div>
         ) : (
           <>
-            {/* Desktop Table View (hidden on mobile) */}
-            <div className="hidden md:block">
+            {/* Dense evaluations use cards until wide desktop layouts. */}
+            <div className="hidden 2xl:block">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                    <th className="px-5 py-3.5 w-16">Rank</th>
                     <th className="px-5 py-3.5">Member</th>
                     <th className="px-5 py-3.5 text-right">Attendance</th>
                     <th className="px-5 py-3.5 text-right">Task Quality</th>
@@ -217,24 +211,8 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   </tr>
                 </thead>
                 <tbody className="text-sm divide-y divide-slate-100">
-                  {filteredData.map((student, idx) => (
+                  {filteredData.map((student) => (
                     <tr key={student.student_id} className="hover:bg-slate-50/60 transition-colors group">
-                      {/* Rank */}
-                      <td className="px-5 py-3.5 whitespace-nowrap">
-                        <div
-                          className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${
-                            idx === 0
-                              ? 'bg-amber-100 text-amber-800'
-                              : idx === 1
-                              ? 'bg-slate-200 text-slate-800'
-                              : idx === 2
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'text-slate-400 bg-slate-50 font-medium'
-                          }`}
-                        >
-                          {idx + 1}
-                        </div>
-                      </td>
 
                       {/* Member Identity */}
                       <td className="px-5 py-3.5 whitespace-nowrap">
@@ -330,25 +308,12 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
             </div>
 
             {/* Mobile Evaluation Card Transform (Zero horizontal scroll!) */}
-            <div className="block md:hidden divide-y divide-slate-100">
-              {filteredData.map((student, idx) => (
+            <div className="block 2xl:hidden divide-y divide-slate-100">
+              {filteredData.map((student) => (
                 <div key={student.student_id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
                   {/* Card Header: Rank + Bilingual Identity + Rating Badge */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2.5 min-w-0">
-                      <div
-                        className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
-                          idx === 0
-                            ? 'bg-amber-100 text-amber-800'
-                            : idx === 1
-                            ? 'bg-slate-200 text-slate-800'
-                            : idx === 2
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : 'text-slate-400 bg-slate-50 font-medium'
-                        }`}
-                      >
-                        #{idx + 1}
-                      </div>
                       <div className="min-w-0">
                         <div className="font-bold text-slate-900 text-sm font-['Cairo'] truncate">
                           {student.arabic_name}

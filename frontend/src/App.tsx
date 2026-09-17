@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Menu, Layers } from 'lucide-react';
+import { WorkspaceHeader } from './components/WorkspaceHeader';
+import { ThemeProvider } from './context/ThemeContext';
 import { Sidebar, Tab, Role } from './components/Sidebar';
 import { LoginPage }          from './components/auth/LoginPage';
 import { RegisterPage }       from './components/auth/RegisterPage';
@@ -20,15 +21,20 @@ import { WhatsAppAgentPage }  from './components/WhatsAppAgentPage';
 import { api }                from './api/client';
 import { UserProfile }        from './types';
 import { ToastProvider }      from './context/ToastContext';
-
-type AuthScreen = 'login' | 'register' | 'app';
+import { LandingPage } from './components/LandingPage';
+import { navigate, useLocationPath } from './hooks/useLocationPath';
+import { NAV_ITEMS } from './components/Sidebar';
+import { ProfilePage } from './components/ProfilePage';
 
 function AppContent() {
-  const initialUser = api.getUser();
-  const [screen, setScreen]             = useState<AuthScreen>(initialUser && api.getToken() ? 'app' : 'login');
-  const [currentUser, setCurrentUser]   = useState<UserProfile | null>(initialUser);
-  const [userRole, setUserRole]         = useState<Role>(initialUser?.role || 'hr_admin');
-  const [activeTab, setActiveTab]       = useState<Tab>('dashboard');
+  const path = useLocationPath();
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [checkingSession, setCheckingSession] = useState(() => Boolean(api.getToken()));
+  const userRole: Role = currentUser?.role || 'member';
+  const requestedTab = path.split('/')[2];
+  const resolvedTab = requestedTab === 'whatsapp' ? 'inbox' : requestedTab;
+  const activeTab: Tab = NAV_ITEMS.find(item => item.id === resolvedTab && item.roles.includes(userRole))?.id || 'dashboard';
+  const setActiveTab = (tab: Tab) => navigate(`/app/${tab}`);
   const [chatInitialQuery, setChatInitialQuery] = useState<string | undefined>(undefined);
 
   // Responsive sidebar states
@@ -50,43 +56,42 @@ function AppContent() {
   }, [isDesktopCollapsed]);
 
   useEffect(() => {
-    const token = api.getToken();
-    if (token) {
-      api.getMe()
-        .then((user) => {
-          setCurrentUser(user);
-          setUserRole(user.role);
-          setScreen('app');
-        })
-        .catch(() => {
-          api.logout();
-          setCurrentUser(null);
-          setScreen('login');
-        });
-    } else {
-      setScreen('login');
+    let active = true;
+    if (api.getToken()) {
+      api.getMe().then(user => {
+        if (active) setCurrentUser(user);
+      }).catch(() => {
+        if (active) { api.logout(); setCurrentUser(null); }
+      }).finally(() => { if (active) setCheckingSession(false); });
     }
+    return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (checkingSession) return;
+    if (path.startsWith('/app') && !currentUser) navigate('/login', true);
+    else if (currentUser && (path === '/login' || path === '/signup')) navigate('/app/dashboard', true);
+    else if (currentUser && path.startsWith('/app/') && requestedTab !== activeTab) navigate(`/app/${activeTab}`, true);
+  }, [path, checkingSession, currentUser, requestedTab, activeTab]);
+
+  useEffect(() => {
+    const title = path === '/' ? 'Student organization workspace' : path === '/login' ? 'Sign in' : path === '/signup' ? 'Create an account' : NAV_ITEMS.find(item => item.id === activeTab)?.label || 'Workspace';
+    document.title = `${title} — StudentOps`;
+    setIsMobileSidebarOpen(false);
+  }, [path, activeTab]);
 
   const handleLogin = (user: UserProfile) => {
     setCurrentUser(user);
-    setUserRole(user.role);
-    setScreen('app');
-    setActiveTab('dashboard');
+    setCheckingSession(false);
+    navigate('/app/dashboard', true);
   };
-
-  const handleRegister = (user: UserProfile) => {
-    setCurrentUser(user);
-    setUserRole(user.role);
-    setScreen('app');
-    setActiveTab('dashboard');
-  };
+  const handleRegister = handleLogin;
 
   const handleLogout = () => {
     api.logout();
     setCurrentUser(null);
-    setScreen('login');
-    setActiveTab('dashboard');
+    setChatInitialQuery(undefined);
+    navigate('/login', true);
   };
 
   const handleSendChatQuery = (query: string) => {
@@ -94,32 +99,21 @@ function AppContent() {
     setActiveTab('chat');
   };
 
-  // ── Auth screens ──────────────────────────────────────────────────────────
-  if (screen === 'login') {
-    return (
-      <LoginPage
-        onLogin={handleLogin}
-        onGoToRegister={() => setScreen('register')}
-      />
-    );
-  }
-
-  if (screen === 'register') {
-    return (
-      <RegisterPage
-        onRegister={handleRegister}
-        onGoToLogin={() => setScreen('login')}
-      />
-    );
-  }
+  if (path === '/') return <LandingPage signedIn={Boolean(currentUser)} />;
+  if (checkingSession) return <main className="flex min-h-dvh items-center justify-center" role="status">Opening your workspace…</main>;
+  if (path === '/login') return <LoginPage onLogin={handleLogin} onGoToRegister={() => navigate('/signup')} />;
+  if (path === '/signup') return <RegisterPage onRegister={handleRegister} onGoToLogin={() => navigate('/login')} />;
+  if (!path.startsWith('/app/')) return <main className="mx-auto max-w-lg px-6 py-24"><h1 className="text-3xl font-semibold">Page not found</h1><p className="mt-4 text-slate-600">This address doesn't match a StudentOps page.</p><a href="/" className="mt-6 inline-block underline">Return home</a></main>;
+  if (!currentUser) return <main role="status" className="p-8">Opening sign in…</main>;
 
   // ── Main app shell ────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex antialiased selection:bg-blue-600 selection:text-white">
+    <div className="app-shell min-h-dvh bg-slate-50 flex antialiased">
+      <a href="#workspace-content" className="skip-link">Skip to content</a>
       {/* Mobile Backdrop Overlay (Native Blur) */}
       {isMobileSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden"
           onClick={() => setIsMobileSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -138,36 +132,18 @@ function AppContent() {
         setIsDesktopCollapsed={setIsDesktopCollapsed}
       />
 
-      <main className="flex-1 flex flex-col min-h-screen min-w-0 overflow-hidden">
-        {/* Mobile Header Bar (Only shown on phones < md) */}
-        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between h-14 px-4 bg-white/95 backdrop-blur border-b border-slate-200/80 shrink-0">
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="p-2 -ml-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
-              aria-label="Open navigation menu"
-              aria-expanded={isMobileSidebarOpen}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 rounded-md bg-slate-900 flex items-center justify-center shrink-0 shadow-xs">
-                <Layers className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-bold text-sm text-slate-900">StudentOps.AI</span>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 capitalize border border-slate-200/60">
-              {activeTab.replace('-', ' ')}
-            </span>
-          </div>
-        </header>
+      <main className="flex-1 flex flex-col min-h-dvh min-w-0" inert={isMobileSidebarOpen}>
+        <WorkspaceHeader
+          key={currentUser.id}
+          currentUser={currentUser}
+          onNavigate={setActiveTab}
+          onOpenNavigation={() => setIsMobileSidebarOpen(true)}
+          isMobileSidebarOpen={isMobileSidebarOpen}
+        />
 
         {/* Scrollable Page View Container */}
-        <div className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-          <div className="max-w-5xl mx-auto w-full">
+        <div id="workspace-content" tabIndex={-1} className={`flex-1 min-w-0 outline-none ${activeTab === 'chat' ? '' : 'px-4 sm:px-8 lg:px-10 py-6 sm:py-8'}`}>
+          <div className="max-w-7xl mx-auto w-full min-w-0">
             {activeTab === 'dashboard'     && (
               <Dashboard
                 currentUser={currentUser}
@@ -191,9 +167,12 @@ function AppContent() {
             {activeTab === 'qna'           && <CommitteeQnA currentUser={currentUser} />}
             {activeTab === 'feedback'      && <MemberFeedbackView currentUser={currentUser} />}
             {activeTab === 'reports'       && <CommitteeReportsView currentUser={currentUser} />}
-            {activeTab === 'whatsapp'      && currentUser && <WhatsAppAgentPage currentUser={currentUser} />}
+            {activeTab === 'inbox'         && <WhatsAppAgentPage currentUser={currentUser} view="chat" />}
+            {activeTab === 'follow-ups'    && <WhatsAppAgentPage currentUser={currentUser} view="escalations" />}
+            {activeTab === 'channel-settings' && <WhatsAppAgentPage currentUser={currentUser} view="official" />}
             {activeTab === 'notifications' && <NotificationsPage />}
             {activeTab === 'audit'         && <AuditViewer />}
+            {activeTab === 'profile'       && <ProfilePage key={currentUser.id} currentUser={currentUser} />}
           </div>
         </div>
       </main>
@@ -203,9 +182,11 @@ function AppContent() {
 
 export function App() {
   return (
-    <ToastProvider>
-      <AppContent />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

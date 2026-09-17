@@ -23,6 +23,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [memberSubmissions, setMemberSubmissions] = useState<Record<string, SubmissionItem>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   // Committee Head Create Task Modal
@@ -50,6 +51,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
   const loadTasks = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await api.getTasks();
       setTasks(data);
 
@@ -57,12 +59,8 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
         try {
           const subPairs = await Promise.all(
             data.map(async (t) => {
-              try {
-                const s = await api.getTaskSubmissions(t.id);
-                return [t.id, s[0] || null] as const;
-              } catch {
-                return [t.id, null] as const;
-              }
+              const s = await api.getTaskSubmissions(t.id);
+              return [t.id, s[0] || null] as const;
             })
           );
           const map: Record<string, SubmissionItem> = {};
@@ -73,11 +71,11 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
           }
           setMemberSubmissions(map);
         } catch (e) {
-          console.error(e);
+          setError(e instanceof Error ? e.message : 'Unable to load submission status.');
         }
       }
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Unable to load tasks.');
     } finally {
       setLoading(false);
     }
@@ -136,14 +134,14 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
   );
 
   return (
-    <div className="space-y-6">
+    <div className="workspace-page min-w-0 space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Tasks &amp; Deliverables</h2>
-          <p className="text-[12px] text-slate-500 mt-0.5">
+          <h2 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">Tasks &amp; Deliverables</h2>
+          <p className="text-sm text-slate-600 mt-2">
             {isMember
-              ? 'Your assigned Social Media Committee deliverables and deadlines.'
-              : 'Social Media Committee deliverables, deadlines, and member submissions.'}
+              ? 'Your assigned work, submission status, and deadlines.'
+              : 'Committee deliverables, deadlines, and member submissions.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -151,7 +149,8 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Filter tasks..."
+              aria-label="Filter tasks"
+              placeholder="Filter tasks…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-blue-500 focus:bg-white w-full sm:w-48 transition-all"
@@ -163,7 +162,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
               onClick={() => {
                 const nextNum = tasks.length + 1;
                 setTaskNumber(nextNum);
-                setTaskTitle(`Task ${nextNum}: Campaign Content Deliverable`);
+                setTaskTitle('');
                 setShowCreateModal(true);
               }}
               className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md shadow-sm text-[13px] font-medium flex items-center space-x-1.5 transition-colors"
@@ -175,7 +174,12 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
         </div>
       </div>
 
-      {loading ? (
+      {error && !loading ? (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-white p-5 text-sm text-rose-700">
+          <p>{error}</p>
+          <button onClick={loadTasks} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry tasks</button>
+        </div>
+      ) : loading ? (
         <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
             <Skeleton className="h-3.5 w-48 rounded" />
@@ -204,7 +208,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
         <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden flex flex-col">
           <div className="px-4 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-              {isMember ? 'My Assigned Sprints' : 'Social Media Committee Sprint Tasks'}
+              {isMember ? 'Assigned to you' : 'Committee tasks'}
             </span>
             <span className="text-[11px] text-slate-400 font-mono">{filteredTasks.length} items</span>
           </div>
@@ -212,9 +216,9 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 hover:bg-slate-50/80 transition-colors group"
+                className="flex min-w-0 flex-col xl:flex-row xl:items-center justify-between gap-5 p-5 hover:bg-slate-50/80 transition-colors group"
               >
-                <div className="flex items-center space-x-3 w-full sm:w-1/2 min-w-0">
+                <div className="flex items-center space-x-3 w-full xl:w-1/2 min-w-0">
                   <div className="flex-shrink-0 mt-0.5">
                     {isMember ? (
                       memberSubmissions[task.id]?.file_url ? (
@@ -231,19 +235,19 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
                   <span className="font-mono text-[11px] text-slate-400 w-14 shrink-0">
                     TSK-{task.task_number}
                   </span>
-                  <div className="truncate">
-                    <span className="text-[13px] font-medium text-slate-900 truncate group-hover:text-blue-600 transition-colors block">
+                  <div className="min-w-0">
+                    <span className="text-sm font-semibold text-slate-900 break-words block">
                       {task.title}
                     </span>
                     {task.description && (
-                      <span className="text-[11px] text-slate-400 truncate block">
+                      <span className="text-sm text-slate-500 break-words block mt-1">
                         {task.description}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-4 w-1/2 justify-end">
+                <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto xl:justify-end">
                   {task.deadline && (
                     <div className="flex items-center gap-1 text-[11px] text-slate-500 font-mono">
                       <Calendar className="w-3 h-3 text-slate-400" />
@@ -288,7 +292,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
                           setSubmitTaskTarget(task);
                           setFileUrl(memberSubmissions[task.id]?.file_url || '');
                         }}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium flex items-center gap-1 shrink-0"
+                        className="px-3 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold flex items-center gap-2 shrink-0"
                       >
                         <Upload className="w-3 h-3" />
                         <span>{memberSubmissions[task.id]?.file_url ? 'Resubmit' : 'Submit Work'}</span>

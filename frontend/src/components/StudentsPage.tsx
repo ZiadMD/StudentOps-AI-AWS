@@ -6,7 +6,7 @@ import { Modal } from './ui/Modal';
 import { SkeletonTableRow, SkeletonCard } from './ui/Skeleton';
 import { useCachedData } from '../hooks/useCachedData';
 import { 
-  Search, Plus, MoreHorizontal, 
+  Search, Plus, 
   UserCheck, UserX, Mail, Phone, University,
   AlertCircle, Loader2
 } from 'lucide-react';
@@ -34,6 +34,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
   const {
     data: cachedStudents,
     loading,
+    error,
+    refresh,
     mutate: mutateStudents,
   } = useCachedData<Student[]>(
     'students_list',
@@ -122,20 +124,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
       s.arabic_name.includes(search) ||
       s.email.toLowerCase().includes(q) ||
       s.student_code.toLowerCase().includes(q);
-    const matchStatus = statusFilter === 'all' || s.status === statusFilter;
+    const matchStatus = statusFilter === 'all' || s.status.toLowerCase() === statusFilter;
     return matchSearch && matchStatus;
   });
 
   const STATUS_FILTERS = ['all', 'active', 'inactive', 'probation'];
 
   return (
-    <div className="space-y-6">
+    <div className="workspace-page min-w-0 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Member Registry</h2>
+          <h2 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">Member Registry</h2>
           <p className="text-sm text-slate-500 mt-1">
-            {students.length} total enrolled members across committees.
+            {loading ? 'Loading members…' : error ? 'Member registry unavailable.' : `${students.length} members in your accessible committees.`}
           </p>
         </div>
         {canAddMember && (
@@ -158,6 +160,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
+            aria-label="Search by name, email, or code"
             placeholder="Search by name, email, or code…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -184,10 +187,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
       {/* Table Container */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
-        {loading ? (
+        {error ? (
+          <div role="alert" className="p-5 text-sm text-rose-700"><p>{error.message}</p><button onClick={() => void refresh()} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry members</button></div>
+        ) : loading ? (
           <div>
             {/* Desktop Table Skeletons */}
-            <div className="hidden md:block">
+            <div className="hidden xl:block">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
@@ -195,7 +200,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                     <th className="px-5 py-3.5">Contact Details</th>
                     <th className="px-5 py-3.5">Role & University</th>
                     <th className="px-5 py-3.5 text-center">Status</th>
-                    <th className="px-5 py-3.5 text-right"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -207,7 +211,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
             </div>
 
             {/* Mobile Card Skeletons */}
-            <div className="block md:hidden p-3 space-y-3">
+            <div className="block xl:hidden p-3 space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
@@ -215,8 +219,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
           </div>
         ) : (
           <>
-            {/* Desktop Table View (hidden on mobile, zero overflow bugs) */}
-            <div className="hidden md:block">
+            {/* Use cards until the workspace can accommodate all columns. */}
+            <div className="hidden xl:block">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
@@ -224,7 +228,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                     <th className="px-5 py-3.5">Contact Details</th>
                     <th className="px-5 py-3.5">Role & University</th>
                     <th className="px-5 py-3.5 text-center">Status</th>
-                    <th className="px-5 py-3.5 text-right"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -279,7 +282,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
                       {/* Status */}
                       <td className="px-5 py-3.5 text-center">
-                        {s.status === 'active' ? (
+                        {s.status.toLowerCase() === 'active' ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
                             <UserCheck className="w-3 h-3" />
                             <span>Active</span>
@@ -292,15 +295,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                         )}
                       </td>
 
-                      {/* Actions */}
-                      <td className="px-5 py-3.5 text-right">
-                        <button 
-                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition-colors"
-                          aria-label={`Options for ${s.full_name}`}
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </td>
+
                     </tr>
                   ))}
                 </tbody>
@@ -308,7 +303,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
             </div>
 
             {/* Mobile Card Transform (Zero horizontal scroll!) */}
-            <div className="block md:hidden divide-y divide-slate-100">
+            <div className="block xl:hidden divide-y divide-slate-100">
               {filtered.map(s => (
                 <div key={s.id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
                   {/* Card Header: Avatar + Identity + Status */}
@@ -328,7 +323,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                     </div>
 
                     <div className="shrink-0">
-                      {s.status === 'active' ? (
+                      {s.status.toLowerCase() === 'active' ? (
                         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold">
                           <UserCheck className="w-2.5 h-2.5" />
                           <span>Active</span>
@@ -370,12 +365,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                       )}
                     </div>
 
-                    <button 
-                      className="p-2 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
-                      aria-label={`Options for ${s.full_name}`}
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
+
                   </div>
                 </div>
               ))}

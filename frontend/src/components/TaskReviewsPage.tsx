@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { TaskItem, SubmissionItem, UserProfile } from '../types';
 import {
   ChevronRight, CheckCircle2, Circle, Clock, Search,
-  ExternalLink, Shield
+  ExternalLink
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -19,6 +19,9 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
   const [loading, setLoading]           = useState(true);
   const [subsLoading, setSubsLoading]   = useState(false);
   const [search, setSearch]             = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [subsError, setSubsError] = useState<string | null>(null);
+  const selectionRequest = useRef(0);
   // Local grading state: { [subId]: { score: string, note: string } }
   const [grades, setGrades]             = useState<Record<string, { score: string; note: string }>>({});
   const [savingSubId, setSavingSubId]   = useState<string | null>(null);
@@ -32,7 +35,7 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
     }
     async function load() {
       try { const t = await api.getTasks(); setTasks(t); if (t.length) selectTask(t[0]); }
-      catch (e) { console.error(e); }
+      catch (e) { setError(e instanceof Error ? e.message : 'Unable to load tasks.'); }
       finally { setLoading(false); }
     }
     load();
@@ -40,11 +43,8 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
 
   if (isMember) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl p-8 text-center max-w-md mx-auto my-12 space-y-3">
-        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
-          <Shield className="w-6 h-6" />
-        </div>
-        <h2 className="text-base font-bold text-slate-900">Task Reviews are Restricted</h2>
+      <div className="workspace-page min-w-0 space-y-3">
+        <h2 className="text-[28px] leading-tight font-semibold text-slate-900">Task Reviews are Restricted</h2>
         <p className="text-xs text-slate-500 leading-relaxed">
           Technical evaluation and grading of deliverables is reserved for Committee Heads.
         </p>
@@ -53,15 +53,18 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
   }
 
   const selectTask = async (task: TaskItem) => {
+    const request = ++selectionRequest.current;
     setSelectedTask(task);
     setSubsLoading(true);
+    setSubsError(null);
+    setSubs([]);
     try {
       const data = await api.getTaskSubmissions(task.id);
-      setSubs(data);
+      if (request === selectionRequest.current) setSubs(data);
     } catch (e) {
-      setSubs([]);
+      if (request === selectionRequest.current) setSubsError(e instanceof Error ? e.message : 'Unable to load submissions.');
     } finally {
-      setSubsLoading(false);
+      if (request === selectionRequest.current) setSubsLoading(false);
     }
   };
 
@@ -85,9 +88,9 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
   };
 
   return (
-    <div className="space-y-6">
+    <div className="workspace-page min-w-0 space-y-8">
       <div>
-        <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Task Reviews</h2>
+        <h2 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">Task Reviews</h2>
         <p className="text-sm text-slate-500 mt-1">
           Review and grade individual member task submissions.
         </p>
@@ -98,10 +101,10 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
         <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/60">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Sprint Tasks
+              Tasks to review
             </span>
           </div>
-          {loading ? (
+          {error ? <p role="alert" className="p-5 text-sm text-rose-700">{error}</p> : loading ? (
             <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Loading…</div>
           ) : (
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
@@ -111,7 +114,7 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
                   onClick={() => selectTask(task)}
                   className={`w-full text-left p-4 flex items-center justify-between group transition-colors ${
                     selectedTask?.id === task.id
-                      ? 'bg-blue-50/80 border-l-2 border-blue-500'
+                      ? 'bg-slate-100 border-l-2 border-slate-900'
                       : 'hover:bg-slate-50'
                   }`}
                 >
@@ -147,7 +150,7 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
           ) : (
             <>
               {/* Sub-header */}
-              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+              <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="font-mono text-[10px] text-slate-400">TSK-{selectedTask.task_number}</span>
@@ -160,6 +163,7 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
+                    aria-label="Search submissions by member"
                     placeholder="Search member…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
@@ -171,6 +175,8 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
               <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
                 {subsLoading ? (
                   <div className="py-16 text-center text-slate-400 text-sm">Loading submissions…</div>
+                ) : subsError ? (
+                  <div role="alert" className="p-5 text-sm text-rose-700"><p>{subsError}</p><button onClick={() => selectTask(selectedTask)} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry submissions</button></div>
                 ) : filteredSubs.length === 0 ? (
                   <div className="py-16 text-center text-slate-400 text-sm">No submissions found.</div>
                 ) : filteredSubs.map(sub => {
@@ -179,9 +185,9 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
                   return (
                     <div key={sub.id} className="p-5 space-y-3">
                       {/* Member row */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-semibold shrink-0">
                             {(sub.student_name || '?').charAt(0)}
                           </div>
                           <div>
@@ -213,18 +219,20 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
                       </div>
 
                       {/* Grading row */}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 pl-0 sm:pl-11">
+                      <div className="flex min-w-0 flex-col gap-3 pl-0 sm:pl-11">
                         {/* Score chips */}
-                        <div className="flex items-center space-x-1 shrink-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           {[...Array(selectedTask.max_score)].map((_, i) => (
                             <button
                               key={i}
                               onClick={() => setGrades(g => ({ ...g, [sub.id]: { ...local, score: String(i + 1) } }))}
-                              className={`w-7 h-7 rounded-md text-xs font-bold transition-all border ${
+                              aria-label={`Score ${i + 1} for ${sub.student_name || sub.student_id}`}
+                              aria-pressed={Number(local.score) === i + 1}
+                              className={`w-9 h-9 rounded-md text-xs font-semibold transition-colors border ${
                                 Number(local.score) === i + 1
-                                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-105'
+                                  ? 'bg-slate-900 text-white border-slate-900'
                                   : Number(local.score) > i
-                                    ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                    ? 'bg-slate-100 text-slate-700 border-slate-300'
                                     : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
                               }`}
                             >
@@ -238,10 +246,11 @@ export const TaskReviewsPage: React.FC<TaskReviewsPageProps> = ({ currentUser })
                         <div className="flex items-center space-x-2 flex-1 w-full">
                           <input
                             type="text"
+                            aria-label={`Reviewer note for ${sub.student_name || sub.student_id}`}
                             placeholder="Reviewer note…"
                             value={local.note}
                             onChange={e => setGrades(g => ({ ...g, [sub.id]: { ...local, note: e.target.value } }))}
-                            className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs focus:outline-none focus:border-blue-500 transition-all"
+                            className="min-w-0 flex-1 px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-500 transition-colors"
                           />
 
                           <button

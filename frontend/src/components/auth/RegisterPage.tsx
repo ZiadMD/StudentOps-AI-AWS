@@ -1,259 +1,141 @@
-import React, { useState, useEffect } from 'react';
-import { Layers, Eye, EyeOff, ChevronRight, Check } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Loader2 } from 'lucide-react';
 import { api } from '../../api/client';
-import { UserProfile, TeamItem } from '../../types';
+import type { UserProfile, TeamItem } from '../../types';
+import { AuthLayout, AuthLink, PasswordField, authButtonClass, authErrorClass, authInputClass, authLinkClass } from './AuthLayout';
 
 interface RegisterPageProps {
   onRegister: (user: UserProfile) => void;
   onGoToLogin: () => void;
 }
 
-export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onGoToLogin }) => {
-  const [step, setStep]           = useState<1 | 2>(1);
-  const role                      = 'member';
-  const [name, setName]           = useState('');
+export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
+  const [name, setName] = useState('');
   const [arabicName, setArabicName] = useState('');
-  const [email, setEmail]         = useState('');
-  const [password, setPassword]   = useState('');
-  const [teamId, setTeamId]       = useState<string>('');
-  const [teams, setTeams]         = useState<TeamItem[]>([]);
-  const [showPass, setShowPass]   = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [teamId, setTeamId] = useState('');
+  const [teams, setTeams] = useState<TeamItem[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(true);
+  const [teamsError, setTeamsError] = useState(false);
+  const [teamsAttempt, setTeamsAttempt] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [invalidField, setInvalidField] = useState('');
+  const submitting = useRef(false);
 
   useEffect(() => {
+    let active = true;
     async function loadTeams() {
       try {
-        const t = await api.getTeams();
-        setTeams(t);
-        if (t.length > 0) setTeamId(t[0].id);
-      } catch (e) {
-        // Teams not loaded
+        const result = await api.getTeams();
+        if (active) setTeams(result);
+      } catch {
+        if (active) setTeamsError(true);
+      } finally {
+        if (active) setTeamsLoading(false);
       }
     }
-    loadTeams();
-  }, []);
+    void loadTeams();
+    return () => { active = false; };
+  }, [teamsAttempt]);
 
-  const handleStep1 = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!role) { setError('Please select a role.'); return; }
-    setError('');
-    setStep(2);
+  const retryTeams = () => {
+    setTeamsLoading(true);
+    setTeamsError(false);
+    setTeamsAttempt((attempt) => attempt + 1);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setError('All fields are required.');
-      return;
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting.current) return;
+    const invalid = !name.trim() ? 'full_name'
+      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? 'email'
+      : password.length < 8 ? 'password' : '';
+    setInvalidField(invalid);
+    if (invalid) {
+      setError(invalid === 'full_name' ? 'Enter your full name in English.'
+        : invalid === 'email' ? 'Enter a valid email address.' : 'Password must be at least 8 characters.');
+      event.currentTarget.querySelector<HTMLInputElement>(`[name="${invalid}"]`)?.focus();
       return;
     }
     setError('');
+    submitting.current = true;
     setLoading(true);
     try {
-      const res = await api.register({
-        email: email.trim(),
-        password: password.trim(),
-        full_name: name.trim(),
-        arabic_name: arabicName.trim() || undefined,
-        role: role,
-        team_id: teamId || undefined,
+      const result = await api.register({
+        email: email.trim(), password, full_name: name.trim(),
+        arabic_name: arabicName.trim() || undefined, role: 'member', team_id: teamId || undefined,
       });
-      onRegister(res.user);
-    } catch (err: any) {
-      setError(err?.message || 'Registration failed. Please check your details.');
+      onRegister(result.user);
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : 'Unable to create your account. Please try again.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex items-center space-x-2.5 mb-10">
-          <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center">
-            <Layers className="w-5 h-5 text-white" />
+    <AuthLayout>
+      <header className="mb-7">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">Join your organization</p>
+        <h1 id="register-title" className="text-3xl font-semibold tracking-tight text-slate-900">Create an account</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">Start with a member account. Additional access is managed by your organization administrator.</p>
+      </header>
+      <form noValidate onSubmit={handleSubmit} aria-labelledby="register-title" aria-busy={loading} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="min-w-0 space-y-2">
+            <label htmlFor="register-name" className="block text-sm font-medium text-slate-700">Full name (English)</label>
+            <input id="register-name" name="full_name" type="text" autoComplete="name" required
+              value={name} onChange={(event) => setName(event.target.value)} disabled={loading}
+              aria-invalid={invalidField === 'full_name'} aria-describedby={invalidField === 'full_name' ? 'register-error' : undefined} className={authInputClass} />
           </div>
-          <span className="font-extrabold text-slate-900 text-lg tracking-tight">
-            StudentOps<span className="text-blue-600">.AI</span>
-          </span>
+          <div className="min-w-0 space-y-2">
+            <label htmlFor="register-arabic-name" className="block text-sm font-medium text-slate-700"><span lang="ar" dir="rtl" className="font-['Cairo']">الاسم بالعربية</span> <span className="font-normal text-slate-500">(optional)</span></label>
+            <input id="register-arabic-name" name="arabic_name" type="text" lang="ar" dir="rtl" autoComplete="off"
+              value={arabicName} onChange={(event) => setArabicName(event.target.value)} disabled={loading} className={`${authInputClass} font-['Cairo']`} />
+          </div>
         </div>
-
-        {/* Step progress */}
-        <div className="flex items-center space-x-3 mb-8">
-          {[1, 2].map((s) => (
-            <React.Fragment key={s}>
-              <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-colors ${
-                step > s ? 'bg-emerald-500 text-white' : step === s ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-500'
-              }`}>
-                {step > s ? <Check className="w-3.5 h-3.5" /> : s}
-              </div>
-              {s < 2 && <div className={`flex-1 h-px ${step > s ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
-            </React.Fragment>
-          ))}
+        <div className="space-y-2">
+          <label htmlFor="register-email" className="block text-sm font-medium text-slate-700">Email address</label>
+          <input id="register-email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} required
+            value={email} onChange={(event) => setEmail(event.target.value)} disabled={loading}
+            aria-invalid={invalidField === 'email'} aria-describedby={invalidField === 'email' ? 'register-error' : undefined} className={authInputClass} />
         </div>
-
-        {/* Step 1 — Role & Community Notice */}
-        {step === 1 && (
-          <form onSubmit={handleStep1} className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Create an account</h1>
-              <p className="text-sm text-slate-500 mt-1.5">
-                Already have one?{' '}
-                <button type="button" onClick={onGoToLogin} className="text-blue-600 font-semibold hover:underline">
-                  Sign in
-                </button>
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Account Type</label>
-              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/70 text-left">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-2 h-2 rounded-full bg-blue-600" />
-                  <span className="text-sm font-bold text-blue-900">Community Member Account</span>
-                </div>
-                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                  Self-registration creates a verified student member account. Elevated access (Team Lead & HR Admin) is granted by platform administrators.
-                </p>
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-semibold rounded-lg text-sm transition-all shadow-sm flex items-center justify-center space-x-2"
-            >
-              <span>Continue to Profile</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </form>
-        )}
-
-        {/* Step 2 — Profile details */}
-        {step === 2 && (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Your profile</h1>
-              <p className="text-sm text-slate-500 mt-1.5">
-                Registering as a verified <span className="font-semibold text-slate-800">Community Member</span>
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Full Name (EN)</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ziad Mohamed"
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">الاسم بالعربية</label>
-                <input
-                  type="text"
-                  dir="rtl"
-                  value={arabicName}
-                  onChange={(e) => setArabicName(e.target.value)}
-                  placeholder="زياد محمد"
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs font-cairo"
-                  style={{ fontFamily: 'Cairo, sans-serif' }}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Email address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@engineering.org"
-                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Password</label>
-              <div className="relative">
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Min. 8 characters"
-                  className="w-full px-3 py-2.5 pr-10 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* Password strength bar */}
-              {password && (
-                <div className="flex space-x-1 mt-1">
-                  {[1,2,3,4].map(i => (
-                    <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${
-                      password.length >= i * 3
-                        ? password.length < 6 ? 'bg-rose-400' : password.length < 10 ? 'bg-amber-400' : 'bg-emerald-500'
-                        : 'bg-slate-200'
-                    }`} />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {teams.length > 0 && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Select Team</label>
-                <select
-                  value={teamId}
-                  onChange={(e) => setTeamId(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-xs"
-                >
-                  {teams.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {error && (
-              <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-semibold rounded-lg text-sm transition-all shadow-sm flex items-center justify-center space-x-2 disabled:opacity-60"
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span>Create Account</span>
-                  <ChevronRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+        <div className="space-y-2">
+          <label htmlFor="register-password" className="block text-sm font-medium text-slate-700">Password</label>
+          <PasswordField id="register-password" value={password} onChange={setPassword} autoComplete="new-password" minLength={8}
+            disabled={loading} invalid={invalidField === 'password'} describedBy={`password-help${invalidField === 'password' ? ' register-error' : ''}`} />
+          <p id="password-help" className="text-xs leading-5 text-slate-600">Use at least 8 characters. Spaces count as characters.</p>
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="register-team" className="block text-sm font-medium text-slate-700">Team <span className="font-normal text-slate-500">(optional)</span></label>
+          <select id="register-team" name="team_id" value={teamId} onChange={(event) => setTeamId(event.target.value)}
+            disabled={loading || teamsLoading || teamsError || teams.length === 0} aria-describedby="team-help" className={authInputClass}>
+            <option value="">No team selected</option>
+            {teams.map((team) => <option key={team.id} value={team.id}>{team.name} ({team.code})</option>)}
+          </select>
+          <p id="team-help" role="status" className="text-xs leading-5 text-slate-600">
+            {teamsLoading ? 'Loading teams…' : teamsError ? 'You can create an account without a team.'
+              : teams.length === 0 ? 'No teams are available. You can continue without one.' : 'Choose your team, or leave this blank.'}
+          </p>
+          {teamsError && <div role="alert" className={authErrorClass}>
+            <p>Teams could not be loaded.</p>
+            <button type="button" onClick={retryTeams} disabled={loading} className={`mt-1 min-h-11 text-sm disabled:opacity-60 ${authLinkClass}`}>Retry loading teams</button>
+          </div>}
+        </div>
+        {error && <p id="register-error" role="alert" className={authErrorClass}>{error}</p>}
+        <button type="submit" disabled={loading} className={authButtonClass}>
+          {loading && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+          {loading ? 'Creating account…' : 'Create account'}
+        </button>
+      </form>
+      <p role="status" className="sr-only">{loading ? 'Creating account. Please wait.' : ''}</p>
+      <p className="mt-7 border-t border-slate-200 pt-5 text-sm leading-6 text-slate-600">
+        Already have an account?{' '}<AuthLink href="/login" onNavigate={onGoToLogin}>Sign in</AuthLink>
+      </p>
+    </AuthLayout>
   );
-};
+}
+
