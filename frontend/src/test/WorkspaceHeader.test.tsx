@@ -70,14 +70,12 @@ afterEach(() => {
 });
 
 describe('WorkspaceHeader search and actions', () => {
-  it('uses a circular placeholder portrait and falls back to initials on image failure', () => {
+  it('renders a deterministic initials avatar in the profile button', () => {
     const { props } = mount();
     const profile = screen.getByRole('button', { name: 'My profile' });
-    const portrait = within(profile).getByRole('img', { name: 'Temporary profile photo' });
-    expect(portrait).toHaveClass('rounded-full', 'object-cover');
-    fireEvent.error(portrait);
     expect(within(profile).queryByRole('img')).not.toBeInTheDocument();
-    expect(within(profile).getByText('TM')).toBeInTheDocument();
+    const initials = within(profile).getByText('TM');
+    expect(initials).toHaveClass('rounded-full');
     fireEvent.click(profile);
     expect(props.onNavigate).toHaveBeenCalledWith('profile');
   });
@@ -93,7 +91,10 @@ describe('WorkspaceHeader search and actions', () => {
     for (const button of buttons) {
       expect(button).toHaveClass('h-11', 'w-11');
       expect(button).toHaveAttribute('title', button.getAttribute('aria-label'));
-      expect(button.textContent).toBe('');
+      // Profile button contains initials text from the avatar; all others are icon-only
+      if (button.getAttribute('aria-label') !== 'My profile') {
+        expect(button.textContent).toBe('');
+      }
     }
     expect(within(header).queryByRole('heading')).not.toBeInTheDocument();
     expect(within(header).queryByText(/Organization|breadcrumb/i)).not.toBeInTheDocument();
