@@ -13,12 +13,15 @@ import {
   CheckSquare,
   Activity,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  Bell,
+  MessageSquare
 } from 'lucide-react';
 import { api } from '../api/client';
-import { DashboardStats, MeetingDetail, StudentScoreSummary, EventItem, UserProfile } from '../types';
+import { DashboardStats, MeetingDetail, StudentScoreSummary, EventItem, UserProfile, ReminderItem } from '../types';
 import { ProgressBar } from './ui/ProgressBar';
 import { Badge } from './ui/Badge';
+import { useLanguage } from '../context/LanguageContext';
 
 interface DashboardProps {
   currentUser?: UserProfile | null;
@@ -99,25 +102,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToTab, 
   onSendChatQuery 
 }) => {
+  const { t } = useLanguage();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [meetings, setMeetings] = useState<MeetingDetail[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [scoreboard, setScoreboard] = useState<StudentScoreSummary[]>([]);
+  const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const isMember = currentUser?.role === 'committee_member' || currentUser?.role === 'member';
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [statsData, meetingsData, eventsData, scoreData] = await Promise.all([
+        const promises: Promise<any>[] = [
           api.getStats(),
           api.getMeetings(),
           api.getEvents(),
           api.getScoreboard()
-        ]);
+        ];
+        if (isMember) {
+          promises.push(api.getReminders());
+        }
+        const [statsData, meetingsData, eventsData, scoreData, remindersData] = await Promise.all(promises);
         setStats(statsData);
         setMeetings(meetingsData || []);
         setEvents(eventsData || []);
         setScoreboard(scoreData || []);
+        if (remindersData) {
+          setReminders(remindersData);
+        }
       } catch (err) {
         console.error('Failed to load dashboard data', err);
       } finally {
@@ -125,7 +139,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
     }
     loadData();
-  }, []);
+  }, [isMember]);
 
   const userRole = currentUser?.role || 'hr_admin';
   const roleInfo = ROLE_DISPLAY_NAMES[userRole] || { en: 'Operations', ar: 'العمليات' };
@@ -603,65 +617,117 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Right Column: Top Standings + Contextual Prompts */}
         <div className="space-y-6">
-          {/* Top Standings / Evaluation Board */}
-          <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-slate-700 flex items-center">
-                <Award className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
-                Member Evaluations & Standings
-              </span>
-              <button 
-                onClick={() => onNavigateToTab('scoreboard')} 
-                className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
-              >
-                View All <ChevronRight className="w-3 h-3 ml-0.5" />
-              </button>
-            </div>
+          {/* Right Column: Member Reminders (for members) OR Top Standings (for management) */}
+          {isMember ? (
+            <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-slate-700 flex items-center">
+                  <Bell className="w-3.5 h-3.5 mr-1.5 rtl:mr-0 rtl:ml-1.5 text-blue-600" />
+                  {t('myReminders')}
+                </span>
+                <button
+                  onClick={() => onNavigateToTab('notifications')}
+                  className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                >
+                  {t('viewAll')} <ChevronRight className="w-3 h-3 ml-0.5 rtl:ml-0 rtl:mr-0.5" />
+                </button>
+              </div>
 
-            <div className="divide-y divide-slate-100">
-              {topStudents.map((student, idx) => {
-                const badgeVariant = getRatingBadgeVariant(student.overall_rating || '');
-                return (
-                  <div key={student.student_id} className="flex items-center justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <span className="font-mono text-[11px] font-bold text-slate-400 w-5">
-                        #{idx + 1}
-                      </span>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[13px] font-bold text-slate-900 font-['Cairo'] truncate">
-                          {student.arabic_name}
-                        </span>
-                        <span className="text-[11px] text-slate-500 truncate">
-                          {student.student_name}
-                        </span>
+              <div className="divide-y divide-slate-100">
+                {reminders.slice(0, 4).map((rem) => {
+                  const isWhatsApp = rem.channel === 'whatsapp';
+                  return (
+                    <div key={rem.id} className="flex items-start justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-start space-x-3 rtl:space-x-reverse min-w-0">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border mt-0.5 ${
+                          isWhatsApp ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-blue-50 border-blue-100 text-blue-600'
+                        }`}>
+                          {isWhatsApp ? <MessageSquare className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[13px] font-semibold text-slate-900 truncate">
+                            {rem.title || 'Operational Notice'}
+                          </span>
+                          <span className="text-[11px] text-slate-500 line-clamp-1">
+                            {rem.message_content}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                            {rem.sent_at ? new Date(rem.sent_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
 
-                    <div className="flex items-center space-x-3 shrink-0 ml-3">
-                      <Badge variant={badgeVariant} size="sm">
-                        {student.overall_rating || 'Evaluated'}
-                      </Badge>
-
-                      <div className="text-right flex flex-col min-w-[52px]">
-                        <span className="text-[12px] font-mono font-bold text-slate-800">
-                          {student.total_behavior_score}/23
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          Behavior
-                        </span>
-                      </div>
-                    </div>
+                {reminders.length === 0 && (
+                  <div className="py-6 text-center text-sm text-slate-400">
+                    {t('noReminders')}
                   </div>
-                );
-              })}
-
-              {topStudents.length === 0 && (
-                <div className="py-6 text-center text-sm text-slate-400">
-                  No student evaluation records found.
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Top Standings / Evaluation Board for Management */
+            <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-slate-700 flex items-center">
+                  <Award className="w-3.5 h-3.5 mr-1.5 rtl:mr-0 rtl:ml-1.5 text-blue-600" />
+                  Member Evaluations & Standings
+                </span>
+                <button
+                  onClick={() => onNavigateToTab('scoreboard')}
+                  className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                >
+                  {t('viewAll')} <ChevronRight className="w-3 h-3 ml-0.5 rtl:ml-0 rtl:mr-0.5" />
+                </button>
+              </div>
+
+              <div className="divide-y divide-slate-100">
+                {topStudents.map((student, idx) => {
+                  const badgeVariant = getRatingBadgeVariant(student.overall_rating || '');
+                  return (
+                    <div key={student.student_id} className="flex items-center justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
+                        <span className="font-mono text-[11px] font-bold text-slate-400 w-5">
+                          #{idx + 1}
+                        </span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[13px] font-bold text-slate-900 font-['Cairo'] truncate">
+                            {student.arabic_name}
+                          </span>
+                          <span className="text-[11px] text-slate-500 truncate">
+                            {student.student_name}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 rtl:space-x-reverse shrink-0 ml-3 rtl:ml-0 rtl:mr-3">
+                        <Badge variant={badgeVariant} size="sm">
+                          {student.overall_rating || 'Evaluated'}
+                        </Badge>
+
+                        <div className="text-right rtl:text-left flex flex-col min-w-[52px]">
+                          <span className="text-[12px] font-mono font-bold text-slate-800">
+                            {student.total_behavior_score}/23
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            Behavior
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {topStudents.length === 0 && (
+                  <div className="py-6 text-center text-sm text-slate-400">
+                    No student evaluation records found.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Contextual Operations Starters (Functional & Honest, No Fake Shortcuts) */}
           <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs p-4 space-y-3">

@@ -1,4 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
+import { SettingsModal } from './ui/SettingsModal';
 import {
   Bot,
   LayoutDashboard,
@@ -114,7 +116,7 @@ const NAV_ITEMS: {
     id: 'qna',
     label: 'Committee Q&A',
     icon: MessageCircleQuestion,
-    roles: ['committee_head', 'committee_member', 'member', 'committee_hr_leader', 'hr_admin', 'team_lead'],
+    roles: ['committee_head', 'committee_member', 'member', 'committee_hr_leader', 'hr_admin', 'team_lead', 'region_hr_head'],
   },
   {
     id: 'feedback',
@@ -138,7 +140,7 @@ const NAV_ITEMS: {
     id: 'notifications',
     label: 'Reminders',
     icon: Bell,
-    roles: ['region_hr_head', 'committee_hr_leader', 'hr_admin', 'team_lead'],
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead', 'member'],
   },
   {
     id: 'audit',
@@ -171,6 +173,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDesktopCollapsed = false,
   setIsDesktopCollapsed,
 }) => {
+  const { t } = useLanguage();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const visibleItems = NAV_ITEMS.filter(item => item.roles.includes(role));
 
   // Lock body scroll on mobile when full-screen drawer is open
@@ -282,16 +286,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className={`text-[11px] md:text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 md:mb-1.5 px-3 md:px-2 pt-2 ${
             isDesktopCollapsed ? 'md:hidden' : ''
           }`}>
-            Workspace Navigation
+            {t('workspaceNav', 'Workspace Navigation')}
           </div>
           {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            const localizedLabel = t(item.id, item.label);
             return (
               <button
                 key={item.id}
                 onClick={() => handleSelectTab(item.id)}
-                title={isDesktopCollapsed ? item.label : undefined}
+                title={isDesktopCollapsed ? localizedLabel : undefined}
                 className={`w-full flex items-center ${
                   isDesktopCollapsed ? 'md:justify-center md:px-0' : 'justify-between px-3 md:px-2.5'
                 } py-3 md:py-[7px] rounded-xl md:rounded-md text-[15px] md:text-[13px] transition-colors ${
@@ -300,7 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     : 'text-slate-700 md:text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 active:bg-slate-100'
                 }`}
               >
-                <div className={`flex items-center ${isDesktopCollapsed ? 'md:space-x-0' : 'space-x-3 md:space-x-2.5'}`}>
+                <div className={`flex items-center ${isDesktopCollapsed ? 'md:space-x-0' : 'space-x-3 md:space-x-2.5 rtl:space-x-reverse'}`}>
                   <Icon
                     className={`w-5 h-5 md:w-4 md:h-4 shrink-0 ${
                       isActive
@@ -309,7 +314,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   />
                   <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>
-                    {item.label}
+                    {localizedLabel}
                   </span>
                 </div>
                 {item.isAgent && (
@@ -329,40 +334,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }`}>
         {/* Settings button */}
         <button
-          title={isDesktopCollapsed ? 'Settings' : undefined}
+          onClick={() => setIsSettingsOpen(true)}
+          title={isDesktopCollapsed ? t('settings', 'Settings') : undefined}
           className={`w-full flex items-center ${
-            isDesktopCollapsed ? 'md:justify-center md:px-0' : 'space-x-3 md:space-x-2.5 px-3 md:px-2.5'
+            isDesktopCollapsed ? 'md:justify-center md:px-0' : 'space-x-3 md:space-x-2.5 rtl:space-x-reverse px-3 md:px-2.5'
           } py-2.5 md:py-2 rounded-xl md:rounded-md text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 transition-colors text-[14px] md:text-[13px]`}
         >
           <Settings className="w-5 h-5 md:w-4 md:h-4 text-slate-400 shrink-0" />
-          <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>Settings</span>
+          <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>{t('settings', 'Settings')}</span>
         </button>
 
         {/* Sign out button */}
         <button
           onClick={onLogout}
-          title={isDesktopCollapsed ? 'Sign out' : undefined}
+          title={isDesktopCollapsed ? t('signOut', 'Sign out') : undefined}
           className={`w-full flex items-center ${
-            isDesktopCollapsed ? 'md:justify-center md:px-0' : 'space-x-3 md:space-x-2.5 px-3 md:px-2.5'
+            isDesktopCollapsed ? 'md:justify-center md:px-0' : 'space-x-3 md:space-x-2.5 rtl:space-x-reverse px-3 md:px-2.5'
           } py-2.5 md:py-2 rounded-xl md:rounded-md text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors text-[14px] md:text-[13px]`}
         >
           <LogOut className="w-5 h-5 md:w-4 md:h-4 text-slate-400 hover:text-rose-600 shrink-0" />
-          <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>Sign out</span>
+          <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>{t('signOut', 'Sign out')}</span>
         </button>
 
         {/* User profile card */}
         <div
-          title={isDesktopCollapsed ? (currentUser?.full_name || 'Admin User') : undefined}
+          title={isDesktopCollapsed ? (currentUser?.full_name || t('adminUser', 'Admin User')) : undefined}
           className={`flex items-center ${
-            isDesktopCollapsed ? 'md:justify-center md:p-2' : 'space-x-3 md:space-x-2.5 px-3 py-2.5 md:px-2.5 md:py-2'
+            isDesktopCollapsed ? 'md:justify-center md:p-2' : 'space-x-3 md:space-x-2.5 rtl:space-x-reverse px-3 py-2.5 md:px-2.5 md:py-2'
           } rounded-xl md:rounded-md mt-1 border border-slate-200 bg-slate-50/80`}
         >
           <div className="w-8 h-8 md:w-6 md:h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs md:text-[10px] font-bold shrink-0 shadow-xs">
-            {currentUser?.full_name?.charAt(0) || ROLE_LABELS[role].charAt(0)}
+            {currentUser?.full_name?.charAt(0) || ROLE_LABELS[role]?.charAt(0) || 'U'}
           </div>
           <div className={`flex flex-col min-w-0 ${isDesktopCollapsed ? 'md:hidden' : 'block'}`}>
             <span className="text-[13px] md:text-[12px] font-semibold text-slate-900 truncate">
-              {currentUser?.full_name || 'Admin User'}
+              {currentUser?.full_name || t('adminUser', 'Admin User')}
             </span>
             <span className="text-[11px] md:text-[10px] text-slate-500 truncate">
               {ROLE_LABELS[role]}{currentUser?.team_name ? ` · ${currentUser.team_name}` : ''}
@@ -370,6 +376,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        currentUser={currentUser}
+      />
     </aside>
   );
 };
