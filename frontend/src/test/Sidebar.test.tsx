@@ -37,6 +37,7 @@ describe('Sidebar role-based navigation gating', () => {
     expect(screen.getByRole('button', { name: /meet attendance/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /tasks & sprints/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /committee q&a/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^reminders$/i })).toBeInTheDocument();
 
     // Forbidden administrative and evaluation tabs
     expect(screen.queryByRole('button', { name: /evaluations/i })).not.toBeInTheDocument();
@@ -60,13 +61,14 @@ describe('Sidebar role-based navigation gating', () => {
     expect(screen.getByRole('button', { name: /task reviews/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /evaluations/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /ai agent console/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /committee q&a/i })).toBeInTheDocument();
 
     // Should NOT see executive reports or audit log
     expect(screen.queryByRole('button', { name: /executive reports/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /audit log/i })).not.toBeInTheDocument();
   });
 
-  it('allows region_hr_head to access executive reports and audit log, but not technical task reviews', () => {
+  it('allows region_hr_head to access executive reports, audit log, and committee q&a', () => {
     render(
       <Sidebar
         {...defaultProps}
@@ -79,6 +81,8 @@ describe('Sidebar role-based navigation gating', () => {
     expect(screen.getByRole('button', { name: /executive reports/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /audit log/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /whatsapp & escalations/i })).toBeInTheDocument();
+    // Requirement 2: HR Head MUST see Committee Q&A
+    expect(screen.getByRole('button', { name: /committee q&a/i })).toBeInTheDocument();
 
     // Technical task reviews are restricted to committee heads
     expect(screen.queryByRole('button', { name: /task reviews/i })).not.toBeInTheDocument();

@@ -20,6 +20,7 @@ import { WhatsAppAgentPage }  from './components/WhatsAppAgentPage';
 import { api }                from './api/client';
 import { UserProfile }        from './types';
 import { ToastProvider }      from './context/ToastContext';
+import { LanguageProvider }   from './context/LanguageContext';
 
 type AuthScreen = 'login' | 'register' | 'app';
 
@@ -192,7 +193,7 @@ function AppContent() {
             {activeTab === 'feedback'      && <MemberFeedbackView currentUser={currentUser} />}
             {activeTab === 'reports'       && <CommitteeReportsView currentUser={currentUser} />}
             {activeTab === 'whatsapp'      && currentUser && <WhatsAppAgentPage currentUser={currentUser} />}
-            {activeTab === 'notifications' && <NotificationsPage />}
+            {activeTab === 'notifications' && <NotificationsPage currentUser={currentUser} />}
             {activeTab === 'audit'         && <AuditViewer />}
           </div>
         </div>
@@ -203,9 +204,11 @@ function AppContent() {
 
 export function App() {
   return (
-    <ToastProvider>
-      <AppContent />
-    </ToastProvider>
+    <LanguageProvider>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </LanguageProvider>
   );
 }
 

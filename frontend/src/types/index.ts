@@ -359,3 +359,15 @@ export interface WhatsAppSyncResponse {
   messages: WhatsAppChatMessage[];
 }
 
+export interface ReminderItem {
+  id: string;
+  recipient_id?: string | null;
+  recipient_name: string;
+  recipient_phone?: string;
+  channel: string;
+  message_content: string;
+  status: string;
+  sent_at?: string | null;
+  trigger_source?: string | null;
+  title?: string;
+}
