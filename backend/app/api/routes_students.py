@@ -1,0 +1,476 @@
+import uuid
+from typing import Optional
+from datetime import datetime, timezone, timedelta
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.core.database import get_db
+from app.core.dependencies import get_current_active_user, verify_student_access, require_roles
+from app.core.security import generate_invitation_token
+from app.models.entities import Student, User, ScoreRecord, Team, StudentInvitation, utcnow
+from app.services.audit_service import AuditService
+from app.models.schemas import (
+    StudentCreate,
+    StudentResponse,
+    StudentScoreSummary,
+    BehaviorScoreUpdate,
+    AssignCohortRequest,
+    StudentPhoneUpdate,
+    BonusAwardRequest,
+    StudentInvitationCreateRequest,
+    StudentInvitationResponse
+)
+from app.services.scoring_service import ScoringService
+from app.agent.tools import escape_like
+
+router = APIRouter(prefix="/students", tags=["Students"])
+
+
+@router.get("", response_model=list[StudentResponse])
+async def list_students(
+    role: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    assigned_only: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Lists student records with automatic organizational scoping:
+    - region_hr_head / hr_admin: sees all students across all teams.
+    - committee_head / committee_hr_leader / team_lead: sees only members belonging to their assigned team_id.
+    - committee_hr_member: sees students assigned to them or in their committee.
+    - committee_member / member: sees only their own student profile.
+    """
+    query = select(Student)
+
+    if current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
+        query = query.where(Student.team_id == current_user.team_id)
+    elif current_user.role == "committee_hr_member":
+        if assigned_only:
+            query = query.where(Student.assigned_hr_id == current_user.id)
+        else:
+            query = query.where(
+                (Student.assigned_hr_id == current_user.id) |
+                (Student.team_id == current_user.team_id)
+            )
+    elif current_user.role in ("committee_member", "member"):
+        query = query.where(Student.id == current_user.student_id)
+
+    if role:
+        query = query.where(Student.role.ilike(f"%{escape_like(role.strip())}%"))
+    if status_filter:
+        query = query.where(Student.status == status_filter.upper())
+
+    res = await db.execute(query)
+    return res.scalars().all()
+
+
+@router.post("", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
+async def create_student(
+    body: StudentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([
+        "region_hr_head", "committee_hr_leader", "committee_head", "team_lead", "hr_admin", "committee_hr_member"
+    ]))
+):
+    """
+    Registers a new member with committee scoping and duplicate prevention.
+    - region_hr_head / hr_admin: can create members across any committee or unassigned.
+    - committee_head / committee_hr_leader / team_lead / committee_hr_member: restricted to their committee.
+    - committee_member / member: forbidden (HTTP 403).
+    """
+    full_name = body.full_name.strip()
+    arabic_name = body.arabic_name.strip()
+    email = str(body.email).strip().lower()
+    phone = body.phone.strip()
+
+    if not full_name:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Full name cannot be empty.")
+    if not arabic_name:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Arabic name cannot be empty.")
+    if not phone:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Phone number cannot be empty.")
+
+    university = (body.university or "Faculty of Engineering").strip()
+    role = (body.role or "Member").strip()
+    status_val = (body.status or "ACTIVE").strip().upper()
+    if status_val not in ("ACTIVE", "INACTIVE", "PROBATION"):
+        status_val = "ACTIVE"
+
+    # Scoping determination
+    target_team_id = body.team_id
+    if current_user.role in ("committee_head", "committee_hr_leader", "team_lead", "committee_hr_member"):
+        if target_team_id and target_team_id != current_user.team_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot create members outside your assigned committee."
+            )
+        target_team_id = current_user.team_id
+    elif current_user.role in ("region_hr_head", "hr_admin"):
+        if target_team_id:
+            team_res = await db.execute(select(Team).where(Team.id == target_team_id))
+            if not team_res.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Assigned committee team '{target_team_id}' not found."
+                )
+
+    # Optional assigned_hr_id verification
+    assigned_hr_id = body.assigned_hr_id
+    if assigned_hr_id:
+        hr_res = await db.execute(select(User).where(User.id == assigned_hr_id))
+        if not hr_res.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Assigned HR member '{assigned_hr_id}' not found."
+            )
+
+    # Check duplicate email
+    existing_email = await db.execute(select(Student).where(Student.email == email))
+    if existing_email.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A member with email '{email}' already exists."
+        )
+        
+    existing_phone = await db.execute(select(Student).where(Student.phone == phone))
+    if existing_phone.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A member with phone '{phone}' already exists."
+        )
+
+    # Student code handling
+    if body.student_code and body.student_code.strip():
+        student_code = body.student_code.strip().upper()
+        existing_code = await db.execute(select(Student).where(Student.student_code == student_code))
+        if existing_code.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A member with student code '{student_code}' already exists."
+            )
+    else:
+        # Auto-generate unique code
+        for _ in range(10):
+            candidate_code = f"ST-2026-{uuid.uuid4().hex[:6].upper()}"
+            existing_code = await db.execute(select(Student).where(Student.student_code == candidate_code))
+            if not existing_code.scalar_one_or_none():
+                student_code = candidate_code
+                break
+        else:
+            student_code = f"ST-2026-{int(utcnow().timestamp())}"
+
+    student_id = f"stu_{uuid.uuid4().hex[:12]}"
+
+    new_student = Student(
+        id=student_id,
+        student_code=student_code,
+        full_name=full_name,
+        arabic_name=arabic_name,
+        email=email,
+        phone=phone,
+        university=university,
+        role=role,
+        status=status_val,
+        team_id=target_team_id,
+        assigned_hr_id=assigned_hr_id,
+    )
+    db.add(new_student)
+    await db.commit()
+    await db.refresh(new_student)
+    return new_student
+
+
+@router.get("/scoreboard/all", response_model=list[StudentScoreSummary])
+async def get_all_scoreboards(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Retrieves scoreboards with scoping:
+    - region_hr_head / hr_admin: full ground-truth scoreboard.
+    - committee_head / committee_hr_leader / team_lead: scoreboard filtered to students in their team.
+    - committee_hr_member: scoreboard for assigned cohort or committee.
+    - committee_member: strictly forbidden (scores are confidential).
+    - member (legacy): personal scorecard summary.
+    """
+    if current_user.role == "committee_member":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Scores are confidential and not visible to committee members."
+        )
+
+    all_summaries = await ScoringService.get_all_summaries(db)
+
+    if current_user.role in ("region_hr_head", "hr_admin"):
+        return all_summaries
+    elif current_user.role in ("committee_head", "committee_hr_leader", "team_lead"):
+        if not current_user.team_id:
+            return []
+        team_res = await db.execute(
+            select(Student.id).where(Student.team_id == current_user.team_id)
+        )
+        team_student_ids = set(team_res.scalars().all())
+        return [s for s in all_summaries if s.student_id in team_student_ids]
+    elif current_user.role == "committee_hr_member":
+        cohort_res = await db.execute(
+            select(Student.id).where(
+                (Student.assigned_hr_id == current_user.id) |
+                ((Student.team_id == current_user.team_id) & (Student.assigned_hr_id.is_(None)))
+            )
+        )
+        cohort_ids = set(cohort_res.scalars().all())
+        return [s for s in all_summaries if s.student_id in cohort_ids]
+    else:  # legacy member
+        if current_user.student_id:
+            return [s for s in all_summaries if s.student_id == current_user.student_id]
+        return []
+
+
+@router.get("/{student_id}", response_model=StudentResponse)
+async def get_student(
+    student_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Retrieves a student record after verifying permission boundary."""
+    return await verify_student_access(student_id, current_user, db)
+
+
+@router.get("/{student_id}/score", response_model=StudentScoreSummary)
+async def get_student_score(
+    student_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Retrieves a student scorecard after verifying permission boundary."""
+    if current_user.role == "committee_member":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Scores are confidential and not visible to committee members."
+        )
+
+    await verify_student_access(student_id, current_user, db)
+    summary = await ScoringService.get_student_score_summary(student_id, db)
+    if not summary:
+        raise HTTPException(status_code=404, detail="Student not found or no score available")
+    return summary
+
+
+@router.put("/{student_id}/behavior-score", response_model=StudentScoreSummary)
+async def update_behavior_score(
+    student_id: str,
+    body: BehaviorScoreUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_hr_member", "hr_admin"]))
+):
+    """
+    Submits or updates behavior scores (/23) for a student.
+    Committee Head is strictly read-only and cannot call this endpoint.
+    Committee HR Member can only grade their assigned cohort or committee students.
+    """
+    student = await verify_student_access(student_id, current_user, db)
+
+    import uuid
+    categories = [
+        ("GROUP_INTERACTION", body.group_interaction, 5.0),
+        ("SOCIAL_MEDIA", body.social_media, 5.0),
+        ("HIERARCHY_RULES", body.hierarchy_rules, 5.0),
+        ("POLITE_CONDUCT", body.polite_conduct, 8.0),
+        ("INTERACTION", body.interaction, 5.0),
+    ]
+
+    for cat_name, points, max_pts in categories:
+        # Check existing record
+        query = select(ScoreRecord).where(
+            ScoreRecord.student_id == student_id,
+            ScoreRecord.category == cat_name
+        )
+        if body.month:
+            query = query.where(ScoreRecord.month == body.month)
+        
+        res = await db.execute(query)
+        record = res.scalar_one_or_none()
+
+        if record:
+            record.points = points
+            record.notes = body.notes or record.notes
+            record.graded_by_user_id = current_user.id
+            record.updated_by = current_user.full_name
+        else:
+            record = ScoreRecord(
+                id=f"score_{uuid.uuid4().hex[:12]}",
+                student_id=student_id,
+                category=cat_name,
+                points=points,
+                max_points=max_pts,
+                month=body.month,
+                graded_by_user_id=current_user.id,
+                notes=body.notes or "",
+                updated_by=current_user.full_name,
+            )
+            db.add(record)
+
+    await db.commit()
+    summary = await ScoringService.get_student_score_summary(student_id, db)
+    return summary
+
+
+@router.post("/assign-cohort")
+async def assign_student_cohort(
+    body: AssignCohortRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_hr_leader", "region_hr_head", "hr_admin"]))
+):
+    """
+    Assigns a cohort of students to a specific HR Member.
+    Managed by Committee HR Leader or Regional Head.
+    """
+    # Verify HR member exists and has committee_hr_member role
+    hr_res = await db.execute(select(User).where(User.id == body.hr_member_id))
+    hr_user = hr_res.scalar_one_or_none()
+    if not hr_user:
+        raise HTTPException(status_code=404, detail="HR member user not found")
+
+    # If caller is committee_hr_leader, ensure HR member and students belong to their committee
+    if current_user.role == "committee_hr_leader":
+        if hr_user.team_id != current_user.team_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot assign HR members outside your committee."
+            )
+
+    # Fetch and update students
+    res = await db.execute(select(Student).where(Student.id.in_(body.student_ids)))
+    students = res.scalars().all()
+    if not students:
+        raise HTTPException(status_code=404, detail="No matching students found")
+
+    for s in students:
+        if current_user.role == "committee_hr_leader" and s.team_id != current_user.team_id:
+            continue
+        s.assigned_hr_id = body.hr_member_id
+
+    await db.commit()
+    return {"status": "success", "assigned_count": len(students), "hr_member_id": body.hr_member_id}
+
+
+@router.patch("/{student_id}/phone", response_model=StudentResponse)
+async def update_student_phone(
+    student_id: str,
+    body: StudentPhoneUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_hr_leader", "hr_admin", "committee_hr_member"]))
+):
+    """Updates a student's phone number. Prevents duplicates."""
+    student = await verify_student_access(student_id, current_user, db)
+    
+    new_phone = body.phone.strip()
+    existing_phone = await db.execute(select(Student).where(Student.phone == new_phone, Student.id != student_id))
+    if existing_phone.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A member with phone '{new_phone}' already exists."
+        )
+
+    student.phone = new_phone
+    await db.commit()
+    await db.refresh(student)
+    return student
+
+
+@router.post("/{student_id}/bonus", response_model=StudentScoreSummary)
+async def award_student_bonus(
+    student_id: str,
+    body: BonusAwardRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["committee_hr_leader", "hr_admin"]))
+):
+    """
+    Awards bonus points to a member.
+    Authoritative workflow: HR Leader can give bonuses to members.
+    Committee Head and Members are strictly forbidden.
+    """
+    student = await verify_student_access(student_id, current_user, db)
+
+    import uuid
+    query = select(ScoreRecord).where(
+        ScoreRecord.student_id == student_id,
+        ScoreRecord.category == "BONUS"
+    )
+    res = await db.execute(query)
+    record = res.scalar_one_or_none()
+
+    if record:
+        record.points = min(10.0, record.points + body.points)
+        record.notes = f"{record.notes} | {body.notes}" if record.notes and body.notes else (body.notes or record.notes)
+        record.graded_by_user_id = current_user.id
+        record.updated_by = current_user.full_name
+    else:
+        record = ScoreRecord(
+            id=f"score_bonus_{uuid.uuid4().hex[:10]}",
+            student_id=student_id,
+            category="BONUS",
+            points=min(10.0, body.points),
+            max_points=10.0,
+            graded_by_user_id=current_user.id,
+            notes=body.notes or "Bonus awarded by HR Leader",
+            updated_by=current_user.full_name,
+        )
+        db.add(record)
+
+    await db.commit()
+    summary = await ScoringService.get_student_score_summary(student_id, db)
+    return summary
+
+
+@router.post("/{student_id}/invitation", response_model=StudentInvitationResponse, status_code=status.HTTP_201_CREATED)
+async def create_student_invitation(
+    student_id: str,
+    payload: Optional[StudentInvitationCreateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Generates a cryptographically secure, single-use invitation token for a student profile.
+    Requires write-level access to the student (scoped to committee HR, committee heads, regional heads, or HR admins).
+    Regular members are strictly forbidden.
+    """
+    student = await verify_student_access(student_id, current_user, db, mode="write")
+
+    # Check if student is already claimed by an active user account
+    claimed_res = await db.execute(select(User).where(User.student_id == student.id))
+    if claimed_res.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Student profile is already claimed by an active user account."
+        )
+
+    days = payload.expires_in_days if payload and payload.expires_in_days else 7
+    raw_token, token_hash = generate_invitation_token()
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=days)
+
+    invitation = StudentInvitation(
+        id=f"inv_{uuid.uuid4().hex[:12]}",
+        student_id=student.id,
+        token_hash=token_hash,
+        created_by_user_id=current_user.id,
+        expires_at=expires_at,
+        is_used=False,
+        created_at=now
+    )
+    db.add(invitation)
+    await db.commit()
+    await db.refresh(invitation)
+
+    return StudentInvitationResponse(
+        id=invitation.id,
+        student_id=invitation.student_id,
+        token=raw_token,
+        expires_at=invitation.expires_at,
+        is_used=invitation.is_used,
+        created_at=invitation.created_at
+    )
+

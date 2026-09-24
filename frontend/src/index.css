@@ -1,0 +1,87 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@layer base {
+  :root {
+    --background: 228 33% 97%;
+    --foreground: 231 46% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 231 46% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 231 46% 13%;
+    --primary: 231 71% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 228 30% 94%;
+    --secondary-foreground: 231 46% 13%;
+    --muted: 228 30% 94%;
+    --muted-foreground: 229 17% 50%;
+    --accent: 228 30% 94%;
+    --accent-foreground: 231 46% 13%;
+    --destructive: 350 89% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 228 26% 90%;
+    --input: 228 26% 90%;
+    --ring: 231 85% 62%;
+    --radius: 0.875rem;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: #f6f7fb;
+    color: #141830;
+    font-family: 'Plus Jakarta Sans', 'Cairo', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Arabic text: Cairo has tighter metrics, so drop negative tracking. */
+  [dir='rtl'] h1, [dir='rtl'] h2, [dir='rtl'] h3, [dir='rtl'] h4 { letter-spacing: 0; }
+
+  /* One consistent, visible keyboard focus treatment across the app. */
+  :focus-visible { outline: 2px solid #4a66f0; outline-offset: 2px; }
+  ::selection { background: #3a4edb; color: #fff; }
+
+  tbody tr, [role='row'] { transition: background-color 150ms ease; }
+}
+
+/* Modal / overlay entrance. The code already uses animate-in / fade-in / zoom-in-95;
+   those need a plugin that is not installed, so they are provided here. */
+.animate-in { animation: sop-fade 160ms ease-out both; }
+.animate-in.zoom-in-95 { animation: sop-pop 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-in.slide-in-from-top-2, .animate-in.slide-in-from-top-4 { animation: sop-slide 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Ambient background: a quiet cobalt wash at the top edge only. */
+.bg-ambient-mesh {
+  background-color: #f6f7fb;
+  background-image:
+    radial-gradient(60% 40% at 0% 0%, rgba(74, 102, 240, 0.07) 0px, transparent 70%),
+    radial-gradient(45% 35% at 100% 0%, rgba(108, 138, 251, 0.05) 0px, transparent 70%);
+}
+
+/* Refined scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c9cedd; border-radius: 9999px; border: 2px solid #f6f7fb; }
+::-webkit-scrollbar-thumb:hover { background: #98a0b8; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
