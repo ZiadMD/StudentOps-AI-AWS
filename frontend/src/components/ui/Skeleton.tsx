@@ -13,7 +13,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className, ...props }) => {
       role="status"
       aria-busy="true"
       aria-label="Loading content"
-      className={cn('animate-pulse rounded-md bg-slate-200/80', className)}
+      className={cn('animate-pulse rounded-md bg-ink-200/80', className)}
       {...props}
     />
   );
@@ -24,7 +24,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className, ...props }) => {
  */
 export const SkeletonTableRow: React.FC<{ className?: string }> = ({ className }) => {
   return (
-    <tr className={cn('border-b border-slate-100', className)}>
+    <tr className={cn('border-b border-ink-100', className)}>
       {/* Composite identity: Avatar + primary Arabic title + secondary Latin / student code */}
       <td className="px-5 py-4">
         <div className="flex items-center space-x-3">
@@ -74,7 +74,7 @@ export const SkeletonCard: React.FC<{ className?: string }> = ({ className }) =>
       role="status"
       aria-busy="true"
       className={cn(
-        'p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3',
+        'p-4 bg-white border border-rule rounded-lg space-y-3',
         className
       )}
     >
@@ -89,7 +89,7 @@ export const SkeletonCard: React.FC<{ className?: string }> = ({ className }) =>
         <Skeleton className="h-5 w-16 rounded-full shrink-0" />
       </div>
 
-      <div className="pt-2 border-t border-slate-100 space-y-2">
+      <div className="pt-2 border-t border-ink-100 space-y-2">
         <Skeleton className="h-3.5 w-5/6 rounded" />
         <Skeleton className="h-3.5 w-2/3 rounded" />
       </div>
@@ -111,7 +111,7 @@ export const SkeletonStatCard: React.FC<{ className?: string }> = ({ className }
       role="status"
       aria-busy="true"
       className={cn(
-        'p-5 bg-white border border-slate-200/90 rounded-xl shadow-xs space-y-3',
+        'p-5 bg-white border border-rule/90 rounded-lg space-y-3',
         className
       )}
     >

@@ -3,7 +3,6 @@ import { api } from '../api/client';
 import { StudentScoreSummary, UserProfile } from '../types';
 import {
   Search,
-  SlidersHorizontal,
   Shield,
   Edit3,
   Check,
@@ -112,12 +111,12 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
   if (isCommitteeMember) {
     return (
       <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
-        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+        <div className="w-12 h-12 rounded-full bg-paper-200 flex items-center justify-center text-ink-faint">
           <Shield className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-base font-bold text-slate-900">Scorecards are Confidential</h2>
-          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+          <h2 className="text-base font-bold text-ink-900">Scorecards are Confidential</h2>
+          <p className="text-xs text-ink-soft mt-1 leading-relaxed">
             Member behavioral evaluations and scorecards are confidential and only accessible to Committee Heads
             and HR coordinators.
           </p>
@@ -137,43 +136,39 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Member Evaluations</h2>
+            <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-ink-900">Evaluations</h1>
             {isCommitteeHead && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-paper-200 text-ink-soft px-2 py-0.5 rounded border border-rule">
                 <Eye className="w-3 h-3" />
                 Read-Only (Committee Head)
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500 mt-1">Behavior score (/23), interaction score (/5), task quality (/10), and bonuses</p>
+          <p className="text-sm text-ink-soft mt-1">Behavior score (/23), interaction score (/5), task quality (/10), and bonuses</p>
         </div>
 
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-initial">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="w-full sm:w-auto">
+          <div className="relative">
+            <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search members..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full sm:w-64 transition-all"
+              className="h-11 w-full rounded-md border border-rule bg-paper-100 pl-9 pr-3 text-base transition-colors placeholder:text-ink-faint focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600/20 sm:w-64 sm:text-sm"
             />
           </div>
-          <button className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 flex items-center space-x-2 text-sm font-medium transition-colors shrink-0">
-            <SlidersHorizontal className="w-4 h-4" />
-            <span>Filter</span>
-          </button>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
+      <div className="bg-white border border-rule shadow-xs rounded-lg overflow-hidden">
         {loading ? (
           <div>
             {/* Desktop Table Skeletons */}
-            <div className="hidden md:block">
+            <div className="hidden lg:block">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr className="border-b border-ink-900/15 text-[11px] font-semibold text-ink-soft uppercase tracking-wider">
                     <th className="px-5 py-3.5 w-16">Rank</th>
                     <th className="px-5 py-3.5">Member</th>
                     <th className="px-5 py-3.5 text-right">Attendance</th>
@@ -184,7 +179,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                     {(canEditBehavior || isHrLeader) && <th className="px-5 py-3.5 text-right">Actions</th>}
                   </tr>
                 </thead>
-                <tbody className="text-sm divide-y divide-slate-100">
+                <tbody className="text-sm divide-y divide-rule">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <SkeletonTableRow key={i} />
                   ))}
@@ -193,7 +188,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
             </div>
 
             {/* Mobile Card Skeletons */}
-            <div className="block md:hidden p-3 space-y-3">
+            <div className="block p-3 space-y-3 lg:hidden">
               {Array.from({ length: 4 }).map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
@@ -202,10 +197,10 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
         ) : (
           <>
             {/* Desktop Table View (hidden on mobile) */}
-            <div className="hidden md:block">
+            <div className="hidden lg:block">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr className="border-b border-ink-900/15 text-[11px] font-semibold text-ink-soft uppercase tracking-wider">
                     <th className="px-5 py-3.5 w-16">Rank</th>
                     <th className="px-5 py-3.5">Member</th>
                     <th className="px-5 py-3.5 text-right">Attendance</th>
@@ -216,9 +211,9 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                     {(canEditBehavior || isHrLeader) && <th className="px-5 py-3.5 text-right">Actions</th>}
                   </tr>
                 </thead>
-                <tbody className="text-sm divide-y divide-slate-100">
+                <tbody className="text-sm divide-y divide-rule">
                   {filteredData.map((student, idx) => (
-                    <tr key={student.student_id} className="hover:bg-slate-50/60 transition-colors group">
+                    <tr key={student.student_id} className="hover:bg-paper-100/60 transition-colors group">
                       {/* Rank */}
                       <td className="px-5 py-3.5 whitespace-nowrap">
                         <div
@@ -226,10 +221,10 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                             idx === 0
                               ? 'bg-amber-100 text-amber-800'
                               : idx === 1
-                              ? 'bg-slate-200 text-slate-800'
+                              ? 'bg-ink-200 text-ink-800'
                               : idx === 2
                               ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'text-slate-400 bg-slate-50 font-medium'
+                              : 'text-ink-faint bg-paper-100 font-medium'
                           }`}
                         >
                           {idx + 1}
@@ -239,23 +234,23 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                       {/* Member Identity */}
                       <td className="px-5 py-3.5 whitespace-nowrap">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-900 font-['Cairo'] text-sm group-hover:text-blue-700 transition-colors">
+                          <span className="font-bold text-ink-900 font-['Cairo'] text-sm group-hover:text-indigo-700 transition-colors">
                             {student.arabic_name}
                           </span>
-                          <span className="text-[11px] text-slate-500">{student.student_name}</span>
+                          <span className="text-[11px] text-ink-soft">{student.student_name}</span>
                         </div>
                       </td>
 
                       {/* Attendance */}
-                      <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-slate-700 text-xs">
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-ink-800 text-xs">
                         <span>{student.on_time_attendance_count + student.late_attendance_count}</span>
-                        <span className="text-slate-400 text-[10px] ml-1">sessions</span>
+                        <span className="text-ink-faint text-[10px] ml-1">sessions</span>
                       </td>
 
                       {/* Task Quality */}
-                      <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-slate-800 text-xs font-semibold">
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-ink-800 text-xs font-semibold">
                         <span>{student.average_task_quality.toFixed(1)}</span>
-                        <span className="text-slate-400 text-[10px] ml-0.5">/10</span>
+                        <span className="text-ink-faint text-[10px] ml-0.5">/10</span>
                       </td>
 
                       {/* Behavior (/23) */}
@@ -263,25 +258,25 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                         <span
                           className={
                             student.total_behavior_score >= 20 
-                              ? 'text-emerald-700 font-bold' 
+                              ? 'text-green-700 font-bold' 
                               : student.total_behavior_score >= 15 
-                              ? 'text-slate-800 font-medium' 
+                              ? 'text-ink-800 font-medium' 
                               : 'text-amber-700 font-medium'
                           }
                         >
                           {student.total_behavior_score}
                         </span>
-                        <span className="text-slate-400 text-[10px] ml-0.5">/23</span>
+                        <span className="text-ink-faint text-[10px] ml-0.5">/23</span>
                       </td>
 
                       {/* Bonus */}
                       <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-xs">
                         {student.bonus_points && student.bonus_points > 0 ? (
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+                          <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700 font-bold border border-green-100">
                             +{student.bonus_points}
                           </span>
                         ) : (
-                          <span className="text-slate-300">—</span>
+                          <span className="text-ink-300">—</span>
                         )}
                       </td>
 
@@ -302,9 +297,9 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                           {canEditBehavior && (
                             <button
                               onClick={() => handleOpenEdit(student)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-md transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-ink-800 hover:text-ink-900 bg-white hover:bg-paper-200 border border-rule rounded-md transition-colors"
                             >
-                              <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                              <Edit3 className="w-3.5 h-3.5 text-ink-soft" />
                               <span>Grade</span>
                             </button>
                           )}
@@ -315,9 +310,9 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                                 setBonusPoints(2.0);
                                 setBonusReason('');
                               }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:text-blue-900 bg-blue-50/70 hover:bg-blue-100 border border-blue-200/80 rounded-md transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200/80 rounded-md transition-colors"
                             >
-                              <Award className="w-3.5 h-3.5 text-blue-600" />
+                              <Award className="w-3.5 h-3.5 text-indigo-700" />
                               <span>Bonus</span>
                             </button>
                           )}
@@ -330,9 +325,9 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
             </div>
 
             {/* Mobile Evaluation Card Transform (Zero horizontal scroll!) */}
-            <div className="block md:hidden divide-y divide-slate-100">
+            <div className="block divide-y divide-rule lg:hidden">
               {filteredData.map((student, idx) => (
-                <div key={student.student_id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
+                <div key={student.student_id} className="p-4 space-y-3 hover:bg-paper-100/50 transition-colors">
                   {/* Card Header: Rank + Bilingual Identity + Rating Badge */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2.5 min-w-0">
@@ -341,19 +336,19 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                           idx === 0
                             ? 'bg-amber-100 text-amber-800'
                             : idx === 1
-                            ? 'bg-slate-200 text-slate-800'
+                            ? 'bg-ink-200 text-ink-800'
                             : idx === 2
                             ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : 'text-slate-400 bg-slate-50 font-medium'
+                            : 'text-ink-faint bg-paper-100 font-medium'
                         }`}
                       >
                         #{idx + 1}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-slate-900 text-sm font-['Cairo'] truncate">
+                        <div className="font-bold text-ink-900 text-sm font-['Cairo'] truncate">
                           {student.arabic_name}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate">
+                        <div className="text-[11px] text-ink-soft truncate">
                           {student.student_name}
                         </div>
                       </div>
@@ -371,18 +366,18 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   </div>
 
                   {/* 3-Metric Key-Value Strip */}
-                  <div className="grid grid-cols-3 gap-2 p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-center font-mono">
+                  <div className="grid grid-cols-3 gap-2 p-2.5 bg-paper-100 rounded-lg border border-ink-100 text-center font-mono">
                     <div>
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-sans font-medium">Behavior</div>
-                      <div className="text-xs font-bold text-slate-800 mt-0.5">{student.total_behavior_score}/23</div>
+                      <div className="text-[10px] text-ink-faint uppercase tracking-wider font-sans font-medium">Behavior</div>
+                      <div className="text-xs font-bold text-ink-800 mt-0.5">{student.total_behavior_score}/23</div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-sans font-medium">Task Qual</div>
-                      <div className="text-xs font-bold text-slate-800 mt-0.5">{student.average_task_quality.toFixed(1)}/10</div>
+                      <div className="text-[10px] text-ink-faint uppercase tracking-wider font-sans font-medium">Task Qual</div>
+                      <div className="text-xs font-bold text-ink-800 mt-0.5">{student.average_task_quality.toFixed(1)}/10</div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-sans font-medium">Attendance</div>
-                      <div className="text-xs font-bold text-slate-800 mt-0.5">{student.on_time_attendance_count + student.late_attendance_count} ses</div>
+                      <div className="text-[10px] text-ink-faint uppercase tracking-wider font-sans font-medium">Attendance</div>
+                      <div className="text-xs font-bold text-ink-800 mt-0.5">{student.on_time_attendance_count + student.late_attendance_count} ses</div>
                     </div>
                   </div>
 
@@ -390,11 +385,11 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <div>
                       {student.bonus_points && student.bonus_points > 0 ? (
-                        <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-100">
+                        <span className="px-2 py-0.5 rounded bg-green-50 text-green-700 text-[11px] font-semibold border border-green-100">
                           +{student.bonus_points} Bonus Pts
                         </span>
                       ) : (
-                        <span className="text-[11px] text-slate-400">No bonus points</span>
+                        <span className="text-[11px] text-ink-faint">No bonus points</span>
                       )}
                     </div>
 
@@ -403,7 +398,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                         {canEditBehavior && (
                           <button
                             onClick={() => handleOpenEdit(student)}
-                            className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+                            className="px-2.5 py-1 text-xs font-semibold text-ink-800 bg-white border border-rule rounded-md hover:bg-paper-100 transition-colors"
                           >
                             Grade /23
                           </button>
@@ -415,7 +410,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                               setBonusPoints(2.0);
                               setBonusReason('');
                             }}
-                            className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                            className="px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 transition-colors"
                           >
                             Bonus
                           </button>
@@ -428,7 +423,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
             </div>
 
             {filteredData.length === 0 && (
-              <div className="py-16 text-center text-slate-400 text-sm">
+              <div className="py-16 text-center text-ink-faint text-sm">
                 No evaluation records found matching your query.
               </div>
             )}
@@ -448,7 +443,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
           <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Group Interaction (/5)</label>
+                <label className="block font-medium text-ink-800 mb-1">Group Interaction (/5)</label>
                 <input
                   type="number"
                   min="0"
@@ -458,11 +453,11 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   onChange={(e) =>
                     setEditForm({ ...editForm, group_interaction: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full border border-rule rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 />
               </div>
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Social Media (/5)</label>
+                <label className="block font-medium text-ink-800 mb-1">Social Media (/5)</label>
                 <input
                   type="number"
                   min="0"
@@ -472,11 +467,11 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   onChange={(e) =>
                     setEditForm({ ...editForm, social_media: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full border border-rule rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 />
               </div>
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Hierarchy Rules (/5)</label>
+                <label className="block font-medium text-ink-800 mb-1">Hierarchy Rules (/5)</label>
                 <input
                   type="number"
                   min="0"
@@ -486,11 +481,11 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   onChange={(e) =>
                     setEditForm({ ...editForm, hierarchy_rules: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full border border-rule rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 />
               </div>
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Polite Conduct (/8)</label>
+                <label className="block font-medium text-ink-800 mb-1">Polite Conduct (/8)</label>
                 <input
                   type="number"
                   min="0"
@@ -500,24 +495,24 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                   onChange={(e) =>
                     setEditForm({ ...editForm, polite_conduct: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full border border-rule rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block font-medium text-slate-700 mb-1">HR Evaluation Notes</label>
+              <label className="block font-medium text-ink-800 mb-1">HR Evaluation Notes</label>
               <textarea
                 rows={2}
                 placeholder="Optional observation notes..."
                 value={editForm.notes}
                 onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full border border-rule rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ink-900"
               />
             </div>
 
-            <div className="pt-3 flex items-center justify-between border-t border-slate-100">
-              <span className="font-semibold text-slate-800">
+            <div className="pt-3 flex items-center justify-between border-t border-ink-100">
+              <span className="font-semibold text-ink-800">
                 Total:{' '}
                 {(
                   editForm.group_interaction +
@@ -531,14 +526,14 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                 <button
                   type="button"
                   onClick={() => setEditingStudent(null)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium"
+                  className="px-3 py-1.5 rounded-lg border border-rule text-ink-soft hover:bg-paper-100 font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-ink-900 text-white font-medium hover:bg-ink-800 disabled:opacity-50"
                 >
                   <Check className="w-3.5 h-3.5" />
                   {saving ? 'Saving...' : 'Save Evaluation'}
@@ -560,7 +555,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
         {bonusStudent && (
           <form onSubmit={handleAwardBonus} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-ink-800 mb-1">
                 Bonus Points (e.g. 1.0 to 5.0)
               </label>
               <input
@@ -570,13 +565,13 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                 max="10.0"
                 value={bonusPoints}
                 onChange={(e) => setBonusPoints(parseFloat(e.target.value) || 0)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600 font-mono"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600 font-mono"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-ink-800 mb-1">
                 Recognition Reason / Justification
               </label>
               <textarea
@@ -584,16 +579,16 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                 placeholder="e.g. Exceptional reel editing turn-around and active community moderation..."
                 value={bonusReason}
                 onChange={(e) => setBonusReason(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                 required
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <div className="flex justify-end gap-2 pt-3 border-t border-ink-100">
               <button
                 type="button"
                 onClick={() => setBonusStudent(null)}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+                className="px-3 py-1.5 border border-rule rounded-lg text-xs font-medium text-ink-soft hover:bg-paper-100"
               >
                 Cancel
               </button>

@@ -21,15 +21,15 @@ const typeStyles: Record<
   { border: string; bg: string; iconColor: string; Icon: React.ElementType }
 > = {
   success: {
-    border: "border-emerald-200",
-    bg: "bg-emerald-50/50",
-    iconColor: "text-emerald-600",
+    border: "border-green-200",
+    bg: "bg-green-50/50",
+    iconColor: "text-green-600",
     Icon: CheckCircle2,
   },
   error: {
-    border: "border-rose-200",
-    bg: "bg-rose-50/50",
-    iconColor: "text-rose-600",
+    border: "border-red-200",
+    bg: "bg-red-50/50",
+    iconColor: "text-red-600",
     Icon: AlertCircle,
   },
   warning: {
@@ -54,7 +54,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
       role={toast.type === "error" ? "alert" : "status"}
       aria-live={toast.type === "error" ? "assertive" : "polite"}
       className={cn(
-        "pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border bg-white shadow-lg text-slate-800 transition-all duration-200 animate-in slide-in-from-bottom-2 sm:slide-in-from-top-2",
+        "pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border bg-white shadow-lg text-ink-800 transition-all duration-200 animate-in slide-in-from-bottom-2 sm:slide-in-from-top-2",
         border,
         bg
       )}
@@ -66,7 +66,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
       <button
         type="button"
         onClick={() => onDismiss(toast.id)}
-        className="shrink-0 rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none"
+        className="shrink-0 rounded-md p-1 text-ink-400 hover:text-ink-600 hover:bg-ink-100 transition-colors focus:outline-none"
         aria-label="Dismiss notification"
       >
         <X className="w-3.5 h-3.5" />

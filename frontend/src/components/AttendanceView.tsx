@@ -107,20 +107,20 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Meet Attendance Logs</h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-ink-900">Attendance</h1>
+          <p className="text-sm text-ink-soft mt-1">
             Deterministic attendance matching against Google Meet logs and session numbers.
           </p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search meetings..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full sm:w-64 transition-all"
+              className="pl-9 pr-4 py-2 bg-white border border-rule rounded-lg text-sm focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 w-full sm:w-64 transition-all"
             />
           </div>
 
@@ -132,7 +132,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                 setTitle(`Session ${nextNum}: Social Media Workshop`);
                 setShowScheduleModal(true);
               }}
-              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition-colors"
+              className="px-3 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>Schedule Session</span>
@@ -141,23 +141,23 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
+      <div className="bg-white border border-rule shadow-xs rounded-lg overflow-hidden">
         {loading ? (
           <div>
             {/* Desktop Table Skeletons */}
             <div className="hidden md:block">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr className="border-b border-ink-900/15 text-[11px] font-semibold text-ink-soft uppercase tracking-wider">
                     <th className="px-5 py-3.5">Session / Event</th>
                     <th className="px-5 py-3.5">Date &amp; Duration</th>
                     <th className="px-5 py-3.5 w-72">Attendance Health</th>
                     <th className="px-5 py-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-rule">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <tr key={i} className="border-b border-slate-100">
+                    <tr key={i} className="border-b border-ink-100">
                       <td className="px-5 py-4">
                         <div className="flex items-center space-x-3">
                           <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
@@ -201,14 +201,14 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
             <div className="hidden md:block">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr className="border-b border-ink-900/15 text-[11px] font-semibold text-ink-soft uppercase tracking-wider">
                     <th className="px-5 py-3.5">Session / Event</th>
                     <th className="px-5 py-3.5">Date &amp; Duration</th>
                     <th className="px-5 py-3.5 w-72">Attendance Health</th>
                     <th className="px-5 py-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="text-sm divide-y divide-slate-100">
+                <tbody className="text-sm divide-y divide-rule">
                   {filteredMeetings.map((m) => {
                     const totalRecorded = (m.present_count || 0) + (m.late_count || 0) + (m.absent_count || 0);
                     const totalExpected = m.total_expected > 0 ? m.total_expected : totalRecorded;
@@ -216,16 +216,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                     const ratio = Math.round(((m.present_count || 0) / calculatedMax) * 100);
 
                     return (
-                      <tr key={m.id} className="hover:bg-slate-50/60 transition-colors group">
+                      <tr key={m.id} className="hover:bg-paper-100/60 transition-colors group">
                         {/* Session Identity */}
                         <td className="px-5 py-3.5">
                           <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                              <Video className="w-4 h-4 text-blue-600" />
+                            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                              <Video className="w-4 h-4 text-indigo-700" />
                             </div>
                             <div>
-                              <div className="font-semibold text-slate-900">{m.title}</div>
-                              <div className="text-[11px] font-mono text-slate-500">{m.meeting_code}</div>
+                              <div className="font-semibold text-ink-900">{m.title}</div>
+                              <div className="text-[11px] font-mono text-ink-soft">{m.meeting_code}</div>
                             </div>
                           </div>
                         </td>
@@ -233,14 +233,14 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                         {/* Date & Duration */}
                         <td className="px-5 py-3.5 whitespace-nowrap">
                           <div className="flex flex-col">
-                            <span className="text-slate-800 text-xs font-medium">
+                            <span className="text-ink-800 text-xs font-medium">
                               {new Date(m.start_time).toLocaleDateString([], {
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric',
                               })}
                             </span>
-                            <span className="text-[11px] text-slate-500">{m.duration_minutes} minutes</span>
+                            <span className="text-[11px] text-ink-soft">{m.duration_minutes} minutes</span>
                           </div>
                         </td>
 
@@ -254,13 +254,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                               showPercentage={false}
                             />
                             <div className="flex items-center justify-between text-[11px] font-mono">
-                              <span className="text-slate-500 font-sans font-medium">{ratio}% Present</span>
+                              <span className="text-ink-soft font-sans font-medium">{ratio}% Present</span>
                               <div className="space-x-1.5">
-                                <span className="text-emerald-700 font-bold">{m.present_count} P</span>
-                                <span className="text-slate-300">·</span>
+                                <span className="text-green-700 font-bold">{m.present_count} P</span>
+                                <span className="text-ink-300">·</span>
                                 <span className="text-amber-700 font-bold">{m.late_count} L</span>
-                                <span className="text-slate-300">·</span>
-                                <span className="text-rose-700 font-bold">{m.absent_count} A</span>
+                                <span className="text-ink-300">·</span>
+                                <span className="text-red-800 font-bold">{m.absent_count} A</span>
                               </div>
                             </div>
                           </div>
@@ -272,10 +272,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                             <button
                               onClick={() => handleProcessAttendance(m.id)}
                               disabled={processingId === m.id}
-                              className="inline-flex items-center space-x-1 text-slate-700 hover:text-slate-900 font-semibold text-xs border border-slate-200 px-2.5 py-1 rounded-md bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
+                              className="inline-flex items-center space-x-1 text-ink-800 hover:text-ink-900 font-semibold text-xs border border-rule px-2.5 py-1 rounded-md bg-white hover:bg-paper-100 transition-colors disabled:opacity-50"
                               title="Take/re-process attendance and update absence follow-up flags"
                             >
-                              <RefreshCw className={`w-3 h-3 ${processingId === m.id ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+                              <RefreshCw className={`w-3 h-3 ${processingId === m.id ? 'animate-spin text-indigo-700' : 'text-ink-soft'}`} />
                               <span>Process</span>
                             </button>
                           )}
@@ -292,7 +292,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                               <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
                             </a>
                           ) : (
-                            <span className="text-slate-400 text-xs italic">Ended</span>
+                            <span className="text-ink-faint text-xs italic">Ended</span>
                           )}
                         </td>
                       </tr>
@@ -303,7 +303,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
             </div>
 
             {/* Mobile Session Card Transform (Zero horizontal scroll!) */}
-            <div className="block md:hidden divide-y divide-slate-100">
+            <div className="block md:hidden divide-y divide-rule">
               {filteredMeetings.map((m) => {
                 const totalRecorded = (m.present_count || 0) + (m.late_count || 0) + (m.absent_count || 0);
                 const totalExpected = m.total_expected > 0 ? m.total_expected : totalRecorded;
@@ -311,16 +311,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                 const ratio = Math.round(((m.present_count || 0) / calculatedMax) * 100);
 
                 return (
-                  <div key={m.id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
+                  <div key={m.id} className="p-4 space-y-3 hover:bg-paper-100/50 transition-colors">
                     {/* Session Header */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center space-x-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                          <Video className="w-4 h-4 text-blue-600" />
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                          <Video className="w-4 h-4 text-indigo-700" />
                         </div>
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-900 text-sm truncate">{m.title}</div>
-                          <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1.5 mt-0.5">
+                          <div className="font-semibold text-ink-900 text-sm truncate">{m.title}</div>
+                          <div className="text-[11px] font-mono text-ink-soft flex items-center gap-1.5 mt-0.5">
                             <span>{m.meeting_code}</span>
                             <span>·</span>
                             <span>{new Date(m.start_time).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
@@ -330,15 +330,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                     </div>
 
                     {/* Attendance Health Meter */}
-                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 space-y-1.5">
+                    <div className="p-2.5 bg-paper-100 rounded-lg border border-ink-100 space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-700">Attendance: {ratio}%</span>
+                        <span className="font-semibold text-ink-800">Attendance: {ratio}%</span>
                         <div className="font-mono text-[11px] space-x-1.5">
-                          <span className="text-emerald-700 font-bold">{m.present_count} P</span>
-                          <span className="text-slate-300">·</span>
+                          <span className="text-green-700 font-bold">{m.present_count} P</span>
+                          <span className="text-ink-300">·</span>
                           <span className="text-amber-700 font-bold">{m.late_count} L</span>
-                          <span className="text-slate-300">·</span>
-                          <span className="text-rose-700 font-bold">{m.absent_count} A</span>
+                          <span className="text-ink-300">·</span>
+                          <span className="text-red-800 font-bold">{m.absent_count} A</span>
                         </div>
                       </div>
                       <ProgressBar
@@ -355,9 +355,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                         <button
                           onClick={() => handleProcessAttendance(m.id)}
                           disabled={processingId === m.id}
-                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs transition-colors"
+                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md border border-rule bg-white hover:bg-paper-100 text-ink-800 font-semibold text-xs shadow-2xs transition-colors"
                         >
-                          <RefreshCw className={`w-3 h-3 ${processingId === m.id ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+                          <RefreshCw className={`w-3 h-3 ${processingId === m.id ? 'animate-spin text-indigo-700' : 'text-ink-soft'}`} />
                           <span>Process Roster</span>
                         </button>
                       )}
@@ -373,7 +373,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                           <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
                         </a>
                       ) : (
-                        <span className="text-xs text-slate-400 italic">Session Concluded</span>
+                        <span className="text-xs text-ink-faint italic">Session Concluded</span>
                       )}
                     </div>
                   </div>
@@ -382,7 +382,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
             </div>
 
             {filteredMeetings.length === 0 && (
-              <div className="py-16 text-center text-slate-400 text-sm">
+              <div className="py-16 text-center text-ink-faint text-sm">
                 No meeting records match your filter.
               </div>
             )}
@@ -401,88 +401,88 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
         <form onSubmit={handleScheduleSubmit} className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-slate-700 mb-1">Session Title</label>
+              <label className="block text-xs font-medium text-ink-800 mb-1">Session Title</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                 placeholder="e.g. Session 7: TikTok Virality"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Session #</label>
+              <label className="block text-xs font-medium text-ink-800 mb-1">Session #</label>
               <input
                 type="number"
                 min={1}
                 value={sessionNumber}
                 onChange={(e) => setSessionNumber(parseInt(e.target.value) || 1)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Session Topic</label>
+            <label className="block text-xs font-medium text-ink-800 mb-1">Session Topic</label>
             <input
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
               placeholder="e.g. Hook writing and audience retention metrics"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Start Time</label>
+              <label className="block text-xs font-medium text-ink-800 mb-1">Start Time</label>
               <input
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Duration (minutes)</label>
+              <label className="block text-xs font-medium text-ink-800 mb-1">Duration (minutes)</label>
               <input
                 type="number"
                 min={15}
                 step={15}
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(parseInt(e.target.value) || 60)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Google Meet URL</label>
+            <label className="block text-xs font-medium text-ink-800 mb-1">Google Meet URL</label>
             <input
               type="url"
               value={meetUrl}
               onChange={(e) => setMeetUrl(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
               placeholder="https://meet.google.com/abc-defg-hij"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-3 border-t border-ink-100">
             <button
               type="button"
               onClick={() => setShowScheduleModal(false)}
-              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="px-3 py-1.5 border border-rule rounded-lg text-xs font-medium text-ink-soft hover:bg-paper-100"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={scheduling}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+              className="px-4 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-medium disabled:opacity-50"
             >
               {scheduling ? 'Scheduling...' : 'Confirm Session'}
             </button>

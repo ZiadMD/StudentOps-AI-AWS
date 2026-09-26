@@ -90,13 +90,13 @@ export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
   return (
     <AuthLayout>
       <header className="mb-7">
-        <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
+        <p className="eyebrow mb-2.5">
           Create an account
         </p>
-        <h1 id="register-title" className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+        <h1 id="register-title" className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-ink-900">
           Join your organization
         </h1>
-        <p className="mt-2.5 text-sm leading-6 text-slate-600">
+        <p className="mt-2.5 text-sm leading-6 text-ink-600">
           New accounts start with member access. An administrator grants any
           additional permissions.
         </p>
@@ -124,7 +124,7 @@ export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
           <div className="min-w-0 space-y-2">
             <label htmlFor="register-arabic-name" className={authLabelClass}>
               <span lang="ar" dir="rtl" className="font-arabic">الاسم بالعربية</span>
-              <span className="ml-1.5 font-normal text-slate-500">(optional)</span>
+              <span className="ml-1.5 font-normal text-ink-500">(optional)</span>
             </label>
             <input
               id="register-arabic-name" name="arabic_name" type="text"
@@ -155,7 +155,7 @@ export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
             invalid={invalidField === 'password'}
             describedBy={`password-help${invalidField === 'password' ? ' register-error' : ''}`}
           />
-          <p id="password-help" className="text-xs leading-5 text-slate-600">
+          <p id="password-help" className="text-xs leading-5 text-ink-600">
             Use at least 8 characters. Spaces count as characters.
           </p>
         </div>
@@ -163,7 +163,7 @@ export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
         <div className="space-y-2">
           <label htmlFor="register-team" className={authLabelClass}>
             Committee
-            <span className="ml-1.5 font-normal text-slate-500">(optional)</span>
+            <span className="ml-1.5 font-normal text-ink-500">(optional)</span>
           </label>
           <select
             id="register-team" name="team_id" value={teamId}
@@ -178,7 +178,7 @@ export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
             ))}
           </select>
 
-          <p id="team-help" role="status" className="text-xs leading-5 text-slate-600">
+          <p id="team-help" role="status" className="text-xs leading-5 text-ink-600">
             {teamsLoading ? 'Loading committees'
               : teamsError ? 'Committees could not be loaded. You can continue without one.'
                 : teams.length === 0 ? 'No committees are available. You can continue without one.'
@@ -210,7 +210,7 @@ export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
         </p>
       </form>
 
-      <p className="mt-7 border-t border-slate-200 pt-5 text-sm leading-6 text-slate-600">
+      <p className="mt-7 border-t border-ink-200 pt-5 text-sm leading-6 text-ink-600">
         Already have an account?{' '}
         <AuthLink href="/login" onNavigate={onGoToLogin}>Sign in</AuthLink>
       </p>

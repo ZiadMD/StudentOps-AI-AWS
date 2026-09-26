@@ -125,7 +125,7 @@ function AppContent() {
   if (checkingSession) {
     return (
       <div className="flex min-h-dvh items-center justify-center" role="status">
-        <p className="text-sm text-slate-500">Checking your session…</p>
+        <p className="text-sm text-ink-500">Checking your session…</p>
       </div>
     );
   }
@@ -141,13 +141,13 @@ function AppContent() {
   if (!isAppPath(path)) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6 py-16">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Page not found</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Page not found</h1>
+        <p className="mt-3 text-sm leading-6 text-ink-600">
           This address does not match a StudentOps page.
         </p>
         <a
           href="/"
-          className="mt-6 inline-flex min-h-12 w-fit items-center rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-800"
+          className="mt-6 inline-flex min-h-12 w-fit items-center rounded-lg bg-ink-900 px-5 text-sm font-semibold text-white hover:bg-ink-800"
         >
           Back to home
         </a>

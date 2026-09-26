@@ -137,10 +137,10 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Tasks &amp; Deliverables</h2>
-          <p className="text-[12px] text-slate-500 mt-0.5">
+          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-ink-900">Tasks</h1>
+          <p className="text-[12px] text-ink-soft mt-0.5">
             {isMember
               ? 'Your assigned Social Media Committee deliverables and deadlines.'
               : 'Social Media Committee deliverables, deadlines, and member submissions.'}
@@ -148,13 +148,13 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 sm:flex-initial">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Filter tasks..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-blue-500 focus:bg-white w-full sm:w-48 transition-all"
+              className="pl-8 pr-3 py-1.5 bg-paper-100 border border-rule rounded-md text-[13px] focus:outline-none focus:border-indigo-600 focus:bg-white w-full sm:w-48 transition-all"
             />
           </div>
 
@@ -166,7 +166,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
                 setTaskTitle(`Task ${nextNum}: Campaign Content Deliverable`);
                 setShowCreateModal(true);
               }}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md shadow-sm text-[13px] font-medium flex items-center space-x-1.5 transition-colors"
+              className="px-3 py-1.5 bg-ink-900 hover:bg-ink-800 text-white rounded-md shadow-sm text-[13px] font-medium flex items-center space-x-1.5 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create Task</span>
@@ -176,12 +176,12 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
       </div>
 
       {loading ? (
-        <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+        <div className="bg-white border border-rule shadow-sm rounded-lg overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-ink-100 bg-paper-100 flex items-center justify-between">
             <Skeleton className="h-3.5 w-48 rounded" />
             <Skeleton className="h-3.5 w-16 rounded" />
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-rule">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5">
                 <div className="flex items-center space-x-3 w-full sm:w-1/2 min-w-0">
@@ -201,42 +201,42 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
           </div>
         </div>
       ) : (
-        <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden flex flex-col">
-          <div className="px-4 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="bg-white border border-rule shadow-sm rounded-lg overflow-hidden flex flex-col">
+          <div className="px-4 py-2 border-b border-ink-100 bg-paper-100 flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-ink-soft uppercase tracking-wider">
               {isMember ? 'My Assigned Sprints' : 'Social Media Committee Sprint Tasks'}
             </span>
-            <span className="text-[11px] text-slate-400 font-mono">{filteredTasks.length} items</span>
+            <span className="text-[11px] text-ink-faint font-mono">{filteredTasks.length} items</span>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-rule">
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 hover:bg-slate-50/80 transition-colors group"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 hover:bg-paper-100/80 transition-colors group"
               >
                 <div className="flex items-center space-x-3 w-full sm:w-1/2 min-w-0">
                   <div className="flex-shrink-0 mt-0.5">
                     {isMember ? (
                       memberSubmissions[task.id]?.file_url ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <CheckCircle2 className="w-4 h-4 text-green-700" />
                       ) : (
-                        <Circle className="w-4 h-4 text-slate-300" />
+                        <Circle className="w-4 h-4 text-ink-300" />
                       )
                     ) : task.pending_count === 0 ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <CheckCircle2 className="w-4 h-4 text-green-700" />
                     ) : (
-                      <Circle className="w-4 h-4 text-slate-300" />
+                      <Circle className="w-4 h-4 text-ink-300" />
                     )}
                   </div>
-                  <span className="font-mono text-[11px] text-slate-400 w-14 shrink-0">
+                  <span className="font-mono text-[11px] text-ink-faint w-14 shrink-0">
                     TSK-{task.task_number}
                   </span>
                   <div className="truncate">
-                    <span className="text-[13px] font-medium text-slate-900 truncate group-hover:text-blue-600 transition-colors block">
+                    <span className="text-[13px] font-medium text-ink-900 truncate group-hover:text-indigo-700 transition-colors block">
                       {task.title}
                     </span>
                     {task.description && (
-                      <span className="text-[11px] text-slate-400 truncate block">
+                      <span className="text-[11px] text-ink-faint truncate block">
                         {task.description}
                       </span>
                     )}
@@ -245,8 +245,8 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
 
                 <div className="flex items-center space-x-4 w-1/2 justify-end">
                   {task.deadline && (
-                    <div className="flex items-center gap-1 text-[11px] text-slate-500 font-mono">
-                      <Calendar className="w-3 h-3 text-slate-400" />
+                    <div className="flex items-center gap-1 text-[11px] text-ink-soft font-mono">
+                      <Calendar className="w-3 h-3 text-ink-faint" />
                       <span>{new Date(task.deadline).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                     </div>
                   )}
@@ -260,7 +260,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
                             className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-semibold border ${
                               memberSubmissions[task.id].status === 'LATE'
                                 ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-green-50 text-green-700 border-green-200'
                             }`}
                           >
                             <CheckCircle2 className="w-3 h-3" />
@@ -270,15 +270,15 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
                             href={memberSubmissions[task.id].file_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-slate-400 hover:text-blue-600 p-1"
+                            className="text-ink-faint hover:text-indigo-700 p-1"
                             title="Open submitted deliverable link"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-semibold border bg-slate-50 text-slate-500 border-slate-200">
-                          <Circle className="w-3 h-3 text-slate-400" />
+                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-semibold border bg-paper-100 text-ink-soft border-rule">
+                          <Circle className="w-3 h-3 text-ink-faint" />
                           Not Submitted
                         </span>
                       )}
@@ -288,7 +288,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
                           setSubmitTaskTarget(task);
                           setFileUrl(memberSubmissions[task.id]?.file_url || '');
                         }}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium flex items-center gap-1 shrink-0"
+                        className="px-2.5 py-1 bg-indigo-700 hover:bg-indigo-800 text-white rounded text-xs font-medium flex items-center gap-1 shrink-0"
                       >
                         <Upload className="w-3 h-3" />
                         <span>{memberSubmissions[task.id]?.file_url ? 'Resubmit' : 'Submit Work'}</span>
@@ -297,13 +297,13 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
                   ) : (
                     <>
                       {task.max_score != null && (
-                        <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-paper-200 text-ink-soft border border-rule">
                           Max: {task.max_score}pts
                         </span>
                       )}
 
-                      <div className="flex items-center space-x-2 w-28 shrink-0 border-l border-slate-100 pl-4">
-                        <span className="text-[11px] text-slate-600 truncate">
+                      <div className="flex items-center space-x-2 w-28 shrink-0 border-l border-ink-100 pl-4">
+                        <span className="text-[11px] text-ink-soft truncate">
                           {task.submission_count} Submitted
                         </span>
                       </div>
@@ -314,7 +314,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
             ))}
 
             {filteredTasks.length === 0 && (
-              <div className="px-4 py-8 text-center text-[13px] text-slate-500">
+              <div className="px-4 py-8 text-center text-[13px] text-ink-soft">
                 No tasks found matching your filters.
               </div>
             )}
@@ -332,77 +332,77 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
         <form onSubmit={handleCreateTask} className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-slate-700 mb-1">Task Title</label>
+              <label className="block text-xs font-medium text-ink-800 mb-1">Task Title</label>
               <input
                 type="text"
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
                 placeholder="e.g. Task 6: Reel Script & Storyboard"
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Task #</label>
+              <label className="block text-xs font-medium text-ink-800 mb-1">Task #</label>
               <input
                 type="number"
                 min={1}
                 value={taskNumber}
                 onChange={(e) => setTaskNumber(parseInt(e.target.value) || 1)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Brief Description</label>
+            <label className="block text-xs font-medium text-ink-800 mb-1">Brief Description</label>
             <textarea
               rows={3}
               value={taskDesc}
               onChange={(e) => setTaskDesc(e.target.value)}
               placeholder="Task instructions, delivery criteria, or templates..."
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+              className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink-900"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Deadline</label>
+              <label className="block text-xs font-medium text-ink-800 mb-1">Deadline</label>
               <input
                 type="datetime-local"
                 value={taskDeadline}
                 onChange={(e) => setTaskDeadline(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Max Score</label>
+              <label className="block text-xs font-medium text-ink-800 mb-1">Max Score</label>
               <input
                 type="number"
                 min={1}
                 max={100}
                 value={maxScore}
                 onChange={(e) => setMaxScore(parseFloat(e.target.value) || 10.0)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 required
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-2 border-t border-ink-100">
             <button
               type="button"
               onClick={() => setShowCreateModal(false)}
-              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="px-3 py-1.5 border border-rule rounded-lg text-xs font-medium text-ink-soft hover:bg-paper-100"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={creating}
-              className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+              className="px-4 py-1.5 bg-ink-900 hover:bg-ink-800 text-white rounded-lg text-xs font-medium disabled:opacity-50"
             >
               {creating ? 'Publishing...' : 'Publish Task'}
             </button>
@@ -417,35 +417,35 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ currentUser }) =
         title={submitTaskTarget ? `Submit Deliverable: ${submitTaskTarget.title}` : 'Submit Deliverable'}
         size="md"
       >
-        <p className="text-xs text-slate-500 mb-3">
+        <p className="text-xs text-ink-soft mb-3">
           Provide the direct link to your deliverable (Google Drive, Figma, Canva, or GitHub).
         </p>
 
         <form onSubmit={handleSubmitWork} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Deliverable URL</label>
+            <label className="block text-xs font-medium text-ink-800 mb-1">Deliverable URL</label>
             <input
               type="url"
               placeholder="https://drive.google.com/your-work"
               value={fileUrl}
               onChange={(e) => setFileUrl(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
               required
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-2 border-t border-ink-100">
             <button
               type="button"
               onClick={() => setSubmitTaskTarget(null)}
-              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="px-3 py-1.5 border border-rule rounded-lg text-xs font-medium text-ink-soft hover:bg-paper-100"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 flex items-center gap-1"
+              className="px-4 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-medium disabled:opacity-50 flex items-center gap-1"
             >
               <Upload className="w-3 h-3" />
               <span>{submitting ? 'Submitting...' : 'Confirm Submission'}</span>

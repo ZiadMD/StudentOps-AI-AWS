@@ -62,10 +62,10 @@ export function AuditViewer() {
     <div className="workspace-page min-w-0 space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+          <h1 className="text-xl font-semibold tracking-tight text-ink-900 sm:text-2xl">
             Audit log
           </h1>
-          <p className="mt-1.5 text-sm text-slate-600">
+          <p className="mt-1.5 text-sm text-ink-soft">
             Every recorded action taken in this workspace, newest first.
           </p>
         </div>
@@ -75,13 +75,13 @@ export function AuditViewer() {
             <label htmlFor="audit-search" className="sr-only">Search the audit log</label>
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint"
             />
             <input
               id="audit-search" type="search" value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="Search actions"
-              className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+              className="h-11 w-full rounded-lg border border-rule bg-white pl-9 pr-3 text-sm text-ink-900 placeholder:text-ink-soft focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
             />
           </div>
           <Button variant="secondary" onClick={() => void load()} aria-label="Reload the audit log">
@@ -97,14 +97,14 @@ export function AuditViewer() {
         </p>
       )}
 
-      <p role="status" className="text-sm text-slate-500">
+      <p role="status" className="text-sm text-ink-soft">
         {loading ? 'Loading the audit log' : `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`}
       </p>
 
       {loading ? (
         <div className="space-y-2" aria-hidden="true">
           {[0, 1, 2, 3, 4].map(row => (
-            <div key={row} className="h-16 animate-pulse rounded-lg border border-slate-200 bg-slate-100" />
+            <div key={row} className="h-16 animate-pulse rounded-lg border border-rule bg-paper-200" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -119,11 +119,11 @@ export function AuditViewer() {
       ) : (
         <>
           {/* Desktop: dense records. */}
-          <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block">
+          <div className="hidden overflow-hidden rounded-lg border border-rule bg-white md:block">
             <table className="w-full border-collapse text-left text-sm">
               <caption className="sr-only">Recorded actions, newest first</caption>
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-rule bg-paper-100 text-xs uppercase tracking-wide text-ink-soft">
                   <th scope="col" className="px-4 py-3 font-semibold">When</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Action</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Area</th>
@@ -131,15 +131,15 @@ export function AuditViewer() {
                   <th scope="col" className="px-4 py-3 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-rule">
                 {filtered.map(log => (
-                  <tr key={log.id} className="hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-500 tnum">
+                  <tr key={log.id} className="hover:bg-paper-100">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-ink-soft tnum">
                       {formatTimestamp(log.timestamp)}
                     </td>
-                    <td className="px-4 py-3 text-slate-900">{log.intent}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{log.tool_name}</td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-ink-900">{log.intent}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-ink-soft">{log.tool_name}</td>
+                    <td className="px-4 py-3 text-ink-soft">
                       {log.requires_confirmation ? (log.confirmed ? 'Confirmed' : 'Awaiting') : 'Not required'}
                     </td>
                     <td className="px-4 py-3">
@@ -154,23 +154,23 @@ export function AuditViewer() {
           {/* Phone and tablet: the same records as stacked cards. */}
           <ul className="space-y-2 md:hidden">
             {filtered.map(log => (
-              <li key={log.id} className="rounded-lg border border-slate-200 bg-white p-4">
+              <li key={log.id} className="rounded-lg border border-rule bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="min-w-0 text-sm font-medium text-slate-900">{log.intent}</p>
+                  <p className="min-w-0 text-sm font-medium text-ink-900">{log.intent}</p>
                   <Badge variant={statusTone(log.status)} className="shrink-0">{log.status}</Badge>
                 </div>
                 <dl className="mt-3 space-y-1.5 text-xs">
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">When</dt>
-                    <dd className="text-right font-mono text-slate-700 tnum">{formatTimestamp(log.timestamp)}</dd>
+                    <dt className="text-ink-soft">When</dt>
+                    <dd className="text-right font-mono text-ink-800 tnum">{formatTimestamp(log.timestamp)}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Area</dt>
-                    <dd className="truncate font-mono text-slate-700">{log.tool_name}</dd>
+                    <dt className="text-ink-soft">Area</dt>
+                    <dd className="truncate font-mono text-ink-800">{log.tool_name}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Confirmation</dt>
-                    <dd className="text-slate-700">
+                    <dt className="text-ink-soft">Confirmation</dt>
+                    <dd className="text-ink-800">
                       {log.requires_confirmation ? (log.confirmed ? 'Confirmed' : 'Awaiting') : 'Not required'}
                     </dd>
                   </div>

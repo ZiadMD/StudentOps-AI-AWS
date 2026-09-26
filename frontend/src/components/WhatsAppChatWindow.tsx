@@ -355,42 +355,42 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
   const renderAckIcon = (ack: number, status: string) => {
     if (status === 'failed') {
-      return <AlertCircle className="w-3.5 h-3.5 text-rose-500" />;
+      return <AlertCircle className="w-3.5 h-3.5 text-red-500" />;
     }
     if (ack === 3 || status === 'read') {
-      return <CheckCheck className="w-3.5 h-3.5 text-sky-500" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-cyan-500" />;
     }
     if (ack === 2 || status === 'delivered') {
-      return <CheckCheck className="w-3.5 h-3.5 text-slate-400" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-ink-faint" />;
     }
     if (ack === 1 || status === 'sent') {
-      return <Check className="w-3.5 h-3.5 text-slate-400" />;
+      return <Check className="w-3.5 h-3.5 text-ink-faint" />;
     }
-    return <Clock className="w-3.5 h-3.5 text-slate-400 animate-pulse" />;
+    return <Clock className="w-3.5 h-3.5 text-ink-faint animate-pulse" />;
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-[750px] max-h-[85vh]">
+    <div className="bg-white border border-rule rounded-lg shadow-sm overflow-hidden flex flex-col h-[750px] max-h-[85vh]">
       {/* Top Bar / Header */}
-      <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800">
+      <div className="bg-ink-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-ink-800">
         <div className="flex items-center gap-2.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
           <h2 className="text-sm font-semibold tracking-tight">
             WhatsApp Operational Chat
           </h2>
-          <span className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+          <span className="text-[11px] bg-ink-800 text-ink-300 px-2 py-0.5 rounded border border-ink-700">
             OpenWA Official SIM
           </span>
         </div>
         <div className="flex items-center gap-3">
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded ${
-              wsConnected ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-950 text-amber-300'
+              wsConnected ? 'bg-green-950 text-green-300' : 'bg-amber-950 text-amber-300'
             }`}
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                wsConnected ? 'bg-emerald-400' : 'bg-amber-400'
+                wsConnected ? 'bg-green-400' : 'bg-amber-400'
               }`}
             />
             {wsConnected ? 'Live Socket Active' : 'Connecting Stream…'}
@@ -401,7 +401,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
               fetchThreads();
               if (activeStudentId) fetchMessages(activeStudentId);
             }}
-            className="p-1 rounded text-slate-400 hover:text-white transition-colors"
+            className="p-1 rounded text-ink-faint hover:text-white transition-colors"
             title="Refresh Conversations"
             aria-label="Refresh conversations"
           >
@@ -413,23 +413,23 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
       {/* Main 2-Column Split */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Threads List */}
-        <div className={`w-full sm:w-80 md:w-96 border-r border-slate-200 flex flex-col bg-slate-50/50 ${activeStudentId ? 'hidden sm:flex' : 'flex'}`}>
+        <div className={`w-full sm:w-80 md:w-96 border-r border-rule flex flex-col bg-paper-100/50 ${activeStudentId ? 'hidden sm:flex' : 'flex'}`}>
           {/* Search & Oversight Toggle */}
-          <div className="p-3 border-b border-slate-200 space-y-2 bg-white">
+          <div className="p-3 border-b border-rule space-y-2 bg-white">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <Search className="w-3.5 h-3.5 text-ink-faint absolute left-3 top-2.5" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search assigned members…"
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-paper-100 border border-rule rounded-lg focus:outline-none focus:ring-1 focus:ring-ink-900"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-2 text-ink-faint hover:text-ink-soft"
                   aria-label="Clear search"
                 >
                   <X className="w-3 h-3" />
@@ -439,7 +439,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
             {isLeader && (
               <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] font-medium text-slate-500">
+                <span className="text-[11px] font-medium text-ink-soft">
                   {oversightMode ? 'All Committee (Oversight)' : 'My Assigned Members'}
                 </span>
                 <button
@@ -449,7 +449,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                   className={`min-h-9 shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                     oversightMode
                       ? 'bg-violet-100 text-violet-800'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      : 'bg-paper-200 text-ink-800 hover:bg-paper-300'
                   }`}
                 >
                   {oversightMode ? 'Switch to my assigned' : 'View committee oversight'}
@@ -459,15 +459,15 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
           </div>
 
           {/* Threads List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+          <div className="flex-1 overflow-y-auto divide-y divide-rule">
             {loadingThreads ? (
-              <div className="flex items-center justify-center p-8 text-xs text-slate-400">
+              <div className="flex items-center justify-center p-8 text-xs text-ink-faint">
                 <RefreshCw className="w-4 h-4 animate-spin mr-2" />
                 Loading conversations…
               </div>
             ) : filteredThreads.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400">
-                <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              <div className="p-8 text-center text-xs text-ink-faint">
+                <Users className="w-8 h-8 mx-auto mb-2 text-ink-300" />
                 No assigned members found.
               </div>
             ) : (
@@ -479,16 +479,16 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                     onClick={() => setActiveStudentId(thread.student_id)}
                     className={`w-full text-left p-3.5 transition-colors flex items-start gap-3 ${
                       isSelected
-                        ? 'bg-white border-l-4 border-l-slate-900 shadow-sm'
-                        : 'hover:bg-slate-100/70'
+                        ? 'bg-white border-l-4 border-l-ink-900 shadow-sm'
+                        : 'hover:bg-paper-200/70'
                     }`}
                   >
                     {/* Initials Avatar */}
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                         isSelected
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-200 text-slate-700'
+                          ? 'bg-ink-900 text-white'
+                          : 'bg-ink-200 text-ink-800'
                       }`}
                     >
                       {thread.full_name.slice(0, 2).toUpperCase()}
@@ -496,35 +496,35 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-semibold text-slate-900 truncate">
+                        <span className="text-xs font-semibold text-ink-900 truncate">
                           {thread.full_name}
                         </span>
                         {thread.last_message && (
-                          <span className="text-[10px] text-slate-400 shrink-0">
+                          <span className="text-[10px] text-ink-faint shrink-0">
                             {formatMessageTime(thread.last_message.created_at)}
                           </span>
                         )}
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-slate-500 font-arabic truncate" dir="rtl">
+                        <span className="text-[11px] text-ink-soft font-arabic truncate" dir="rtl">
                           {thread.arabic_name}
                         </span>
                         {thread.unread_count > 0 && (
-                          <span className="bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                          <span className="bg-green-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
                             {thread.unread_count}
                           </span>
                         )}
                       </div>
 
                       {thread.last_message ? (
-                        <p className="text-[11px] text-slate-500 truncate mt-1 flex items-center gap-1">
+                        <p className="text-[11px] text-ink-soft truncate mt-1 flex items-center gap-1">
                           {thread.last_message.sender_type === 'HR' &&
                             renderAckIcon(thread.last_message.ack_status, thread.last_message.status)}
                           <span className="truncate">{thread.last_message.content}</span>
                         </p>
                       ) : (
-                        <p className="text-[10px] text-slate-400 italic mt-1">No messages yet</p>
+                        <p className="text-[10px] text-ink-faint italic mt-1">No messages yet</p>
                       )}
                     </div>
                   </button>
@@ -539,36 +539,36 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
           {activeThread ? (
             <>
               {/* Active Conversation Top Header */}
-              <div className="bg-white px-4 sm:px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+              <div className="bg-white px-4 sm:px-5 py-3 border-b border-rule flex items-center justify-between">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <button
                     type="button"
                     onClick={() => setActiveStudentId(null)}
-                    className="sm:hidden p-1.5 -ml-1 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 shrink-0"
+                    className="sm:hidden p-1.5 -ml-1 text-ink-soft hover:text-ink-900 rounded-lg hover:bg-paper-200 shrink-0"
                     aria-label="Back to conversations list"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
-                  <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-ink-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
                     {activeThread.full_name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 truncate">
-                      <h3 className="text-xs font-bold text-slate-900 truncate">
+                      <h3 className="text-xs font-bold text-ink-900 truncate">
                         {activeThread.full_name}
                       </h3>
-                      <span className="text-xs text-slate-500 font-arabic shrink-0" dir="rtl">
+                      <span className="text-xs text-ink-soft font-arabic shrink-0" dir="rtl">
                         ({activeThread.arabic_name})
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5 truncate">
+                    <div className="flex items-center gap-2 text-[11px] text-ink-soft mt-0.5 truncate">
                       <span className="font-mono">{activeThread.phone}</span>
                       <span>•</span>
                       <span>{activeThread.student_code}</span>
                       {activeThread.assigned_hr_name && (
                         <>
                           <span>•</span>
-                          <span className="text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 text-[10px] truncate">
+                          <span className="text-violet-700 bg-violet-50 px-1.5 py-0.2 rounded border border-violet-200 text-[10px] truncate">
                             HR: {activeThread.assigned_hr_name}
                           </span>
                         </>
@@ -582,16 +582,16 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                     type="button"
                     onClick={handleSyncChat}
                     disabled={syncing}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 rounded-lg transition-colors border border-slate-200"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-ink-800 bg-paper-200 hover:bg-paper-300 disabled:opacity-50 rounded-lg transition-colors border border-rule"
                     title="Sync with WhatsApp"
                     aria-label="Sync chat with WhatsApp"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-slate-900' : 'text-slate-500'}`} />
+                    <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-ink-900' : 'text-ink-soft'}`} />
                     <span className="hidden md:inline">{syncing ? 'Syncing…' : 'Sync Chat'}</span>
                   </button>
                   <a
                     href={`tel:${activeThread.phone}`}
-                    className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="p-2 text-ink-soft hover:text-ink-900 hover:bg-paper-200 rounded-lg transition-colors"
                     title="Direct Call"
                     aria-label={`Call ${activeThread.full_name}`}
                   >
@@ -603,17 +603,17 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
               {/* Message List Stream */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {loadingMessages ? (
-                  <div className="flex items-center justify-center h-full text-xs text-slate-400">
+                  <div className="flex items-center justify-center h-full text-xs text-ink-faint">
                     <RefreshCw className="w-4 h-4 animate-spin mr-2" />
                     Loading conversation history…
                   </div>
                 ) : messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 p-8 space-y-2">
-                    <Shield className="w-8 h-8 text-slate-300" />
-                    <p className="text-xs font-medium text-slate-600">
+                  <div className="flex flex-col items-center justify-center h-full text-center text-ink-faint p-8 space-y-2">
+                    <Shield className="w-8 h-8 text-ink-300" />
+                    <p className="text-xs font-medium text-ink-soft">
                       Start of conversation with {activeThread.full_name}
                     </p>
-                    <p className="text-[11px] text-slate-400 max-w-sm">
+                    <p className="text-[11px] text-ink-faint max-w-sm">
                       Messages sent here are routed via the official OpenWA account. Strict access isolation ensures only you can view and respond to this thread.
                     </p>
                   </div>
@@ -629,13 +629,13 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                         <div
                           className={`relative max-w-md md:max-w-lg rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
                             isHR
-                              ? 'bg-emerald-50 text-slate-900 border border-emerald-200 rounded-tr-none'
-                              : 'bg-white text-slate-900 border border-slate-200 rounded-tl-none'
+                              ? 'bg-green-50 text-ink-900 border border-green-200 rounded-tr-none'
+                              : 'bg-white text-ink-900 border border-rule rounded-tl-none'
                           }`}
                         >
                           {/* Replied-to parent quote */}
                           {msg.reply_to_message_id && (
-                            <div className="mb-2 p-2 rounded bg-black/5 border-l-2 border-slate-500 text-[11px] text-slate-600">
+                            <div className="mb-2 p-2 rounded bg-black/5 border-l-2 border-ink-500 text-[11px] text-ink-soft">
                               <span className="font-semibold block text-[10px]">Quoted message</span>
                               <span className="truncate block">Original message referenced</span>
                             </div>
@@ -661,7 +661,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
                           {msg.message_type === 'audio' && msg.media_url && isSafeMediaUrl(msg.media_url) && (
                             <div className="mb-2 flex items-center gap-2 bg-black/5 p-2 rounded-lg">
-                              <Volume2 className="w-4 h-4 text-slate-600" />
+                              <Volume2 className="w-4 h-4 text-ink-soft" />
                               <audio src={msg.media_url} controls className="h-8 w-full" />
                             </div>
                           )}
@@ -677,18 +677,18 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                                   e.preventDefault();
                                 }
                               }}
-                              className="mb-2 flex items-center gap-2 p-2.5 rounded-lg bg-black/5 hover:bg-black/10 transition-colors border border-black/5 text-slate-800"
+                              className="mb-2 flex items-center gap-2 p-2.5 rounded-lg bg-black/5 hover:bg-black/10 transition-colors border border-black/5 text-ink-800"
                             >
                               <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
                               <div className="min-w-0 flex-1">
                                 <span className="font-medium truncate block">
                                   {msg.media_filename || 'Document File'}
                                 </span>
-                                <span className="text-[10px] text-slate-500 uppercase">
+                                <span className="text-[10px] text-ink-soft uppercase">
                                   {msg.media_mimetype || 'PDF/DOC'}
                                 </span>
                               </div>
-                              <Download className="w-4 h-4 text-slate-500 shrink-0" />
+                              <Download className="w-4 h-4 text-ink-soft shrink-0" />
                             </a>
                           )}
 
@@ -696,9 +696,9 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                           <p dir="auto" className="whitespace-pre-wrap break-words">{msg.content}</p>
 
                           {/* Footer: time, status, edited */}
-                          <div className="flex items-center justify-end gap-1.5 mt-1.5 text-[10px] text-slate-400">
+                          <div className="flex items-center justify-end gap-1.5 mt-1.5 text-[10px] text-ink-faint">
                             {msg.is_edited && (
-                              <span className="italic text-slate-400 mr-1">edited</span>
+                              <span className="italic text-ink-faint mr-1">edited</span>
                             )}
                             <span>{formatMessageTime(msg.created_at)}</span>
                             {isHR && renderAckIcon(msg.ack_status, msg.status)}
@@ -706,7 +706,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
                           {/* Reactions badges */}
                           {msg.reactions && msg.reactions.length > 0 && (
-                            <div className="absolute -bottom-2.5 right-2 flex items-center gap-1 bg-white border border-slate-200 rounded-full px-1.5 py-0.5 shadow-sm text-[11px]">
+                            <div className="absolute -bottom-2.5 right-2 flex items-center gap-1 bg-white border border-rule rounded-full px-1.5 py-0.5 shadow-sm text-[11px]">
                               {msg.reactions.map((r, i) => (
                                 <span key={i} title={`From ${r.from}`}>
                                   {r.emoji}
@@ -725,7 +725,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                           <button
                             type="button"
                             onClick={() => setReplyToMsg(msg)}
-                            className="p-1 text-slate-400 hover:text-slate-600 rounded"
+                            className="flex h-9 w-9 items-center justify-center rounded-md text-ink-faint transition-colors hover:bg-paper-200 hover:text-ink-800"
                             title="Reply"
                             aria-label="Reply to message"
                           >
@@ -739,20 +739,20 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                                   activeReactionMsgId === msg.id ? null : msg.id
                                 )
                               }
-                              className="p-1 text-slate-400 hover:text-slate-600 rounded"
+                              className="flex h-9 w-9 items-center justify-center rounded-md text-ink-faint transition-colors hover:bg-paper-200 hover:text-ink-800"
                               title="React"
                               aria-label="Add reaction"
                             >
                               <Smile className="w-3.5 h-3.5" />
                             </button>
                             {activeReactionMsgId === msg.id && (
-                              <div className="absolute bottom-full mb-1 left-0 bg-white border border-slate-200 rounded-lg shadow-lg p-1.5 flex items-center gap-1.5 z-20">
+                              <div className="absolute bottom-full mb-1 left-0 bg-white border border-rule rounded-lg shadow-lg p-1.5 flex items-center gap-1.5 z-20">
                                 {QUICK_REACTIONS.map((emoji) => (
                                   <button
                                     key={emoji}
                                     type="button"
                                     onClick={() => handleToggleReaction(msg.id, emoji)}
-                                    className="p-1 hover:bg-slate-100 rounded text-sm transition-transform hover:scale-125"
+                                    className="p-1 hover:bg-paper-200 rounded text-sm transition-transform hover:scale-125"
                                     aria-label={`React with ${emoji}`}
                                   >
                                     {emoji}
@@ -768,7 +768,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                                 setEditingMsg(msg);
                                 setInputText(msg.content);
                               }}
-                              className="p-1 text-slate-400 hover:text-slate-600 rounded"
+                              className="flex h-9 w-9 items-center justify-center rounded-md text-ink-faint transition-colors hover:bg-paper-200 hover:text-ink-800"
                               title="Edit"
                               aria-label="Edit message"
                             >
@@ -785,7 +785,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
               {/* Reply / Edit Banner */}
               {(replyToMsg || editingMsg || attachedFile) && (
-                <div className="bg-slate-100 border-t border-slate-200 px-4 py-2 flex items-center justify-between text-xs text-slate-700">
+                <div className="bg-paper-200 border-t border-rule px-4 py-2 flex items-center justify-between text-xs text-ink-800">
                   <div className="flex items-center gap-2 truncate">
                     {replyToMsg && (
                       <>
@@ -805,7 +805,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                     )}
                     {attachedFile && (
                       <>
-                        <Paperclip className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <Paperclip className="w-3.5 h-3.5 text-green-700 shrink-0" />
                         <span className="truncate font-medium">
                           {attachedFile.name} ({(attachedFile.size / 1024).toFixed(1)} KB)
                         </span>
@@ -820,7 +820,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                       setAttachedFile(null);
                       if (editingMsg) setInputText('');
                     }}
-                    className="p-1 text-slate-400 hover:text-slate-600"
+                    className="p-1 text-ink-faint hover:text-ink-soft"
                     aria-label="Cancel reply or attachment"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -831,7 +831,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
               {/* Message Input Bar */}
               <form
                 onSubmit={handleSendMessage}
-                className="bg-white p-3 border-t border-slate-200 flex items-end gap-2"
+                className="bg-white p-3 border-t border-rule flex items-end gap-2"
               >
                 <input
                   type="file"
@@ -848,7 +848,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
+                  className="p-2.5 text-ink-faint hover:text-ink-soft hover:bg-paper-200 rounded-lg transition-colors shrink-0"
                   title="Attach File"
                   aria-label="Attach file"
                 >
@@ -872,13 +872,13 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                       : `Message ${activeThread.full_name}… (Shift+Enter for newline)`
                   }
                   rows={1}
-                  className="flex-1 text-xs border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-slate-900 resize-none max-h-32 bg-slate-50/50"
+                  className="flex-1 text-xs border border-rule rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-ink-900 resize-none max-h-32 bg-paper-100/50"
                 />
 
                 <button
                   type="submit"
                   disabled={(!inputText.trim() && !attachedFile) || sending}
-                  className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+                  className="p-2.5 bg-ink-900 text-white rounded-lg hover:bg-ink-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
                   aria-label="Send message"
                 >
                   <Send className={`w-4 h-4 ${sending ? 'animate-pulse' : ''}`} />
@@ -886,7 +886,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
               </form>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
+            <div className="flex-1 flex items-center justify-center text-xs text-ink-faint">
               Select an assigned member from the sidebar to open the chat window.
             </div>
           )}

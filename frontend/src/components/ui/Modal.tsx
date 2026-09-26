@@ -74,7 +74,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 animate-fade-in sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/40 animate-fade-in sm:items-center sm:p-6"
       onClick={(event) => {
         if (closeOnBackdropClick && event.target === event.currentTarget) onClose();
       }}
@@ -90,29 +90,29 @@ export const Modal: React.FC<ModalProps> = ({
         aria-label={typeof title === 'string' ? title : ariaLabel}
         tabIndex={-1}
         className={cn(
-          'flex w-full flex-col overflow-hidden border border-slate-200 bg-white shadow-lg outline-none',
+          'flex w-full flex-col overflow-hidden border border-rule bg-white shadow-lg outline-none',
           'max-h-[92dvh] animate-sheet-in rounded-t-2xl',
-          'sm:max-h-[90vh] sm:animate-sheet-in sm:rounded-xl',
+          'sm:max-h-[90vh] sm:animate-sheet-in sm:rounded-lg',
           sizeClasses[size],
           className,
         )}
       >
         {(title || description) && (
-          <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4">
+          <div className="flex items-start justify-between gap-4 border-b border-rule bg-paper-100 px-5 py-4">
             <div className="min-w-0 space-y-1">
               {title && (
-                <h2 id={titleId} className="text-base font-semibold leading-tight text-slate-900">
+                <h2 id={titleId} className="text-base font-semibold leading-tight text-ink-900">
                   {title}
                 </h2>
               )}
               {description && (
-                <p className="text-sm leading-relaxed text-slate-600">{description}</p>
+                <p className="text-sm leading-relaxed text-ink-soft">{description}</p>
               )}
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="-mr-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200/60 hover:text-slate-900"
+              className="-mr-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink-soft hover:bg-paper-300/60 hover:text-ink-900"
               aria-label="Close dialog"
             >
               <X aria-hidden="true" className="h-5 w-5" />
@@ -123,7 +123,7 @@ export const Modal: React.FC<ModalProps> = ({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
 
         {footer && (
-          <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 border-t border-rule bg-paper-100 px-5 py-4 sm:flex-row sm:justify-end">
             {footer}
           </div>
         )}

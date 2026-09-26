@@ -87,12 +87,12 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h2 className="text-xl font-bold text-ink-900 tracking-tight">
             Executive Committee Reports
           </h2>
-          <p className="text-[12px] text-slate-500 mt-0.5">
+          <p className="text-[12px] text-ink-soft mt-0.5">
             Social Media Committee performance synthesis from HR Leader to HR Region Head.
           </p>
         </div>
@@ -114,40 +114,40 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
       {/* Real-time Summary Cards */}
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <div className="bg-white border border-rule rounded-lg p-4 shadow-sm space-y-1">
+            <div className="flex items-center justify-between text-ink-soft text-xs font-medium">
               <span>Committee Size</span>
-              <Users className="w-4 h-4 text-slate-400" />
+              <Users className="w-4 h-4 text-ink-faint" />
             </div>
-            <div className="text-2xl font-bold text-slate-900 font-mono">{summary.total_members}</div>
-            <p className="text-[11px] text-slate-400">Active Social Media Members</p>
+            <div className="text-2xl font-bold text-ink-900 font-mono">{summary.total_members}</div>
+            <p className="text-[11px] text-ink-faint">Active Social Media Members</p>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <div className="bg-white border border-rule rounded-lg p-4 shadow-sm space-y-1">
+            <div className="flex items-center justify-between text-ink-soft text-xs font-medium">
               <span>Average Total Score</span>
               <Award className="w-4 h-4 text-indigo-500" />
             </div>
             <div className="text-2xl font-bold text-indigo-600 font-mono">{summary.avg_total_score}</div>
-            <p className="text-[11px] text-slate-400">Across behavior, quality &amp; attendance</p>
+            <p className="text-[11px] text-ink-faint">Across behavior, quality &amp; attendance</p>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <div className="bg-white border border-rule rounded-lg p-4 shadow-sm space-y-1">
+            <div className="flex items-center justify-between text-ink-soft text-xs font-medium">
               <span>Task Quality Avg</span>
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
+              <TrendingUp className="w-4 h-4 text-green-500" />
             </div>
-            <div className="text-2xl font-bold text-emerald-600 font-mono">{summary.avg_task_quality} / 10</div>
-            <p className="text-[11px] text-slate-400">Graded by Committee Head</p>
+            <div className="text-2xl font-bold text-green-700 font-mono">{summary.avg_task_quality} / 10</div>
+            <p className="text-[11px] text-ink-faint">Graded by Committee Head</p>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <div className="bg-white border border-rule rounded-lg p-4 shadow-sm space-y-1">
+            <div className="flex items-center justify-between text-ink-soft text-xs font-medium">
               <span>Attendance Rate</span>
-              <Calendar className="w-4 h-4 text-blue-500" />
+              <Calendar className="w-4 h-4 text-indigo-700" />
             </div>
-            <div className="text-2xl font-bold text-blue-600 font-mono">{summary.overall_attendance_rate}%</div>
-            <p className="text-[11px] text-slate-400">Target baseline: 70%</p>
+            <div className="text-2xl font-bold text-indigo-700 font-mono">{summary.overall_attendance_rate}%</div>
+            <p className="text-[11px] text-ink-faint">Target baseline: 70%</p>
           </div>
         </div>
       )}
@@ -155,17 +155,17 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
       {/* Submitted Reports Timeline */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900">Submitted Reports to Region Head</h3>
-          <span className="text-xs font-mono text-slate-400">{reports.length} reports logged</span>
+          <h3 className="text-sm font-bold text-ink-900">Submitted Reports to Region Head</h3>
+          <span className="text-xs font-mono text-ink-faint">{reports.length} reports logged</span>
         </div>
 
         {loading ? (
-          <div className="p-12 text-center text-slate-500 text-sm">Loading executive reports...</div>
+          <div className="p-12 text-center text-ink-soft text-sm">Loading executive reports...</div>
         ) : reports.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-500 space-y-2">
-            <FileText className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="font-medium text-slate-700">No committee reports submitted yet</p>
-            <p className="text-xs text-slate-400">
+          <div className="bg-white border border-rule rounded-lg p-12 text-center text-ink-soft space-y-2">
+            <FileText className="w-8 h-8 text-ink-300 mx-auto" />
+            <p className="font-medium text-ink-800">No committee reports submitted yet</p>
+            <p className="text-xs text-ink-faint">
               The HR Leader compiles performance metrics and submits the executive report upward to the Region HR Head.
             </p>
           </div>
@@ -186,15 +186,15 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
               return (
                 <div
                   key={rep.id}
-                  className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4 hover:border-slate-300 transition-colors"
+                  className="bg-white border border-rule rounded-lg p-5 shadow-sm space-y-4 hover:border-paper-400 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900">{rep.report_title}</span>
+                        <span className="text-sm font-bold text-ink-900">{rep.report_title}</span>
                         <Badge variant="success">Submitted to HR Head</Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                      <div className="flex items-center gap-2 text-[11px] text-ink-faint">
                         <span>Submitted by {rep.submitted_by_name || 'HR Leader'}</span>
                         <span>•</span>
                         <span>
@@ -212,30 +212,30 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
 
                   {/* Metrics Breakdown */}
                   {metrics && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100 font-mono text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-paper-100 p-3 rounded-lg border border-ink-100 font-mono text-xs">
                       <div>
-                        <span className="text-slate-500 text-[11px] block">Active Members</span>
-                        <span className="font-bold text-slate-800">{metrics.total_members}</span>
+                        <span className="text-ink-soft text-[11px] block">Active Members</span>
+                        <span className="font-bold text-ink-800">{metrics.total_members}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 text-[11px] block">Avg Total Score</span>
+                        <span className="text-ink-soft text-[11px] block">Avg Total Score</span>
                         <span className="font-bold text-indigo-600">{metrics.avg_total_score}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 text-[11px] block">Avg Quality</span>
-                        <span className="font-bold text-emerald-600">{metrics.avg_task_quality} / 10</span>
+                        <span className="text-ink-soft text-[11px] block">Avg Quality</span>
+                        <span className="font-bold text-green-700">{metrics.avg_task_quality} / 10</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 text-[11px] block">Attendance</span>
-                        <span className="font-bold text-blue-600">{metrics.overall_attendance_rate}%</span>
+                        <span className="text-ink-soft text-[11px] block">Attendance</span>
+                        <span className="font-bold text-indigo-700">{metrics.overall_attendance_rate}%</span>
                       </div>
                     </div>
                   )}
 
                   {/* Leader Notes */}
                   {rep.notes && (
-                    <div className="text-xs text-slate-700 bg-slate-50/50 p-3 rounded-lg border border-slate-100 space-y-1">
-                      <span className="font-semibold text-slate-900 block text-[11px]">HR Leader Executive Notes:</span>
+                    <div className="text-xs text-ink-800 bg-paper-100/50 p-3 rounded-lg border border-ink-100 space-y-1">
+                      <span className="font-semibold text-ink-900 block text-[11px]">HR Leader Executive Notes:</span>
                       <p className="whitespace-pre-wrap">{rep.notes}</p>
                     </div>
                   )}
@@ -256,18 +256,18 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
       >
         <form onSubmit={handleSubmitReport} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Report Title</label>
+            <label className="block text-xs font-medium text-ink-800 mb-1">Report Title</label>
             <input
               type="text"
               value={reportTitle}
               onChange={(e) => setReportTitle(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-ink-800 mb-1">
               Executive Notes &amp; Observations
             </label>
             <textarea
@@ -275,16 +275,16 @@ export const CommitteeReportsView: React.FC<CommitteeReportsViewProps> = ({ curr
               placeholder="Detail committee progress, campaign highlights, member retention, or operational challenges..."
               value={reportNotes}
               onChange={(e) => setReportNotes(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-600"
               required
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-3 border-t border-ink-100">
             <button
               type="button"
               onClick={() => setShowSubmitModal(false)}
-              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="px-3 py-1.5 border border-rule rounded-lg text-xs font-medium text-ink-soft hover:bg-paper-100"
             >
               Cancel
             </button>

@@ -67,13 +67,13 @@ export function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
   return (
     <AuthLayout>
       <header className="mb-7">
-        <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
+        <p className="eyebrow mb-2.5">
           Sign in
         </p>
-        <h1 id="login-title" className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+        <h1 id="login-title" className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-ink-900">
           Continue to your workspace
         </h1>
-        <p className="mt-2.5 text-sm leading-6 text-slate-600">
+        <p className="mt-2.5 text-sm leading-6 text-ink-600">
           Use the email address or username issued by your organization.
         </p>
       </header>
@@ -131,7 +131,7 @@ export function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
         </p>
       </form>
 
-      <p className="mt-7 border-t border-slate-200 pt-5 text-sm leading-6 text-slate-600">
+      <p className="mt-7 border-t border-ink-200 pt-5 text-sm leading-6 text-ink-600">
         Joining an organization?{' '}
         <AuthLink href="/signup" onNavigate={onGoToRegister}>Create an account</AuthLink>
       </p>
@@ -142,12 +142,12 @@ export function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
         title="Password recovery"
         size="sm"
       >
-        <div className="space-y-4 text-sm leading-6 text-slate-600">
+        <div className="space-y-4 text-sm leading-6 text-ink-600">
           <p>
             Password recovery is handled by your organization administrator.
             Contact them to restore access to your account.
           </p>
-          <p className="text-slate-500">No reset request has been sent.</p>
+          <p className="text-ink-500">No reset request has been sent.</p>
           <button type="button" onClick={closeRecovery} className={authButtonClass}>
             Back to sign in
           </button>

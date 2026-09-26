@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageHeader } from './ui/PageHeader';
 import { api } from '../api/client';
 import { Student, StudentCreatePayload, TeamItem, UserProfile } from '../types';
 import { useToast } from '../context/ToastContext';
@@ -130,21 +131,25 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Member Registry</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            {students.length} total enrolled members across committees.
-          </p>
-        </div>
+      <PageHeader
+        eyebrow="Registry"
+        title="Member registry"
+        description="Every member with their committee, contact details and student code."
+        meta={
+          <>
+            <span>{filtered.length} of {students.length} shown</span>
+            {search && <span>Filtered by "{search}"</span>}
+          </>
+        }
+      />
+      <div className="-mt-4 flex justify-end">
         {canAddMember && (
           <button
             onClick={() => {
               resetForm();
               setIsAddModalOpen(true);
             }}
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white rounded-lg text-sm font-semibold shadow-xs transition-all w-full sm:w-auto justify-center cursor-pointer"
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-ink-900 hover:bg-ink-800 active:scale-[0.98] text-white rounded-lg text-sm font-semibold shadow-xs transition-all w-full sm:w-auto justify-center cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Member</span>
@@ -155,25 +160,25 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <div className="relative w-full sm:w-auto flex-1 max-w-sm">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search by name, email, or code…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-xs transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-rule rounded-lg text-sm focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 shadow-xs transition-all"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+        <div className="flex flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper-200/60 p-1">
           {STATUS_FILTERS.map(f => (
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
               className={`px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors ${
                 statusFilter === f
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-ink-900 shadow-xs border border-rule'
+                  : 'text-ink-soft hover:text-ink-800'
               }`}
             >
               {f}
@@ -183,14 +188,14 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
       </div>
 
       {/* Table Container */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-rule bg-paper-50">
         {loading ? (
           <div>
             {/* Desktop Table Skeletons */}
             <div className="hidden md:block">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr className="border-b border-ink-900/15 text-[11px] font-semibold text-ink-soft uppercase tracking-wider">
                     <th className="px-5 py-3.5">Member Identity</th>
                     <th className="px-5 py-3.5">Contact Details</th>
                     <th className="px-5 py-3.5">Role & University</th>
@@ -198,7 +203,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                     <th className="px-5 py-3.5 text-right"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-rule">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <SkeletonTableRow key={i} />
                   ))}
@@ -219,7 +224,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
             <div className="hidden md:block">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr className="border-b border-ink-900/15 text-[11px] font-semibold text-ink-soft uppercase tracking-wider">
                     <th className="px-5 py-3.5">Member Identity</th>
                     <th className="px-5 py-3.5">Contact Details</th>
                     <th className="px-5 py-3.5">Role & University</th>
@@ -227,22 +232,22 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                     <th className="px-5 py-3.5 text-right"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-rule">
                   {filtered.map(s => (
-                    <tr key={s.id} className="group hover:bg-slate-50/60 transition-colors">
+                    <tr key={s.id} className="group hover:bg-paper-100/60 transition-colors">
                       {/* Composite Member Identity: Arabic primary + English secondary + Code */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 text-xs font-bold shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-paper-200 border border-rule flex items-center justify-center text-ink-800 text-xs font-bold shrink-0">
                             {s.full_name.charAt(0)}
                           </div>
                           <div>
-                            <div className="font-bold text-slate-900 text-sm font-['Cairo'] group-hover:text-blue-700 transition-colors">
+                            <div className="font-bold text-ink-900 text-sm font-['Cairo'] group-hover:text-indigo-700 transition-colors">
                               {s.arabic_name}
                             </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                            <div className="text-[11px] text-ink-soft flex items-center gap-1.5">
                               <span>{s.full_name}</span>
-                              <span className="font-mono text-slate-400 text-[10px]">· {s.student_code}</span>
+                              <span className="font-mono text-ink-faint text-[10px]">· {s.student_code}</span>
                             </div>
                           </div>
                         </div>
@@ -251,13 +256,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                       {/* Stacked Contact */}
                       <td className="px-5 py-3.5">
                         <div className="space-y-0.5">
-                          <div className="flex items-center space-x-1.5 text-[12px] text-slate-700">
-                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                          <div className="flex items-center space-x-1.5 text-[12px] text-ink-800">
+                            <Mail className="w-3 h-3 text-ink-faint shrink-0" />
                             <span className="truncate max-w-[200px]">{s.email}</span>
                           </div>
                           {s.phone && (
-                            <div className="flex items-center space-x-1.5 text-[11px] text-slate-500">
-                              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                            <div className="flex items-center space-x-1.5 text-[11px] text-ink-soft">
+                              <Phone className="w-3 h-3 text-ink-faint shrink-0" />
                               <span className="font-mono">{s.phone}</span>
                             </div>
                           )}
@@ -267,11 +272,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                       {/* Stacked Role & University */}
                       <td className="px-5 py-3.5">
                         <div className="space-y-1">
-                          <span className="inline-block text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 capitalize">
+                          <span className="inline-block text-[11px] font-semibold text-ink-800 bg-paper-200 px-2 py-0.5 rounded border border-rule capitalize">
                             {s.role.replace('_', ' ')}
                           </span>
-                          <div className="flex items-center space-x-1.5 text-[11px] text-slate-500">
-                            <University className="w-3 h-3 text-slate-400 shrink-0" />
+                          <div className="flex items-center space-x-1.5 text-[11px] text-ink-soft">
+                            <University className="w-3 h-3 text-ink-faint shrink-0" />
                             <span className="truncate max-w-[170px]">{s.university || '—'}</span>
                           </div>
                         </div>
@@ -280,12 +285,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                       {/* Status */}
                       <td className="px-5 py-3.5 text-center">
                         {s.status === 'active' ? (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-[11px] font-semibold">
                             <UserCheck className="w-3 h-3" />
                             <span>Active</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-semibold">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-800 text-[11px] font-semibold">
                             <UserX className="w-3 h-3" />
                             <span className="capitalize">{s.status}</span>
                           </span>
@@ -295,7 +300,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                       {/* Actions */}
                       <td className="px-5 py-3.5 text-right">
                         <button 
-                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition-colors"
+                          className="p-1.5 text-ink-faint hover:text-ink-800 rounded-md hover:bg-paper-200 transition-colors"
                           aria-label={`Options for ${s.full_name}`}
                         >
                           <MoreHorizontal className="w-4 h-4" />
@@ -308,33 +313,33 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
             </div>
 
             {/* Mobile Card Transform (Zero horizontal scroll!) */}
-            <div className="block md:hidden divide-y divide-slate-100">
+            <div className="block md:hidden divide-y divide-rule">
               {filtered.map(s => (
-                <div key={s.id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
+                <div key={s.id} className="p-4 space-y-3 hover:bg-paper-100/50 transition-colors">
                   {/* Card Header: Avatar + Identity + Status */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 text-xs font-bold shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-paper-200 border border-rule flex items-center justify-center text-ink-800 text-xs font-bold shrink-0">
                         {s.full_name.charAt(0)}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-slate-900 text-sm font-['Cairo'] truncate">
+                        <div className="font-bold text-ink-900 text-sm font-['Cairo'] truncate">
                           {s.arabic_name}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate">
-                          {s.full_name} <span className="font-mono text-slate-400 text-[10px]">({s.student_code})</span>
+                        <div className="text-[11px] text-ink-soft truncate">
+                          {s.full_name} <span className="font-mono text-ink-faint text-[10px]">({s.student_code})</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="shrink-0">
                       {s.status === 'active' ? (
-                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold">
+                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-[10px] font-semibold">
                           <UserCheck className="w-2.5 h-2.5" />
                           <span>Active</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-semibold">
+                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-800 text-[10px] font-semibold">
                           <UserX className="w-2.5 h-2.5" />
                           <span className="capitalize">{s.status}</span>
                         </span>
@@ -344,34 +349,34 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
                   {/* Card Details: Role & University */}
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 capitalize">
+                    <span className="text-[11px] font-semibold text-ink-800 bg-paper-200 px-2 py-0.5 rounded border border-rule capitalize">
                       {s.role.replace('_', ' ')}
                     </span>
                     {s.university && (
-                      <span className="text-[11px] text-slate-500 flex items-center space-x-1 truncate">
-                        <University className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="text-[11px] text-ink-soft flex items-center space-x-1 truncate">
+                        <University className="w-3 h-3 text-ink-faint shrink-0" />
                         <span>{s.university}</span>
                       </span>
                     )}
                   </div>
 
                   {/* Card Footer: Contacts & Action */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs text-slate-600">
+                  <div className="pt-2 border-t border-ink-100 flex items-center justify-between gap-2 text-xs text-ink-soft">
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center space-x-1.5 text-[11px] truncate">
-                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                        <Mail className="w-3 h-3 text-ink-faint shrink-0" />
                         <span className="truncate">{s.email}</span>
                       </div>
                       {s.phone && (
-                        <div className="flex items-center space-x-1.5 text-[11px] font-mono text-slate-500">
-                          <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                        <div className="flex items-center space-x-1.5 text-[11px] font-mono text-ink-soft">
+                          <Phone className="w-3 h-3 text-ink-faint shrink-0" />
                           <span>{s.phone}</span>
                         </div>
                       )}
                     </div>
 
                     <button 
-                      className="p-2 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
+                      className="p-2 text-ink-faint hover:text-ink-800 rounded-lg hover:bg-paper-200 transition-colors shrink-0"
                       aria-label={`Options for ${s.full_name}`}
                     >
                       <MoreHorizontal className="w-4 h-4" />
@@ -383,10 +388,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
             {filtered.length === 0 && (
               <div className="py-16 text-center space-y-2">
-                <p className="text-slate-500 text-sm">No members match your search.</p>
+                <p className="text-ink-soft text-sm">No members match your search.</p>
                 <button
                   onClick={() => { setSearch(''); setStatusFilter('all'); }}
-                  className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  className="inline-flex min-h-11 items-center rounded-lg border border-paper-400 bg-white px-4 text-sm font-medium text-ink-800 transition-colors hover:bg-paper-100"
                 >
                   Clear filters
                 </button>
@@ -394,10 +399,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
             )}
 
             {/* Table Footer */}
-            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
+            <div className="px-5 py-3 border-t border-ink-100 bg-paper-100/50 flex items-center justify-between text-xs text-ink-soft">
               <span>Showing {filtered.length} of {students.length} members</span>
               {statusFilter !== 'all' && (
-                <span className="text-slate-400 capitalize">Filtered by: {statusFilter}</span>
+                <span className="text-ink-faint capitalize">Filtered by: {statusFilter}</span>
               )}
             </div>
           </>
@@ -417,8 +422,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
       >
         <form onSubmit={handleAddMember} className="space-y-4">
           {formError && (
-            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start space-x-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs flex items-start space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-700" />
               <span className="leading-relaxed">{formError}</span>
             </div>
           )}
@@ -426,23 +431,23 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Full Name (Latin) */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Full Name (English / Latin) <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
+                Full Name (English / Latin) <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="e.g. Mostafa Mahmoud"
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
                 required
               />
             </div>
 
             {/* Arabic Name */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Arabic Name (الاسم بالعربية) <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
+                Arabic Name (الاسم بالعربية) <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -450,44 +455,44 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                 value={arabicName}
                 onChange={(e) => setArabicName(e.target.value)}
                 placeholder="مثال: مصطفى محمود"
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 font-['Cairo'] focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 font-['Cairo'] focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
                 required
               />
             </div>
 
             {/* Email Address */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Email Address <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
+                Email Address <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="e.g. mostafa@studentops.org"
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
                 required
               />
             </div>
 
             {/* Phone Number */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                WhatsApp Phone <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
+                WhatsApp Phone <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="e.g. +20 100 123 4567"
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 font-mono focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
                 required
               />
             </div>
 
             {/* University / Faculty */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
                 University / Institution
               </label>
               <input
@@ -495,20 +500,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                 value={university}
                 onChange={(e) => setUniversity(e.target.value)}
                 placeholder="Faculty of Engineering"
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
               />
             </div>
 
             {/* Committee / Team */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
                 Committee / Team
               </label>
               {canSelectTeam ? (
                 <select
                   value={selectedTeamId}
                   onChange={(e) => setSelectedTeamId(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                  className="w-full text-xs border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
                 >
                   <option value="">General / Unassigned</option>
                   {teams.map((t) => (
@@ -518,7 +523,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                   ))}
                 </select>
               ) : (
-                <div className="w-full text-xs border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-slate-600 font-medium truncate">
+                <div className="w-full text-xs border border-rule bg-paper-100 rounded-lg px-3 py-2 text-ink-soft font-medium truncate">
                   {currentUser?.team_name || 'Assigned Committee'}
                 </div>
               )}
@@ -526,13 +531,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
             {/* Role */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
                 Role in Committee
               </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
               >
                 <option value="Member">Member</option>
                 <option value="Head">Head</option>
@@ -543,13 +548,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
             {/* Status */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
                 Enrollment Status
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
               >
                 <option value="ACTIVE">Active</option>
                 <option value="INACTIVE">Inactive</option>
@@ -559,35 +564,35 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
 
             {/* Student Code (Optional) */}
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Student Code <span className="text-slate-400 font-normal">(Optional — auto-generated if left blank)</span>
+              <label className="block text-xs font-semibold text-ink-800 mb-1">
+                Student Code <span className="text-ink-faint font-normal">(Optional — auto-generated if left blank)</span>
               </label>
               <input
                 type="text"
                 value={studentCode}
                 onChange={(e) => setStudentCode(e.target.value)}
                 placeholder="e.g. CORE-2026-007 (leave blank for automatic assignment)"
-                className="w-full text-xs font-mono border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-colors"
+                className="w-full text-xs font-mono border border-rule rounded-lg px-3 py-2 bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition-colors"
               />
             </div>
           </div>
 
           {/* Actions */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+          <div className="pt-3 border-t border-ink-100 flex items-center justify-end space-x-3">
             <button
               type="button"
               onClick={() => {
                 setIsAddModalOpen(false);
                 setFormError(null);
               }}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-ink-soft hover:text-ink-900 hover:bg-paper-200 rounded-lg transition-colors border border-rule cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 transition-all cursor-pointer"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-ink-900 hover:bg-ink-800 active:scale-[0.98] text-white rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 transition-all cursor-pointer"
             >
               {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>{submitting ? 'Enrolling…' : 'Enroll Member'}</span>

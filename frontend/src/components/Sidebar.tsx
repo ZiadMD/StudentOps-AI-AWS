@@ -78,15 +78,15 @@ export function Sidebar({
       ? 'justify-start px-2 py-2 lg:justify-center lg:px-0'
       : 'gap-3 px-3 py-2',
     active
-      ? 'bg-slate-900 text-white font-semibold shadow-xs'
-      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+      ? 'bg-ink-900 text-white font-semibold shadow-xs'
+      : 'text-ink-700 hover:bg-ink-100 hover:text-ink-900',
   ].join(' ');
 
   return (
     <>
       {isMobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/50 animate-fade-in lg:hidden"
+          className="fixed inset-0 z-40 bg-ink-900/50 animate-fade-in lg:hidden"
           onClick={() => setIsMobileOpen(false)}
           aria-hidden="true"
         />
@@ -100,19 +100,19 @@ export function Sidebar({
         data-collapsed={isDesktopCollapsed}
         data-open={isMobileOpen}
         className={[
-          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-200 bg-white',
+          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-ink-200 bg-white',
           'transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:translate-x-0 lg:shrink-0',
           isMobileOpen ? 'translate-x-0 shadow-drawer' : '-translate-x-full lg:translate-x-0',
           isDesktopCollapsed ? 'lg:w-16' : 'lg:w-60',
         ].join(' ')}
       >
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-3">
+          <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-ink-200 px-3">
             {isDesktopCollapsed ? (
               setIsDesktopCollapsed && (
                 <button
                   type="button" onClick={() => setIsDesktopCollapsed(false)}
-                  className="mx-auto hidden h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:flex"
+                  className="mx-auto hidden h-10 w-10 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900 lg:flex"
                   title="Expand sidebar"
                   aria-label="Expand sidebar"
                 >
@@ -123,18 +123,18 @@ export function Sidebar({
               <>
                 <a
                   href="/"
-                  className="flex min-w-0 items-center gap-2 rounded-sm px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                  className="flex min-w-0 items-center gap-2 rounded-sm px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
                 >
                   <span
                     aria-hidden="true"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-900 text-[0.625rem] font-bold text-white"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-ink-900 text-[0.625rem] font-bold text-white"
                   >
                     SO
                   </span>
                   <span className="flex min-w-0 flex-col leading-tight">
-                    <span className="truncate text-sm font-semibold text-slate-900">StudentOps</span>
+                    <span className="truncate text-sm font-semibold text-ink-900">StudentOps</span>
                     {currentUser?.team_name && (
-                      <span className="truncate text-xs text-slate-500">{currentUser.team_name}</span>
+                      <span className="truncate text-xs text-ink-500">{currentUser.team_name}</span>
                     )}
                   </span>
                 </a>
@@ -143,7 +143,7 @@ export function Sidebar({
                   {setIsDesktopCollapsed && (
                     <button
                       type="button" onClick={() => setIsDesktopCollapsed(true)}
-                      className="hidden h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 lg:flex"
+                      className="hidden h-9 w-9 items-center justify-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-ink-700 lg:flex"
                       title="Collapse sidebar"
                       aria-label="Collapse sidebar"
                     >
@@ -152,7 +152,7 @@ export function Sidebar({
                   )}
                   <button
                     type="button" onClick={() => setIsMobileOpen(false)}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900 lg:hidden"
                     aria-label="Close navigation"
                   >
                     <X className="h-5 w-5" aria-hidden="true" />
@@ -166,7 +166,7 @@ export function Sidebar({
             {groups.map(group => (
               <section key={group.label} aria-label={group.label} className="mb-5 last:mb-0">
                 <h2
-                  className={`mb-1.5 px-2 text-2xs font-semibold uppercase tracking-[0.12em] text-slate-400 ${
+                  className={`mb-1.5 px-2 text-2xs font-semibold uppercase tracking-[0.12em] text-ink-400 ${
                     isDesktopCollapsed ? 'lg:sr-only' : ''
                   }`}
                 >
@@ -187,7 +187,7 @@ export function Sidebar({
                         >
                           <Icon
                             aria-hidden="true"
-                            className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-slate-400'}`}
+                            className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-ink-400'}`}
                           />
                           <span className={isDesktopCollapsed ? 'lg:sr-only' : 'truncate'}>
                             {t(item.id, item.label)}
@@ -202,13 +202,13 @@ export function Sidebar({
           </nav>
         </div>
 
-        <div className="shrink-0 space-y-1 border-t border-slate-200 p-3">
+        <div className="shrink-0 space-y-1 border-t border-ink-200 p-3">
           <button
             type="button" onClick={() => setIsSettingsOpen(true)}
             title={isDesktopCollapsed ? t('settings', 'Settings') : undefined}
             className={itemClass(false)}
           >
-            <Settings aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-400" />
+            <Settings aria-hidden="true" className="h-5 w-5 shrink-0 text-ink-400" />
             <span className={isDesktopCollapsed ? 'lg:sr-only' : 'truncate'}>
               {t('settings', 'Settings')}
             </span>
@@ -219,7 +219,7 @@ export function Sidebar({
             title={isDesktopCollapsed ? t('signOut', 'Sign out') : undefined}
             className={`${itemClass(false)} hover:bg-red-50 hover:text-red-700`}
           >
-            <LogOut aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-400" />
+            <LogOut aria-hidden="true" className="h-5 w-5 shrink-0 text-ink-400" />
             <span className={isDesktopCollapsed ? 'lg:sr-only' : 'truncate'}>
               {t('signOut', 'Sign out')}
             </span>

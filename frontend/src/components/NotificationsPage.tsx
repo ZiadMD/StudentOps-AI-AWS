@@ -39,8 +39,8 @@ const QUICK_TEMPLATES = [
 
 const statusStyle: Record<string, string> = {
   scheduled: 'bg-amber-50  border-amber-200  text-amber-700',
-  sent:      'bg-emerald-50 border-emerald-200 text-emerald-700',
-  failed:    'bg-rose-50   border-rose-200   text-rose-700',
+  sent:      'bg-green-50 border-green-200 text-green-700',
+  failed:    'bg-red-50   border-red-200   text-red-800',
 };
 
 const statusIcon = (s: string) => {
@@ -106,13 +106,13 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{t('remindersTitle')}</h2>
-          <p className="text-sm text-slate-500 mt-1">{t('remindersSubtitle')}</p>
+          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-ink-900">{t('remindersTitle')}</h1>
+          <p className="text-sm text-ink-soft mt-1">{t('remindersSubtitle')}</p>
         </div>
         {!isMember && (
           <button
             onClick={() => setComposing(c => !c)}
-            className="inline-flex items-center space-x-2 rtl:space-x-reverse px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white rounded-lg text-sm font-semibold shadow-sm transition-all"
+            className="inline-flex items-center space-x-2 rtl:space-x-reverse px-4 py-2 bg-ink-900 hover:bg-ink-800 active:scale-[0.98] text-white rounded-lg text-sm font-semibold shadow-sm transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>{t('newReminder')}</span>
@@ -122,41 +122,41 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
 
       {/* Compose Panel (Hidden from general members) */}
       {!isMember && composing && (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">Compose Reminder</h3>
-            <span className="text-xs text-slate-400">Human-authorized dispatch only</span>
+        <div className="bg-white border border-rule rounded-lg shadow-sm overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-ink-100 bg-paper-100/60 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-ink-900">Compose Reminder</h3>
+            <span className="text-xs text-ink-faint">Human-authorized dispatch only</span>
           </div>
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Title</label>
+                <label className="text-xs font-semibold text-ink-800">Title</label>
                 <input
                   type="text"
                   value={draft.title}
                   onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
                   placeholder="e.g. Meeting Reminder"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all"
+                  className="w-full px-3 py-2 bg-paper-100 border border-rule rounded-lg text-sm focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 transition-all"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Channel</label>
+                  <label className="text-xs font-semibold text-ink-800">Channel</label>
                   <select
                     value={draft.channel}
                     onChange={e => setDraft(d => ({ ...d, channel: e.target.value as ReminderChannel }))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-all"
+                    className="w-full px-3 py-2 bg-paper-100 border border-rule rounded-lg text-sm focus:outline-none focus:border-indigo-600 transition-all"
                   >
                     <option value="whatsapp">WhatsApp</option>
                     <option value="in_app">In-App</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Audience</label>
+                  <label className="text-xs font-semibold text-ink-800">Audience</label>
                   <select
                     value={draft.audience}
                     onChange={e => setDraft(d => ({ ...d, audience: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-all"
+                    className="w-full px-3 py-2 bg-paper-100 border border-rule rounded-lg text-sm focus:outline-none focus:border-indigo-600 transition-all"
                   >
                     <option>All Members</option>
                     <option>Pending Submitters</option>
@@ -168,28 +168,28 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Message</label>
+              <label className="text-xs font-semibold text-ink-800">Message</label>
               <textarea
                 value={draft.message}
                 onChange={e => setDraft(d => ({ ...d, message: e.target.value }))}
                 placeholder="Write your message here…"
                 rows={3}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all resize-none"
+                className="w-full px-3 py-2 bg-paper-100 border border-rule rounded-lg text-sm focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 transition-all resize-none"
               />
-              <p className="text-[11px] text-slate-400">{draft.message.length} characters</p>
+              <p className="text-[11px] text-ink-faint">{draft.message.length} characters</p>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-2 border-t border-ink-100">
               <button
                 onClick={() => setComposing(false)}
-                className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900 font-medium transition-colors"
+                className="px-4 py-2 text-sm text-ink-soft hover:text-ink-900 font-medium transition-colors"
               >
                 {t('cancel')}
               </button>
               <button
                 onClick={handleSend}
                 disabled={!draft.title || !draft.message || sending}
-                className="inline-flex items-center space-x-2 rtl:space-x-reverse px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex items-center space-x-2 rtl:space-x-reverse px-4 py-2 bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -208,17 +208,17 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
       {/* Quick Templates (Management only) */}
       {!isMember && !composing && (
         <div>
-          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Quick Templates</h3>
+          <h3 className="text-[11px] font-bold text-ink-soft uppercase tracking-wider mb-3">Quick Templates</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {QUICK_TEMPLATES.map((tpl) => (
               <button
                 key={tpl.label}
                 onClick={() => applyTemplate(tpl)}
-                className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-blue-400 hover:shadow-sm text-left rtl:text-right group transition-all"
+                className="p-3.5 bg-white border border-rule rounded-lg hover:border-indigo-400 hover:shadow-sm text-left rtl:text-right group transition-all"
               >
-                <tpl.icon className="w-4 h-4 text-slate-400 group-hover:text-blue-600 mb-2 transition-colors" />
-                <div className="text-xs font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{tpl.label}</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">{tpl.audience}</div>
+                <tpl.icon className="w-4 h-4 text-ink-faint group-hover:text-indigo-700 mb-2 transition-colors" />
+                <div className="text-xs font-bold text-ink-800 group-hover:text-indigo-700 transition-colors">{tpl.label}</div>
+                <div className="text-[11px] text-ink-faint mt-0.5">{tpl.audience}</div>
               </button>
             ))}
           </div>
@@ -227,47 +227,47 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
 
       {/* Reminders Log / Member Feed */}
       <div>
-        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">
+        <h3 className="text-[11px] font-bold text-ink-soft uppercase tracking-wider mb-3">
           {isMember ? t('myRemindersTitle') : 'Sent & Scheduled'}
         </h3>
 
         {loading ? (
-          <div className="bg-white border border-slate-200 rounded-xl p-8 flex items-center justify-center space-x-2 rtl:space-x-reverse text-slate-500 text-sm">
-            <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          <div className="bg-white border border-rule rounded-lg p-8 flex items-center justify-center space-x-2 rtl:space-x-reverse text-ink-soft text-sm">
+            <Loader2 className="w-4 h-4 animate-spin text-ink-faint" />
             <span>{t('loading')}</span>
           </div>
         ) : reminders.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-500 space-y-2">
-            <Bell className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="font-medium text-slate-700">{t('noRemindersFound')}</p>
-            <p className="text-xs text-slate-400">
+          <div className="bg-white border border-rule rounded-lg p-12 text-center text-ink-soft space-y-2">
+            <Bell className="w-8 h-8 text-ink-300 mx-auto" />
+            <p className="font-medium text-ink-800">{t('noRemindersFound')}</p>
+            <p className="text-xs text-ink-faint">
               {isMember
                 ? 'You are all caught up! No active reminders or task alerts for you at this time.'
                 : 'No automation logs or scheduled reminders recorded yet.'}
             </p>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden divide-y divide-slate-100">
+          <div className="bg-white border border-rule rounded-lg shadow-sm overflow-hidden divide-y divide-rule">
             {reminders.map(r => {
               const channelType = (r.channel || 'whatsapp').toLowerCase();
               const statusNormalized = (r.status || 'sent').toLowerCase();
               return (
-                <div key={r.id} className="p-4 flex items-start justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+                <div key={r.id} className="p-4 flex items-start justify-between gap-4 hover:bg-paper-100/50 transition-colors">
                   <div className="flex items-start space-x-3 rtl:space-x-reverse">
                     <div className={`mt-0.5 p-1.5 rounded-md ${
-                      channelType === 'whatsapp' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+                      channelType === 'whatsapp' ? 'bg-green-50 text-green-700' : 'bg-indigo-50 text-indigo-700'
                     }`}>
                       {channelType === 'whatsapp' ? <MessageSquare className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
                     </div>
                     <div className="space-y-0.5">
-                      <div className="text-sm font-semibold text-slate-900">{r.title || 'Operational Notice'}</div>
-                      <div className="text-[12px] text-slate-600 max-w-md whitespace-pre-wrap">{r.message_content}</div>
-                      <div className="flex items-center space-x-3 rtl:space-x-reverse text-[11px] text-slate-400 font-mono pt-0.5">
+                      <div className="text-sm font-semibold text-ink-900">{r.title || 'Operational Notice'}</div>
+                      <div className="text-[12px] text-ink-soft max-w-md whitespace-pre-wrap">{r.message_content}</div>
+                      <div className="flex items-center space-x-3 rtl:space-x-reverse text-[11px] text-ink-faint font-mono pt-0.5">
                         <span>{r.sent_at ? new Date(r.sent_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
                         {r.recipient_name && (
                           <>
                             <span>·</span>
-                            <span className="font-sans text-slate-500">{r.recipient_name}</span>
+                            <span className="font-sans text-ink-soft">{r.recipient_name}</span>
                           </>
                         )}
                         {r.trigger_source && (
@@ -281,7 +281,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
                   </div>
 
                   <div className="shrink-0">
-                    <span className={`inline-flex items-center space-x-1 rtl:space-x-reverse px-2 py-0.5 rounded-full border text-[11px] font-semibold ${statusStyle[statusNormalized] || 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                    <span className={`inline-flex items-center space-x-1 rtl:space-x-reverse px-2 py-0.5 rounded-full border text-[11px] font-semibold ${statusStyle[statusNormalized] || 'bg-paper-100 border-rule text-ink-soft'}`}>
                       {statusIcon(statusNormalized)}
                       <span className="capitalize">{statusNormalized}</span>
                     </span>

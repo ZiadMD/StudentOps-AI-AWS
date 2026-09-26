@@ -159,7 +159,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
+      <div className="flex items-center justify-center h-64 text-ink-faint text-sm">
         <RefreshCw className="w-5 h-5 animate-spin mr-2" />
         Loading WhatsApp Operations Console…
       </div>
@@ -169,31 +169,31 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-rule">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-xl font-bold text-ink-900 tracking-tight">
               WhatsApp Operations & SLA Hub
             </h1>
             {isHrLeader && (
-              <span className="text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded">
+              <span className="text-[11px] font-medium bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded">
                 Committee HR Leader
               </span>
             )}
             {isCommitteeHead && (
-              <span className="text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">
+              <span className="text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded">
                 Committee Head
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-ink-soft mt-1">
             Dual-track messaging: Official automated broadcasts + zero-trust client-side links for personal follow-up.
           </p>
         </div>
         <button
           onClick={loadData}
           disabled={refreshing}
-          className="mt-3 sm:mt-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="mt-3 sm:mt-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rule bg-white text-xs font-medium text-ink-soft hover:bg-paper-100"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh Status
@@ -202,15 +202,15 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
 
       {/* Sub-Navigation Tabs. Wraps on narrow screens so the third tab is
           still reachable at 320px without horizontal page scroll. */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-rule pb-2">
         <button
           type="button"
           onClick={() => setActiveView('chat')}
           aria-current={activeView === 'chat' ? 'page' : undefined}
           className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
             activeView === 'chat'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-ink-900 text-white shadow-sm'
+              : 'text-ink-soft hover:bg-paper-200 hover:text-ink-900'
           }`}
         >
           <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
@@ -223,14 +223,14 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
           aria-current={activeView === 'escalations' ? 'page' : undefined}
           className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
             activeView === 'escalations'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-ink-900 text-white shadow-sm'
+              : 'text-ink-soft hover:bg-paper-200 hover:text-ink-900'
           }`}
         >
           <Flame aria-hidden="true" className="h-3.5 w-3.5" />
           SLA escalations
           {escalations.filter((e) => e.is_escalated).length > 0 && (
-            <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-800">
               {escalations.filter((e) => e.is_escalated).length}
             </span>
           )}
@@ -243,8 +243,8 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
             aria-current={activeView === 'official' ? 'page' : undefined}
             className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
               activeView === 'official'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-ink-900 text-white shadow-sm'
+                : 'text-ink-soft hover:bg-paper-200 hover:text-ink-900'
             }`}
           >
             <Shield aria-hidden="true" className="h-3.5 w-3.5" />
@@ -260,11 +260,11 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
 
       {/* Track 1: Official Organization Daemon (Region HR Head / Leader view) */}
       {activeView === 'official' && isRegionHead && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <div className="bg-white rounded-lg border border-rule p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-indigo-600" />
-              <h2 className="text-sm font-semibold text-slate-900">Official Organization Channel (ops_official)</h2>
+              <h2 className="text-sm font-semibold text-ink-900">Official Organization Channel (ops_official)</h2>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -278,7 +278,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               <span
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                   status?.status === 'CONNECTED'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    ? 'bg-green-50 text-green-700 border border-green-200'
                     : 'bg-amber-50 text-amber-700 border border-amber-200'
                 }`}
               >
@@ -297,35 +297,35 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
             </div>
           </div>
 
-          <p className="text-xs text-slate-500 leading-relaxed">
+          <p className="text-xs text-ink-soft leading-relaxed">
             Headless OpenWA daemon running in isolated Docker container. Used exclusively for scheduled Stage-1 reminders
             and regional announcements. Personal coordinator numbers never touch this server.
           </p>
 
           <form onSubmit={handleSendOfficial} className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
             <div>
-              <label className="block text-[11px] font-medium text-slate-600 mb-1">Target Phone (+20...)</label>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Target Phone (+20...)</label>
               <input
                 type="text"
                 placeholder="+2010XXXXXXXX"
                 value={officialPhone}
                 onChange={(e) => setOfficialPhone(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink-900"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-[11px] font-medium text-slate-600 mb-1">Official Message</label>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Official Message</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   placeholder="Official notification content..."
                   value={officialMsg}
                   onChange={(e) => setOfficialMsg(e.target.value)}
-                  className="flex-1 text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="flex-1 text-xs border border-rule rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink-900"
                 />
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800"
                 >
                   <Send className="w-3.5 h-3.5" />
                   Dispatch
@@ -334,38 +334,38 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
             </div>
           </form>
           {broadcastStatus && (
-            <p className="text-xs font-mono text-slate-600 pt-1">{broadcastStatus}</p>
+            <p className="text-xs font-mono text-ink-soft pt-1">{broadcastStatus}</p>
           )}
         </div>
       )}
 
       {/* Track 2: Zero-Trust Client-Side wa.me Link Generator (Requirement 5: Hidden from UI while code is preserved) */}
       {false && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <div className="bg-white rounded-lg border border-rule p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-emerald-600" />
-              <h2 className="text-sm font-semibold text-slate-900">
+              <Phone className="w-4 h-4 text-green-700" />
+              <h2 className="text-sm font-semibold text-ink-900">
                 Zero-Trust 1-Click Direct Follow-Up (wa.me)
               </h2>
             </div>
-            <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded">
+            <span className="text-[11px] font-medium text-ink-faint bg-paper-100 border border-ink-100 px-2 py-0.5 rounded">
               Client-Side Only
             </span>
           </div>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-soft">
             Clicking generate creates an instant direct link that opens your native WhatsApp client. No credentials, tokens,
             or chat histories are stored on the server.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-[11px] font-medium text-slate-600 mb-1">Target Member</label>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Target Member</label>
               <select
                 value={selectedStudentId}
                 onChange={(e) => setSelectedStudentId(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full text-xs border border-rule rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-ink-900"
               >
                 {students.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -377,7 +377,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                 const selectedStudent = students.find((s) => s.id === selectedStudentId);
                 if (!selectedStudent) return null;
                 return (
-                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-ink-soft bg-paper-100 px-2 py-1 rounded border border-ink-100">
                     {editingPhone ? (
                       <div className="flex items-center gap-1.5 w-full">
                         <input
@@ -385,12 +385,12 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                           value={newPhoneInput}
                           onChange={(e) => setNewPhoneInput(e.target.value)}
                           placeholder="+2010XXXXXXXX"
-                          className="text-[11px] px-1.5 py-0.5 border border-slate-300 rounded flex-1 focus:outline-none focus:ring-1 focus:ring-slate-900 font-mono"
+                          className="text-[11px] px-1.5 py-0.5 border border-paper-400 rounded flex-1 focus:outline-none focus:ring-1 focus:ring-ink-900 font-mono"
                         />
                         <button
                           type="button"
                           onClick={handleSavePhone}
-                          className="text-emerald-700 hover:text-emerald-800 font-semibold px-1"
+                          className="text-green-700 hover:text-green-800 font-semibold px-1"
                           title="Save Phone"
                         >
                           <Save className="w-3.5 h-3.5" />
@@ -398,7 +398,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                         <button
                           type="button"
                           onClick={() => setEditingPhone(false)}
-                          className="text-slate-400 hover:text-slate-600 px-1"
+                          className="text-ink-faint hover:text-ink-soft px-1"
                           title="Cancel"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -421,7 +421,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                               Edit Phone
                             </button>
                             {phoneSaveStatus && (
-                              <span className="text-[10px] text-emerald-600 ml-1">{phoneSaveStatus}</span>
+                              <span className="text-[10px] text-green-700 ml-1">{phoneSaveStatus}</span>
                             )}
                           </div>
                         )}
@@ -433,11 +433,11 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-slate-600 mb-1">Template Preset</label>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Template Preset</label>
               <select
                 value={templateType}
                 onChange={(e) => setTemplateType(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full text-xs border border-rule rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-ink-900"
               >
                 <option value="MEETING_REMINDER">Meeting Approaching Reminder (Social Media)</option>
                 <option value="TASK_DEADLINE_REMINDER">Task Deadline Approaching Reminder</option>
@@ -449,11 +449,11 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
 
             {(templateType === 'OVERDUE_TASK' || templateType === 'TASK_DEADLINE_REMINDER') && (
               <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-1">Select Task</label>
+                <label className="block text-[11px] font-medium text-ink-soft mb-1">Select Task</label>
                 <select
                   value={selectedTaskId}
                   onChange={(e) => setSelectedTaskId(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full text-xs border border-rule rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-ink-900"
                 >
                   {tasks.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -467,27 +467,27 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
 
           <button
             onClick={handleGenerateLink}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 shadow-sm"
           >
             <MessageSquare className="w-3.5 h-3.5" />
             Generate WhatsApp Link
           </button>
 
           {generatedLink !== null && (
-            <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-lg p-4 space-y-3 mt-3">
+            <div className="bg-green-50/50 border border-green-200/80 rounded-lg p-4 space-y-3 mt-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-900">Link Ready for Dispatch</span>
+                <span className="text-xs font-bold text-green-900">Link Ready for Dispatch</span>
                 <a
                   href={generatedLink!.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 transition-colors"
                 >
                   Open in WhatsApp
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
-              <div className="bg-white border border-slate-200 rounded p-3 text-xs text-slate-700 whitespace-pre-line font-sans">
+              <div className="bg-white border border-rule rounded p-3 text-xs text-ink-800 whitespace-pre-line font-sans">
                 {generatedLink!.text}
               </div>
             </div>
@@ -497,20 +497,20 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
 
       {/* 3-Day SLA Escalation Table */}
       {activeView === 'escalations' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="bg-white rounded-lg border border-rule shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-rule flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-amber-600" />
-              <h2 className="text-sm font-semibold text-slate-900">3-Day SLA Escalation Monitor</h2>
+              <h2 className="text-sm font-semibold text-ink-900">3-Day SLA Escalation Monitor</h2>
             </div>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink-soft">
               {escalations.length} Active Flag{escalations.length === 1 ? '' : 's'}
             </span>
           </div>
 
           {escalations.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-xs">
-              <UserCheck className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
+            <div className="py-12 text-center text-ink-faint text-xs">
+              <UserCheck className="w-8 h-8 mx-auto text-green-500 mb-2" />
               All committee member follow-ups are on schedule. No overdue SLA breaches.
             </div>
           ) : (
@@ -518,7 +518,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               {/* Desktop Table View (hidden on mobile) */}
               <div className="hidden md:block">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50/70 text-slate-500 font-semibold border-b border-slate-200">
+                  <thead className="bg-paper-100/70 text-ink-soft font-semibold border-b border-rule">
                     <tr>
                       <th className="py-3 px-4">Member</th>
                       <th className="py-3 px-4">Flag Reason</th>
@@ -527,35 +527,35 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                       <th className="py-3 px-4 text-right">Quick Follow-Up</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                  <tbody className="divide-y divide-rule text-ink-800">
                     {escalations.map((esc) => (
-                      <tr key={esc.id} className="hover:bg-slate-50/60 transition-colors">
+                      <tr key={esc.id} className="hover:bg-paper-100/60 transition-colors">
                         {/* Composite Member Identity */}
                         <td className="py-3 px-4">
                           <div className="flex flex-col">
-                            <span className="font-bold text-slate-900 font-['Cairo'] text-[13px]">
+                            <span className="font-bold text-ink-900 font-['Cairo'] text-[13px]">
                               {esc.arabic_name}
                             </span>
-                            <span className="text-[11px] text-slate-500">{esc.student_name}</span>
+                            <span className="text-[11px] text-ink-soft">{esc.student_name}</span>
                           </div>
                         </td>
 
                         {/* Reason */}
                         <td className="py-3 px-4">
-                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-paper-200 text-ink-800 border border-rule">
                             {esc.flagged_reason}
                           </span>
                         </td>
 
                         {/* Responsible HR */}
-                        <td className="py-3 px-4 text-slate-600 font-medium">{esc.hr_member_name}</td>
+                        <td className="py-3 px-4 text-ink-soft font-medium">{esc.hr_member_name}</td>
 
                         {/* Combined SLA Status & Days Open */}
                         <td className="py-3 px-4">
                           <div className="flex items-center space-x-2">
                             {esc.is_escalated ? (
-                              <span className="inline-flex items-center gap-1 text-rose-700 font-semibold text-[11px] bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
-                                <Flame className="w-3.5 h-3.5 text-rose-600" />
+                              <span className="inline-flex items-center gap-1 text-red-800 font-semibold text-[11px] bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                                <Flame className="w-3.5 h-3.5 text-red-700" />
                                 Escalated (3d+ Breach)
                               </span>
                             ) : (
@@ -564,7 +564,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                               </span>
                             )}
                             {esc.is_escalated && (
-                              <span className="font-mono text-slate-500 text-[11px]">{esc.days_open}d open</span>
+                              <span className="font-mono text-ink-soft text-[11px]">{esc.days_open}d open</span>
                             )}
                           </div>
                         </td>
@@ -575,7 +575,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                             onClick={() => {
                               setActiveView('chat');
                             }}
-                            className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-medium text-[11px] shadow-2xs transition-colors"
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-ink-900 hover:bg-ink-800 text-white font-medium text-[11px] shadow-2xs transition-colors"
                           >
                             <MessageSquare className="w-3 h-3" />
                             <span>Open Chat</span>
@@ -588,22 +588,22 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               </div>
 
               {/* Mobile Card Transform (Zero horizontal scroll!) */}
-              <div className="block md:hidden divide-y divide-slate-100">
+              <div className="block md:hidden divide-y divide-rule">
                 {escalations.map((esc) => (
-                  <div key={esc.id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
+                  <div key={esc.id} className="p-4 space-y-3 hover:bg-paper-100/50 transition-colors">
                     {/* Header */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-bold text-slate-900 text-sm font-['Cairo'] truncate">
+                        <div className="font-bold text-ink-900 text-sm font-['Cairo'] truncate">
                           {esc.arabic_name}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate">{esc.student_name}</div>
+                        <div className="text-[11px] text-ink-soft truncate">{esc.student_name}</div>
                       </div>
 
                       <div className="shrink-0">
                         {esc.is_escalated ? (
-                          <span className="inline-flex items-center gap-1 text-rose-700 font-bold text-[10px] bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
-                            <Flame className="w-3 h-3 text-rose-600" />
+                          <span className="inline-flex items-center gap-1 text-red-800 font-bold text-[10px] bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                            <Flame className="w-3 h-3 text-red-700" />
                             Escalated ({esc.days_open}d)
                           </span>
                         ) : (
@@ -615,25 +615,25 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                     </div>
 
                     {/* Metadata Strip */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 pt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-soft pt-1">
                       <div className="flex items-center space-x-1.5">
-                        <span className="text-[10px] text-slate-400 uppercase font-medium">Reason:</span>
-                        <span className="px-1.5 py-0.2 rounded font-mono text-[11px] bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="text-[10px] text-ink-faint uppercase font-medium">Reason:</span>
+                        <span className="px-1.5 py-0.2 rounded font-mono text-[11px] bg-paper-200 text-ink-800 border border-rule">
                           {esc.flagged_reason}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-500">
-                        Assigned to: <span className="font-medium text-slate-700">{esc.hr_member_name}</span>
+                      <div className="text-[11px] text-ink-soft">
+                        Assigned to: <span className="font-medium text-ink-800">{esc.hr_member_name}</span>
                       </div>
                     </div>
 
                     {/* Action */}
-                    <div className="pt-2 border-t border-slate-100">
+                    <div className="pt-2 border-t border-ink-100">
                       <button
                         onClick={() => {
                           setActiveView('chat');
                         }}
-                        className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-2xs transition-colors"
+                        className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg bg-ink-900 hover:bg-ink-800 text-white font-semibold text-xs shadow-2xs transition-colors"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
                         <span>Open WhatsApp Chat</span>
@@ -649,25 +649,25 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
 
       {/* Official WhatsApp SIM QR Pairing Modal */}
       {showQrModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg border border-rule shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-ink-100 pb-3">
               <div className="flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">Pair Official Organization SIM</h3>
+                <h3 className="text-sm font-bold text-ink-900">Pair Official Organization SIM</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-ink-faint hover:text-ink-soft"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="text-xs text-slate-600 space-y-2">
-              <p className="font-medium text-slate-900">How to link the official organization phone number:</p>
-              <ol className="list-decimal list-inside space-y-1 text-slate-500 pl-1">
+            <div className="text-xs text-ink-soft space-y-2">
+              <p className="font-medium text-ink-900">How to link the official organization phone number:</p>
+              <ol className="list-decimal list-inside space-y-1 text-ink-soft pl-1">
                 <li>Open WhatsApp on the official organization phone</li>
                 <li>Go to <strong>Settings</strong> &gt; <strong>Linked Devices</strong></li>
                 <li>Tap <strong>Link a Device</strong></li>
@@ -675,15 +675,15 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               </ol>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 flex flex-col items-center justify-center min-h-[220px]">
+            <div className="bg-paper-100 border border-rule rounded-lg p-6 flex flex-col items-center justify-center min-h-[220px]">
               {loadingQr ? (
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-xs text-ink-soft">
                   <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
                   Generating secure pairing QR...
                 </div>
               ) : qrPayload?.qr ? (
                 qrPayload.qr.startsWith('data:image') || qrPayload.qr.startsWith('http') ? (
-                  <img src={qrPayload.qr} alt="WhatsApp QR Code" className="w-52 h-52 rounded border border-slate-200" />
+                  <img src={qrPayload.qr} alt="WhatsApp QR Code" className="w-52 h-52 rounded border border-rule" />
                 ) : (
                   <pre className="font-mono text-[9px] leading-none bg-white p-2 border rounded max-w-full overflow-auto">
                     {qrPayload.qr}
@@ -692,13 +692,13 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               ) : (
                 <div className="text-center space-y-2">
                   <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
-                  <p className="text-xs text-slate-700 font-semibold">
+                  <p className="text-xs text-ink-800 font-semibold">
                     {qrPayload?.message || 'OpenWA Container Offline'}
                   </p>
-                  <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
+                  <p className="text-[11px] text-ink-soft max-w-xs leading-relaxed">
                     Start the OpenWA Docker daemon to display the live pairing QR code:
                     <br />
-                    <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-800 text-[10px] mt-1.5 inline-block font-mono">
+                    <code className="bg-ink-200 px-1.5 py-0.5 rounded text-ink-800 text-[10px] mt-1.5 inline-block font-mono">
                       docker compose up -d openwa
                     </code>
                   </p>
@@ -710,7 +710,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               <button
                 type="button"
                 onClick={handleFetchQr}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1"
+                className="px-3 py-1.5 rounded-lg border border-rule bg-white text-xs font-medium text-ink-800 hover:bg-paper-100 flex items-center gap-1"
               >
                 <RefreshCw className="w-3 h-3" />
                 Refresh QR
@@ -721,7 +721,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                   setShowQrModal(false);
                   loadData();
                 }}
-                className="px-4 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+                className="px-4 py-1.5 rounded-lg bg-ink-900 text-white text-xs font-semibold hover:bg-ink-800"
               >
                 Done
               </button>

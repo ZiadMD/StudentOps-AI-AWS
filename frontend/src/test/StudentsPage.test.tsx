@@ -55,7 +55,7 @@ describe('StudentsPage & Add Member Modal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Member Registry')).toBeInTheDocument();
+      expect(screen.getByText('Member registry')).toBeInTheDocument();
       expect(screen.getAllByText('زياد محمد').length).toBeGreaterThan(0);
     });
 
@@ -71,7 +71,7 @@ describe('StudentsPage & Add Member Modal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Member Registry')).toBeInTheDocument();
+      expect(screen.getByText('Member registry')).toBeInTheDocument();
     });
 
     const addBtn = screen.getByRole('button', { name: /add member/i });
@@ -106,7 +106,7 @@ describe('StudentsPage & Add Member Modal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Member Registry')).toBeInTheDocument();
+      expect(screen.getByText('Member registry')).toBeInTheDocument();
     });
 
     // Open modal
