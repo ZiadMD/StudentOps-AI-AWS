@@ -386,7 +386,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
                 <p className="text-slate-500 text-sm">No members match your search.</p>
                 <button
                   onClick={() => { setSearch(''); setStatusFilter('all'); }}
-                  className="text-blue-600 text-xs hover:underline font-medium"
+                  className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                 >
                   Clear filters
                 </button>

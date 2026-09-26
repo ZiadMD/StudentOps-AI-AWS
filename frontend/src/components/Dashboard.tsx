@@ -461,9 +461,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </span>
               <button 
                 onClick={() => onNavigateToTab('attendance')} 
-                className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                className="inline-flex min-h-9 shrink-0 items-center rounded px-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
               >
-                View Roster <ChevronRight className="w-3 h-3 ml-0.5" />
+                View Roster <ChevronRight aria-hidden="true" className="ml-0.5 h-3 w-3" />
               </button>
             </div>
 
@@ -556,9 +556,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </span>
               <button 
                 onClick={() => onNavigateToTab('calendar')} 
-                className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                className="inline-flex min-h-9 shrink-0 items-center rounded px-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
               >
-                Full Calendar <ChevronRight className="w-3 h-3 ml-0.5" />
+                Full Calendar <ChevronRight aria-hidden="true" className="ml-0.5 h-3 w-3" />
               </button>
             </div>
 
@@ -632,9 +632,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </span>
                 <button
                   onClick={() => onNavigateToTab('notifications')}
-                  className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                  className="inline-flex min-h-9 shrink-0 items-center rounded px-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
                 >
-                  {t('viewAll')} <ChevronRight className="w-3 h-3 ml-0.5 rtl:ml-0 rtl:mr-0.5" />
+                  {t('viewAll')} <ChevronRight aria-hidden="true" className="ml-0.5 h-3 w-3" />
                 </button>
               </div>
 
@@ -682,9 +682,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </span>
                 <button
                   onClick={() => onNavigateToTab('scoreboard')}
-                  className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center font-medium transition-colors"
+                  className="inline-flex min-h-9 shrink-0 items-center rounded px-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
                 >
-                  {t('viewAll')} <ChevronRight className="w-3 h-3 ml-0.5 rtl:ml-0 rtl:mr-0.5" />
+                  {t('viewAll')} <ChevronRight aria-hidden="true" className="ml-0.5 h-3 w-3" />
                 </button>
               </div>
 

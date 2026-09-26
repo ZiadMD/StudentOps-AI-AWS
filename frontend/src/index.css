@@ -144,8 +144,18 @@
     font-size: 16px !important;
   }
 
-  .workspace-page :where(button, [role='button'], select, a[data-action]) {
+  /*
+   * 44px is the smallest reliably tappable target on a phone. Buttons that
+   * only contain an icon also need the width, or they are hard to hit.
+   * `min-height` does not break inline layout inside tables or prose, so it
+   * is safe to apply broadly within a workspace page.
+   */
+  .workspace-page :where(button, [role='button'], select, summary) {
     min-height: 2.75rem;
+  }
+
+  .workspace-page :where(button, a):has(> svg:only-child) {
+    min-width: 2.75rem;
   }
 
   [role='dialog'] {

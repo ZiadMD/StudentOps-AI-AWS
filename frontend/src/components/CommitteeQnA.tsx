@@ -127,31 +127,31 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
               placeholder={t('searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 rtl:pl-3 rtl:pr-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-blue-500 focus:bg-white w-48 transition-all"
+              className="h-11 w-full min-w-0 rounded-md border border-slate-200 bg-slate-50 pl-8 pr-3 text-base transition-colors placeholder:text-slate-400 focus:border-brand-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-600/20 rtl:pl-3 rtl:pr-8 sm:w-48 sm:text-[13px]"
             />
           </div>
 
-          <div className="flex items-center border border-slate-200 rounded-md bg-white p-0.5 text-xs">
+          <div className="flex w-full flex-wrap items-center gap-1 rounded-md border border-slate-200 bg-white p-1 text-xs sm:w-auto">
             <button
               onClick={() => setStatusFilter('ALL')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                statusFilter === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+              className={`min-h-9 flex-1 rounded px-2.5 py-1.5 font-medium transition-colors sm:flex-none ${
+                statusFilter === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               {t('all')}
             </button>
             <button
               onClick={() => setStatusFilter('OPEN')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                statusFilter === 'OPEN' ? 'bg-amber-100 text-amber-800' : 'text-slate-600 hover:text-slate-900'
+              className={`min-h-9 flex-1 rounded px-2.5 py-1.5 font-medium transition-colors sm:flex-none ${
+                statusFilter === 'OPEN' ? 'bg-amber-100 text-amber-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               {t('open')}
             </button>
             <button
               onClick={() => setStatusFilter('ANSWERED')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                statusFilter === 'ANSWERED' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-600 hover:text-slate-900'
+              className={`min-h-9 flex-1 rounded px-2.5 py-1.5 font-medium transition-colors sm:flex-none ${
+                statusFilter === 'ANSWERED' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               {t('answered')}

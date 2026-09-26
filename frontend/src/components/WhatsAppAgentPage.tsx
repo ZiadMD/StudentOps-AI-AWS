@@ -200,34 +200,37 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
         </button>
       </div>
 
-      {/* Sub-Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+      {/* Sub-Navigation Tabs. Wraps on narrow screens so the third tab is
+          still reachable at 320px without horizontal page scroll. */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
         <button
           type="button"
           onClick={() => setActiveView('chat')}
-          className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+          aria-current={activeView === 'chat' ? 'page' : undefined}
+          className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
             activeView === 'chat'
               ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
           }`}
         >
-          <MessageSquare className="w-3.5 h-3.5" />
-          Chat Window
+          <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
+          Chat window
         </button>
 
         <button
           type="button"
           onClick={() => setActiveView('escalations')}
-          className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+          aria-current={activeView === 'escalations' ? 'page' : undefined}
+          className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
             activeView === 'escalations'
               ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
           }`}
         >
-          <Flame className="w-3.5 h-3.5" />
-          SLA Escalations
+          <Flame aria-hidden="true" className="h-3.5 w-3.5" />
+          SLA escalations
           {escalations.filter((e) => e.is_escalated).length > 0 && (
-            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full">
+            <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
               {escalations.filter((e) => e.is_escalated).length}
             </span>
           )}
@@ -237,14 +240,15 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
           <button
             type="button"
             onClick={() => setActiveView('official')}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+            aria-current={activeView === 'official' ? 'page' : undefined}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
               activeView === 'official'
                 ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <Shield className="w-3.5 h-3.5" />
-            Official SIM & Daemon
+            <Shield aria-hidden="true" className="h-3.5 w-3.5" />
+            Official channel
           </button>
         )}
       </div>

@@ -445,13 +445,14 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 <button
                   type="button"
                   onClick={() => setOversightMode(!oversightMode)}
-                  className={`text-[11px] font-semibold px-2 py-0.5 rounded transition-colors ${
+                  aria-pressed={oversightMode}
+                  className={`min-h-9 shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                     oversightMode
-                      ? 'bg-purple-100 text-purple-800'
+                      ? 'bg-violet-100 text-violet-800'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
-                  {oversightMode ? 'Switch to My Assigned' : 'View Committee Oversight'}
+                  {oversightMode ? 'Switch to my assigned' : 'View committee oversight'}
                 </button>
               </div>
             )}
