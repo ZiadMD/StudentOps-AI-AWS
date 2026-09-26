@@ -2,38 +2,43 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
+/*
+ * Status tags.
+ *
+ * Tinted background plus matching text, which clears WCAG AA at small sizes.
+ * These are the only place saturated colour is used, so a tag always carries
+ * meaning rather than decorating.
+ *
+ * `success` and `danger` are kept as aliases of `compliant` and `critical`
+ * because those are the names the attendance policy uses for the 70% and 50%
+ * thresholds, and the two vocabularies should not drift apart.
+ */
 const badgeVariants = cva(
-  "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 gap-1 select-none",
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-2xs font-semibold " +
+  "tracking-[0.01em] transition-colors",
   {
     variants: {
       variant: {
-        neutral: "bg-slate-100 text-slate-700 border border-slate-200",
-        success: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-        warning: "bg-amber-50 text-amber-800 border border-amber-200",
-        danger: "bg-rose-50 text-rose-700 border border-rose-200",
-        info: "bg-blue-50 text-blue-700 border border-blue-200",
-        purple: "bg-purple-50 text-purple-700 border border-purple-200",
-        outline: "text-slate-600 border border-slate-200 bg-white",
+        neutral: "bg-paper-200 text-ink-700",
+        success: "bg-green-50 text-green-800",
+        compliant: "bg-green-50 text-green-800",
+        warning: "bg-amber-50 text-amber-800",
+        danger: "bg-red-50 text-red-800",
+        critical: "bg-red-50 text-red-800",
+        info: "bg-indigo-50 text-indigo-800",
+        violet: "bg-violet-50 text-violet-800",
+        purple: "bg-violet-50 text-violet-800",
+        outline: "border border-rule bg-transparent text-ink-600",
       },
-      size: {
-        sm: "text-[10px] px-1.5 py-0.2",
-        md: "text-[11px] px-2 py-0.5",
-        lg: "text-xs px-2.5 py-1",
-      }
     },
-    defaultVariants: {
-      variant: "neutral",
-      size: "md",
-    },
-  }
+    defaultVariants: { variant: "neutral" },
+  },
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
-export function Badge({ className, variant, size, ...props }: BadgeProps) {
-  return (
-    <div className={cn(badgeVariants({ variant, size }), className)} {...props} />
-  );
+export function Badge({ className, variant, ...props }: BadgeProps) {
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }

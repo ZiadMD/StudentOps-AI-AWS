@@ -288,11 +288,11 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
                       {/* Rating Tier */}
                       <td className="px-5 py-3.5 whitespace-nowrap text-center">
                         {student.overall_rating === 'Outstanding' ? (
-                          <Badge variant="success" size="sm">Outstanding</Badge>
+                          <Badge variant="success">Outstanding</Badge>
                         ) : student.overall_rating === 'Good' ? (
-                          <Badge variant="info" size="sm">Good</Badge>
+                          <Badge variant="info">Good</Badge>
                         ) : (
-                          <Badge variant="warning" size="sm">Needs Review</Badge>
+                          <Badge variant="warning">Needs Review</Badge>
                         )}
                       </td>
 
@@ -361,11 +361,11 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
 
                     <div className="shrink-0">
                       {student.overall_rating === 'Outstanding' ? (
-                        <Badge variant="success" size="sm">Outstanding</Badge>
+                        <Badge variant="success">Outstanding</Badge>
                       ) : student.overall_rating === 'Good' ? (
-                        <Badge variant="info" size="sm">Good</Badge>
+                        <Badge variant="info">Good</Badge>
                       ) : (
-                        <Badge variant="warning" size="sm">Needs Review</Badge>
+                        <Badge variant="warning">Needs Review</Badge>
                       )}
                     </div>
                   </div>

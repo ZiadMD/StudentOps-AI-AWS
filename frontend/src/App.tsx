@@ -158,7 +158,7 @@ function AppContent() {
   if (!currentUser) return null;
 
   return (
-    <div className="flex min-h-dvh bg-slate-50">
+    <div className="flex min-h-dvh bg-paper">
       <a href="#workspace-content" className="skip-link">Skip to content</a>
 
       <Sidebar
@@ -191,7 +191,7 @@ function AppContent() {
               : 'px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-10'
           }`}
         >
-          <div className={`mx-auto w-full min-w-0 ${activeTab === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'max-w-6xl'}`}>
+          <div className={`mx-auto w-full min-w-0 ${activeTab === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'max-w-[84rem]'}`}>
             {activeTab === 'dashboard' && (
               <Dashboard
                 currentUser={currentUser}

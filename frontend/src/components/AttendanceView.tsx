@@ -285,10 +285,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                               href={m.meet_url}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold text-xs transition-colors"
+                              aria-label={`Join the meeting: ${m.title}`}
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-800"
                             >
                               <span>Join</span>
-                              <ArrowUpRight className="w-3.5 h-3.5" />
+                              <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
                             </a>
                           ) : (
                             <span className="text-slate-400 text-xs italic">Ended</span>
@@ -365,10 +366,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ currentUser }) =
                           href={m.meet_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-2xs transition-colors"
+                          aria-label={`Join the meeting: ${m.title}`}
+                          className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-ink-900 px-3 py-2 text-xs font-medium text-paper-50 transition-colors hover:bg-ink-800"
                         >
-                          <span>Join Meet</span>
-                          <ArrowUpRight className="w-3.5 h-3.5" />
+                          <span>Join meeting</span>
+                          <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
                         </a>
                       ) : (
                         <span className="text-xs text-slate-400 italic">Session Concluded</span>

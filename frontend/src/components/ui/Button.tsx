@@ -1,32 +1,44 @@
-import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "../../lib/utils";
+import * as React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '../../lib/utils';
 
+/*
+ * Buttons.
+ *
+ * The primary is ink-on-paper rather than a saturated brand fill, which keeps
+ * the interface calm and lets colour stay meaningful (state, not decoration).
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-xs font-semibold ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] select-none cursor-pointer",
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ' +
+  'transition-[background-color,border-color,color,box-shadow,transform] duration-150 ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 ' +
+  'focus-visible:ring-offset-paper ' +
+  'active:translate-y-px disabled:pointer-events-none disabled:opacity-45',
   {
     variants: {
       variant: {
-        primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-xs border border-blue-700/20",
-        secondary: "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs hover:border-slate-300",
-        outline: "border border-slate-200 bg-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-900",
-        ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-        danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-xs border border-rose-700/20",
-        success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs border border-emerald-700/20",
-        subtle: "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60",
+        // Ink fill. One per view is enough.
+        primary: 'bg-ink-900 text-paper-50 hover:bg-ink-800 shadow-xs',
+        // Paper surface with a hairline. The default for most actions.
+        secondary: 'bg-paper-50 text-ink-800 border border-rule hover:bg-paper-100 hover:border-paper-400',
+        // Text only, for tertiary actions inside a row.
+        ghost: 'text-ink-700 hover:bg-paper-200/70 hover:text-ink-900',
+        // A tinted action for a positive, non-default path.
+        positive: 'bg-green-700 text-paper-50 hover:bg-green-800 shadow-xs',
+        danger: 'bg-red-700 text-paper-50 hover:bg-red-800 shadow-xs',
+        // Destructive-looking but secondary weight.
+        dangerGhost: 'text-red-700 hover:bg-red-50',
       },
       size: {
-        sm: "h-8 px-2.5 text-xs gap-1.5",
-        md: "h-9 px-3.5 text-xs gap-2",
-        lg: "h-11 px-5 text-sm gap-2.5",
-        icon: "h-8 w-8",
+        sm: 'min-h-9 px-2.5 text-xs gap-1.5',
+        md: 'min-h-10 px-3.5 gap-2',
+        lg: 'min-h-12 px-5 text-sm',
+        icon: 'h-10 w-10 min-h-10',
+        iconSm: 'h-9 w-9 min-h-9',
       },
     },
-    defaultVariants: {
-      variant: "secondary",
-      size: "md",
-    },
-  }
+    defaultVariants: { variant: 'secondary', size: 'md' },
+  },
 );
 
 export interface ButtonProps
@@ -36,39 +48,42 @@ export interface ButtonProps
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, loading, children, disabled, ...props }, ref) => {
-    return (
-      <button
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        disabled={disabled || loading}
-        {...props}
-      >
-        {loading && (
-          <svg
-            className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-current"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-        )}
-        {children}
-      </button>
-    );
-  }
+  ({ className, variant, size, loading, children, disabled, ...props }, ref) => (
+    <button
+      ref={ref}
+      className={cn(buttonVariants({ variant, size }), className)}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading && (
+        <svg className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      )}
+      {children}
+    </button>
+  ),
 );
-Button.displayName = "Button";
+Button.displayName = 'Button';
+
+/** A text action that reads as an inline link, with a real 44px phone target. */
+export const TextButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, children, ...props }, ref) => (
+  <button
+    ref={ref}
+    className={cn(
+      'inline-flex min-h-9 items-center gap-1 rounded px-1.5 text-xs font-medium text-indigo-700',
+      'transition-colors hover:bg-indigo-50 hover:text-indigo-800',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+      className,
+    )}
+    {...props}
+  >
+    {children}
+  </button>
+));
+TextButton.displayName = 'TextButton';

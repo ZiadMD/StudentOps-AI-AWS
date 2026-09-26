@@ -79,10 +79,10 @@ export function WorkspaceHeader({
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white/95 px-3 backdrop-blur sm:px-5">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-rule bg-paper/90 px-3 backdrop-blur sm:px-5">
       <button
         type="button" onClick={onOpenNavigation}
-        className="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden"
+        className="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-700 hover:bg-paper-200 lg:hidden"
         aria-label="Open navigation"
         aria-controls="app-sidebar"
         aria-expanded={isNavigationOpen}
@@ -99,7 +99,7 @@ export function WorkspaceHeader({
       >
         <Search
           aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-1/2 hidden h-4 w-4 -translate-y-1/2 text-slate-400 sm:block"
+          className="pointer-events-none absolute left-3 top-1/2 hidden h-4 w-4 -translate-y-1/2 text-ink-faint sm:block"
         />
         <input
           ref={inputRef}
@@ -114,7 +114,7 @@ export function WorkspaceHeader({
           aria-activedescendant={open && active ? `${id}-option-${active.id}` : undefined}
           autoComplete="off"
           value={query}
-          className="h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 pl-3 pr-3 text-base text-slate-900 placeholder:text-slate-500 focus:border-brand-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-600/20 sm:pl-9 sm:text-sm"
+          className="h-10 w-full min-w-0 rounded-md border border-rule bg-paper-200/60 pl-3 pr-3 text-base text-ink-900 placeholder:text-ink-faint focus:border-indigo-600 focus:bg-paper-50 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 sm:pl-9 sm:text-sm"
           onFocus={() => { setOpen(true); setActiveIndex(-1); }}
           onChange={event => { setQuery(event.target.value); setOpen(true); setActiveIndex(-1); }}
           onKeyDown={event => {
@@ -136,7 +136,7 @@ export function WorkspaceHeader({
         />
 
         {open && (
-          <div className="absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div className="absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-lg border border-rule bg-paper-50 shadow-overlay">
             <ul id={`${id}-results`} role="listbox" aria-label="Pages" className="max-h-72 overflow-y-auto p-1">
               {results.map((item, index) => (
                 <li key={item.id} role="presentation">
@@ -144,20 +144,20 @@ export function WorkspaceHeader({
                     type="button" role="option" tabIndex={-1}
                     id={`${id}-option-${item.id}`}
                     aria-selected={index === activeIndex}
-                    className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm text-slate-700 ${
-                      index === activeIndex ? 'bg-slate-100 text-slate-900' : 'hover:bg-slate-50'
+                    className={`flex min-h-11 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm text-ink-700 ${
+                      index === activeIndex ? 'bg-paper-200 text-ink-900' : 'hover:bg-paper-100'
                     }`}
                     onMouseDown={event => event.preventDefault()}
                     onClick={() => go(item.id)}
                   >
-                    <item.icon aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
+                    <item.icon aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-faint" />
                     {item.label}
                   </button>
                 </li>
               ))}
             </ul>
             {results.length === 0 && (
-              <p role="status" className="px-3 py-3 text-sm text-slate-500">No matching pages.</p>
+              <p role="status" className="px-3 py-3 text-sm text-ink-soft">No matching pages.</p>
             )}
           </div>
         )}
@@ -166,7 +166,7 @@ export function WorkspaceHeader({
       {canAccessTab(role, 'notifications') && (
         <button
           type="button" onClick={() => onNavigate('notifications')}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-700 hover:bg-paper-200"
           aria-label={t('reminders', 'Reminders')}
           title={t('reminders', 'Reminders')}
         >

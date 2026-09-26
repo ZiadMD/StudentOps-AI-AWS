@@ -1,43 +1,40 @@
-import * as React from "react";
-import { cn } from "../../lib/utils";
+import * as React from 'react';
+import { cn } from '../../lib/utils';
 
+/*
+ * Data table.
+ *
+ * Rules rather than boxes: a single hairline under the header and between
+ * sections, no outer frame and no filled header row. Reads like a printed
+ * ledger, which suits records a committee will actually read closely.
+ */
 export const Table = React.forwardRef<
   HTMLTableElement,
   React.TableHTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto rounded-xl border border-slate-200/90 bg-white">
-    <table
-      ref={ref}
-      className={cn("w-full caption-bottom text-sm text-left border-collapse", className)}
-      {...props}
-    />
-  </div>
+  <table
+    ref={ref}
+    className={cn('w-full border-collapse text-left text-sm text-ink-800', className)}
+    {...props}
+  />
 ));
-Table.displayName = "Table";
+Table.displayName = 'Table';
 
 export const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead
-    ref={ref}
-    className={cn("bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider", className)}
-    {...props}
-  />
+  <thead ref={ref} className={cn('border-b border-ink-900/15', className)} {...props} />
 ));
-TableHeader.displayName = "TableHeader";
+TableHeader.displayName = 'TableHeader';
 
 export const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <tbody
-    ref={ref}
-    className={cn("divide-y divide-slate-100 bg-white", className)}
-    {...props}
-  />
+  <tbody ref={ref} className={cn('divide-y divide-rule', className)} {...props} />
 ));
-TableBody.displayName = "TableBody";
+TableBody.displayName = 'TableBody';
 
 export const TableRow = React.forwardRef<
   HTMLTableRowElement,
@@ -45,14 +42,11 @@ export const TableRow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}
-    className={cn(
-      "transition-colors hover:bg-slate-50/75 data-[state=selected]:bg-slate-100",
-      className
-    )}
+    className={cn('transition-colors hover:bg-paper-200/50', className)}
     {...props}
   />
 ));
-TableRow.displayName = "TableRow";
+TableRow.displayName = 'TableRow';
 
 export const TableHead = React.forwardRef<
   HTMLTableCellElement,
@@ -60,14 +54,15 @@ export const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
+    scope="col"
     className={cn(
-      "px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider align-middle",
-      className
+      'eyebrow px-3 py-2.5 align-middle first:pl-0 last:pr-0',
+      className,
     )}
     {...props}
   />
 ));
-TableHead.displayName = "TableHead";
+TableHead.displayName = 'TableHead';
 
 export const TableCell = React.forwardRef<
   HTMLTableCellElement,
@@ -75,11 +70,11 @@ export const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("px-4 py-3 text-sm text-slate-700 align-middle", className)}
+    className={cn('px-3 py-3 align-middle first:pl-0 last:pr-0', className)}
     {...props}
   />
 ));
-TableCell.displayName = "TableCell";
+TableCell.displayName = 'TableCell';
 
 export const TableCaption = React.forwardRef<
   HTMLTableCaptionElement,
@@ -87,8 +82,8 @@ export const TableCaption = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <caption
     ref={ref}
-    className={cn("mt-4 text-xs text-slate-400 text-center", className)}
+    className={cn('mt-4 text-xs text-ink-faint', className)}
     {...props}
   />
 ));
-TableCaption.displayName = "TableCaption";
+TableCaption.displayName = 'TableCaption';

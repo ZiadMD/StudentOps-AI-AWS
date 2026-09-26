@@ -1,28 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Users, 
-  UserCheck, 
-  Clock, 
-  Calendar, 
-  Bot, 
-  Award, 
-  Video, 
-  ChevronRight, 
-  ArrowRight,
-  ExternalLink,
-  CheckSquare,
-  Activity,
-  AlertCircle,
-  HelpCircle,
-  Bell,
-  MessageSquare
+import {
+  UserCheck, Clock, Calendar, Bot, Award, Video,
+  ChevronRight, ArrowRight, CheckSquare, Bell, HelpCircle, AlertCircle,
 } from 'lucide-react';
 import { api } from '../api/client';
-import { DashboardStats, MeetingDetail, StudentScoreSummary, EventItem, UserProfile, ReminderItem } from '../types';
-import { ProgressBar } from './ui/ProgressBar';
+import type {
+  DashboardStats, MeetingDetail, StudentScoreSummary, EventItem, UserProfile, ReminderItem,
+} from '../types';
 import { Badge } from './ui/Badge';
+import { Button, TextButton } from './ui/Button';
+import { EmptyState } from './ui/EmptyState';
+import { PageHeader } from './ui/PageHeader';
 import { type Tab } from './navigation';
-import { useLanguage } from '../context/LanguageContext';
 
 interface DashboardProps {
   currentUser?: UserProfile | null;
@@ -76,14 +65,6 @@ function formatRelativeEventTime(dateStr: string): string {
   }
 }
 
-function getRatingBadgeVariant(rating: string): 'success' | 'info' | 'warning' | 'neutral' {
-  const normalized = rating.toLowerCase();
-  if (normalized.includes('outstanding') || normalized.includes('ممتاز')) return 'success';
-  if (normalized.includes('good') || normalized.includes('جيد')) return 'info';
-  if (normalized.includes('review') || normalized.includes('مراجعة')) return 'warning';
-  return 'neutral';
-}
-
 function getMeetingStatusBadge(status: string): { label: string; variant: 'success' | 'info' | 'warning' | 'danger' | 'neutral' } {
   const norm = (status || '').toUpperCase();
   if (norm === 'COMPLETED' || norm === 'PROCESSED') {
@@ -103,7 +84,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToTab, 
   onSendChatQuery 
 }) => {
-  const { t } = useLanguage();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [meetings, setMeetings] = useState<MeetingDetail[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -234,548 +214,339 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ];
   };
 
+
+  // ── Derived views ──────────────────────────────────────────────────────
+  const latestMeeting = meetings[0] || null;
+  const nextEvent =
+    events.find(e => new Date(e.start_time).getTime() >= Date.now() - 3600000)
+    || events[0] || null;
+  const topStudents = scoreboard.slice(0, 4);
+  const contextualPrompts = getContextualPrompts();
+
+  // ── Loading: mimic the real hierarchy so the page does not jump ──────────
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        {/* Skeleton Header */}
-        <div className="pb-6 border-b border-slate-200/80 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="space-y-2">
-            <div className="h-5 w-36 bg-slate-200 rounded" />
-            <div className="h-7 w-64 bg-slate-200 rounded" />
-            <div className="h-4 w-96 bg-slate-100 rounded" />
-          </div>
-          <div className="h-9 w-32 bg-slate-200 rounded" />
+      <div className="workspace-page min-w-0 space-y-8" role="status" aria-label="Loading overview">
+        <div className="border-b border-ink-900/15 pb-5">
+          <div className="h-3 w-28 animate-pulse rounded bg-paper-300" />
+          <div className="mt-3 h-9 w-72 max-w-full animate-pulse rounded bg-paper-300" />
+          <div className="mt-3 h-4 w-full max-w-xl animate-pulse rounded bg-paper-200" />
         </div>
-
-        {/* Skeleton Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-28 bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-              <div className="h-4 w-24 bg-slate-100 rounded" />
-              <div className="h-6 w-16 bg-slate-200 rounded" />
-              <div className="h-3 w-32 bg-slate-100 rounded" />
+        <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="animate-pulse">
+              <div className="h-10 w-16 rounded bg-paper-300" />
+              <div className="mt-2 h-3 w-28 rounded bg-paper-200" />
             </div>
           ))}
         </div>
-
-        {/* Skeleton Content Split */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-64 bg-white border border-slate-200 rounded-xl" />
-          <div className="h-64 bg-white border border-slate-200 rounded-xl" />
+        <div className="grid gap-8 lg:grid-cols-5">
+          <div className="h-64 animate-pulse rounded-lg border border-rule bg-paper-100 lg:col-span-3" />
+          <div className="h-64 animate-pulse rounded-lg border border-rule bg-paper-100 lg:col-span-2" />
         </div>
       </div>
     );
   }
 
-  const latestMeeting = meetings[0] || null;
-  const nextEvent = events.find(e => new Date(e.start_time).getTime() >= Date.now() - 3600000) || events[0] || null;
-  const topStudents = scoreboard.slice(0, 4);
-  const contextualPrompts = getContextualPrompts();
-
-  // Date formatting
   const todayFormatted = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
+    weekday: 'long', month: 'long', day: 'numeric',
   });
 
+  // Attendance is the one number that genuinely carries a threshold, so it is
+  // toned by the real policy state rather than left neutral.
+  const attendanceRate = stats?.attendance_rate_today ?? 0;
+  const attendanceTone =
+    attendanceRate >= 70 ? 'compliant' : attendanceRate >= 50 ? 'atRisk' : 'critical';
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Authentic Domain Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-200/80">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold border border-slate-200">
-              {roleInfo.en}
-            </span>
-            {currentUser?.arabic_name && (
-              <span className="px-2 py-0.5 rounded-md bg-slate-50 text-slate-600 text-[11px] font-['Cairo'] border border-slate-200/80">
-                {roleInfo.ar}
-              </span>
-            )}
-            <span className="text-[11px] font-medium text-slate-400">
-              {todayFormatted}
-            </span>
-          </div>
-
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Operations overview
-          </h1>
-          {currentUser?.arabic_name && (
-            <p
-              lang="ar"
-              dir="rtl"
-              className="mt-1 font-arabic text-base text-slate-500"
-            >
-              {currentUser.arabic_name}
-            </p>
-          )}
-          
-          <p className="text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-            {currentUser?.team_name 
-              ? `Operational metrics for ${currentUser.team_name}. Attendance rosters, active task reviews, and cohort schedule.`
-              : 'Cohort-wide attendance rosters, evaluation standings, and operational task tracking.'}
-          </p>
-        </div>
-        
-        <div className="flex shrink-0 items-center">
-          <button 
-            onClick={() => onNavigateToTab('chat')}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-          >
+    <div className="workspace-page min-w-0 space-y-10">
+      {/* ── Masthead ─────────────────────────────────────────────────── */}
+      <PageHeader
+        eyebrow={
+          <>
+            {roleInfo.en}
+            {currentUser?.team_name ? ` · ${currentUser.team_name}` : ''}
+          </>
+        }
+        title="Operations overview"
+        description={
+          currentUser?.team_name
+            ? 'Attendance, assignments and evaluations for this committee, drawn from the same records the committee maintains.'
+            : 'Attendance, assignments and evaluations across the organization.'
+        }
+        meta={<><span>{todayFormatted}</span><span>Committee records</span></>}
+        actions={
+          <Button variant="primary" onClick={() => onSendChatQuery('')}>
             <Bot aria-hidden="true" className="h-4 w-4" />
-            <span>Open assistant</span>
-          </button>
-        </div>
-      </div>
+            Ask the assistant
+          </Button>
+        }
+      />
 
-      {/* Honest Operational Metrics Bar (Grounded ground truth, no fake deltas) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Total Enrolled */}
-        <button
-          onClick={() => onNavigateToTab('students')}
-          className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              {currentUser?.team_name ? 'Committee Members' : 'Total Members'}
-            </span>
-            <Users className="w-4 h-4 text-blue-600 opacity-80 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">
-              {stats?.total_students || 0}
-            </span>
-            <span className="text-[11px] text-slate-500 mt-1 font-medium flex items-center">
-              <span>{currentUser?.team_name ? `Enrolled in ${currentUser.team_name}` : 'Active in registry'}</span>
-              <ChevronRight className="w-3 h-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />
-            </span>
-          </div>
-        </button>
+      {currentUser?.arabic_name && (
+        <p lang="ar" dir="rtl" className="-mt-6 font-arabic text-base text-ink-faint">
+          {currentUser.arabic_name}
+        </p>
+      )}
 
-        {/* Metric 2: Today's Attendance */}
-        <button
-          onClick={() => onNavigateToTab('attendance')}
-          className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Today's Attendance
-            </span>
-            <UserCheck className="w-4 h-4 text-emerald-600 opacity-80 group-hover:opacity-100 transition-opacity" />
+      {/* ── Figures ──────────────────────────────────────────────────────
+          A ruled band of real counts. No icons in tinted squares, and no
+          trend chips: there is no historical baseline to compute one from. */}
+      <section aria-label="Key figures" className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">
+        <figure className="border-t border-rule pt-4">
+          <div className="figure text-4xl text-ink-900 sm:text-5xl">
+            {stats?.total_students ?? 0}
           </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">
-              {stats?.attendance_rate_today ?? 0}%
-            </span>
-            <span className="text-[11px] text-slate-500 mt-1 font-medium">
-              <span className="text-emerald-700 font-semibold">{stats?.present_today || 0}</span> Present ·{' '}
-              <span className="text-amber-700 font-semibold">{stats?.late_today || 0}</span> Late ·{' '}
-              <span className="text-rose-700 font-semibold">{stats?.absent_today || 0}</span> Absent
-            </span>
-          </div>
-        </button>
+          <figcaption className="mt-2 text-sm font-medium text-ink-800">
+            {currentUser?.team_name ? 'Committee members' : 'Members enrolled'}
+          </figcaption>
+          <p className="mt-0.5 text-xs text-ink-faint">Active in the registry</p>
+        </figure>
 
-        {/* Metric 3: Upcoming Sessions */}
-        <button
-          onClick={() => onNavigateToTab('calendar')}
-          className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Scheduled Events
-            </span>
-            <Calendar className="w-4 h-4 text-slate-700 opacity-80 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">
-              {stats?.upcoming_meetings_count ?? events.length}
-            </span>
-            <span className="text-[11px] text-slate-500 mt-1 font-medium truncate">
-              {nextEvent ? (
-                <>Next: {nextEvent.title}</>
-              ) : (
-                'No events on schedule'
-              )}
-            </span>
-          </div>
-        </button>
-
-        {/* Metric 4: Role-Adaptive Focus */}
-        {stats?.pending_submissions_count !== null && stats?.pending_submissions_count !== undefined ? (
-          <button
-            onClick={() => onNavigateToTab(userRole === 'committee_head' || userRole === 'team_lead' ? 'task-reviews' : 'tasks')}
-            className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
+        <figure className="border-t border-rule pt-4">
+          <div
+            className={`figure text-4xl sm:text-5xl ${
+              { compliant: 'text-green-700', atRisk: 'text-amber-700', critical: 'text-red-700' }[attendanceTone]
+            }`}
           >
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Pending Reviews
-              </span>
-              <CheckSquare className="w-4 h-4 text-amber-600 opacity-80 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-bold text-slate-900 tracking-tight">
-                {stats.pending_submissions_count}
-              </span>
-              <span className="text-[11px] text-amber-700 font-medium mt-1 flex items-center">
-                <span>{stats.pending_submissions_count === 1 ? '1 task needs grading' : `${stats.pending_submissions_count} tasks need grading`}</span>
-                <ChevronRight className="w-3 h-3 ml-0.5 text-amber-500" />
-              </span>
-            </div>
-          </button>
-        ) : (
-          <button
-            onClick={() => onNavigateToTab('audit')}
-            className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-colors text-left group flex flex-col justify-between"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Agent Audit Log
-              </span>
-              <Activity className="w-4 h-4 text-blue-600 opacity-80 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-bold text-slate-900 tracking-tight">
-                {stats?.recent_actions_count || 0}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-1 font-medium">
-                Audited operations logged
-              </span>
-            </div>
-          </button>
-        )}
-      </div>
+            {attendanceRate}%
+          </div>
+          <figcaption className="mt-2 text-sm font-medium text-ink-800">Present today</figcaption>
+          <p className="mt-0.5 text-xs text-ink-faint">
+            {stats?.present_today ?? 0} on time · {stats?.late_today ?? 0} late · {stats?.absent_today ?? 0} absent
+          </p>
+        </figure>
 
-      {/* Split Views: Recent activity and standings */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Left Column: Latest Meeting + Upcoming Schedule */}
-        <div className="space-y-6">
-          {/* Latest Meeting Roster Card */}
-          <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-slate-700 flex items-center">
-                <Video className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
-                Latest Meeting Session
-              </span>
-              <button 
-                onClick={() => onNavigateToTab('attendance')} 
-                className="inline-flex min-h-9 shrink-0 items-center rounded px-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-              >
-                View Roster <ChevronRight aria-hidden="true" className="ml-0.5 h-3 w-3" />
-              </button>
-            </div>
+        <figure className="border-t border-rule pt-4">
+          <div className="figure text-4xl text-ink-900 sm:text-5xl">
+            {stats?.upcoming_meetings_count ?? 0}
+          </div>
+          <figcaption className="mt-2 text-sm font-medium text-ink-800">Sessions scheduled</figcaption>
+          <p className="mt-0.5 text-xs text-ink-faint">On the shared calendar</p>
+        </figure>
 
-            <div className="p-4 space-y-4">
-              {latestMeeting ? (
-                <>
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">{latestMeeting.title}</h4>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                        <span className="font-mono">{latestMeeting.meeting_code}</span>
-                        <span>·</span>
-                        <span>{formatMeetingDate(latestMeeting.start_time)}</span>
-                      </div>
-                    </div>
+        <figure className="border-t border-rule pt-4">
+          <div className="figure text-4xl text-ink-900 sm:text-5xl">
+            {stats?.pending_submissions_count ?? 0}
+          </div>
+          <figcaption className="mt-2 text-sm font-medium text-ink-800">Awaiting review</figcaption>
+          <p className="mt-0.5 text-xs text-ink-faint">Submitted, not yet graded</p>
+        </figure>
+      </section>
 
-                    {(() => {
-                      const badge = getMeetingStatusBadge(latestMeeting.status);
-                      return (
-                        <Badge variant={badge.variant} size="sm">
-                          {badge.label}
-                        </Badge>
-                      );
-                    })()}
-                  </div>
-                  
-                  {/* Attendance Calculation based on real counts */}
-                  {(() => {
-                    const recordedTotal = (latestMeeting.present_count || 0) + (latestMeeting.late_count || 0) + (latestMeeting.absent_count || 0);
-                    const expectedTotal = latestMeeting.total_expected > 0 ? latestMeeting.total_expected : recordedTotal;
-                    const calculatedMax = expectedTotal > 0 ? expectedTotal : 1;
-                    const presentRatio = Math.round(((latestMeeting.present_count || 0) / calculatedMax) * 100);
+      {/* ── Lead column: the most recent session, given the most room ── */}
+      <div className="grid min-w-0 gap-10 lg:grid-cols-5">
+        <section aria-labelledby="latest-session" className="min-w-0 lg:col-span-3">
+          <div className="flex items-baseline justify-between gap-4 border-b border-ink-900/15 pb-3">
+            <h2 id="latest-session" className="font-display text-lg font-medium text-ink-900">
+              Latest session
+            </h2>
+            <TextButton onClick={() => onNavigateToTab('attendance')}>
+              Full roster
+              <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+            </TextButton>
+          </div>
 
-                    return (
-                      <div className="space-y-2 pt-1">
-                        <ProgressBar
-                          value={latestMeeting.present_count || 0}
-                          max={calculatedMax}
-                          color="emerald"
-                          label={`Cohort Attendance (${presentRatio}%)`}
-                          sublabel={`${latestMeeting.present_count || 0} of ${calculatedMax} members present`}
-                        />
-
-                        <div className="flex justify-between items-center text-xs font-mono pt-2 border-t border-slate-100 text-slate-600">
-                          <span className="flex items-center text-emerald-700 font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
-                            {latestMeeting.present_count || 0} Present
-                          </span>
-                          <span className="flex items-center text-amber-700 font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5" />
-                            {latestMeeting.late_count || 0} Late
-                          </span>
-                          <span className="flex items-center text-rose-700 font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5" />
-                            {latestMeeting.absent_count || 0} Absent
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {latestMeeting.meet_url && (
-                    <div className="pt-2">
-                      <a
-                        href={latestMeeting.meet_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center space-x-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Open Meeting Link</span>
-                      </a>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="py-6 text-center text-sm text-slate-400">
-                  No meeting sessions logged yet.
+          {latestMeeting ? (
+            <div className="pt-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-display text-xl font-medium leading-snug text-ink-900">
+                    {latestMeeting.title}
+                  </h3>
+                  <p className="mt-1 font-mono text-2xs text-ink-faint">
+                    {latestMeeting.meeting_code} · {formatMeetingDate(latestMeeting.start_time)}
+                    {latestMeeting.duration_minutes ? ` · ${latestMeeting.duration_minutes} min` : ''}
+                  </p>
                 </div>
-              )}
-            </div>
-          </div>
+                <Badge variant={getMeetingStatusBadge(latestMeeting.status).variant}>
+                  {getMeetingStatusBadge(latestMeeting.status).label}
+                </Badge>
+              </div>
 
-          {/* Upcoming Schedule Card (Utilizing real events!) */}
-          <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-slate-700 flex items-center">
-                <Calendar className="w-3.5 h-3.5 mr-1.5 text-slate-600" />
-                Upcoming Milestones & Deadlines
-              </span>
-              <button 
-                onClick={() => onNavigateToTab('calendar')} 
-                className="inline-flex min-h-9 shrink-0 items-center rounded px-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-              >
-                Full Calendar <ChevronRight aria-hidden="true" className="ml-0.5 h-3 w-3" />
-              </button>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              {events.slice(0, 3).map((evt) => {
-                const isMeeting = evt.event_type === 'meeting';
-                const relativeTime = formatRelativeEventTime(evt.start_time);
+              {/* Real counts only. The bar is proportional to the recorded
+                  total, so it reflects the data rather than a target. */}
+              {(() => {
+                const present = latestMeeting.present_count || 0;
+                const late = latestMeeting.late_count || 0;
+                const absent = latestMeeting.absent_count || 0;
+                const recorded = present + late + absent;
+                const expected = latestMeeting.total_expected > 0 ? latestMeeting.total_expected : recorded;
+                const total = expected > 0 ? expected : 1;
+                const pct = (n: number) => `${Math.round((n / total) * 100)}%`;
 
                 return (
-                  <div key={evt.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50/60 transition-colors">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                        isMeeting 
-                          ? 'bg-blue-50 border-blue-100 text-blue-600' 
-                          : 'bg-amber-50 border-amber-100 text-amber-600'
-                      }`}>
-                        {isMeeting ? <Video className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-semibold text-slate-800 truncate">
-                          {evt.title}
-                        </div>
-                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                          <span>{formatMeetingDate(evt.start_time)}</span>
-                          {relativeTime && (
-                            <span className="text-slate-400 font-medium">({relativeTime})</span>
-                          )}
-                        </div>
-                      </div>
+                  <div className="mt-6">
+                    <div className="flex h-2 overflow-hidden rounded-full bg-paper-300" role="img"
+                      aria-label={`${present} present, ${late} late, ${absent} absent of ${expected} expected`}>
+                      <span className="bg-green-600" style={{ width: pct(present) }} />
+                      <span className="bg-amber-500" style={{ width: pct(late) }} />
+                      <span className="bg-red-500" style={{ width: pct(absent) }} />
                     </div>
-
-                    <div className="shrink-0 ml-3">
-                      {evt.meet_url ? (
-                        <a 
-                          href={evt.meet_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-2.5 py-1 bg-white border border-slate-200 hover:border-blue-300 rounded text-[11px] font-semibold text-slate-700 hover:text-blue-600 transition-colors inline-flex items-center space-x-1 shadow-xs"
-                        >
-                          <span>Join</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      ) : (
-                        <Badge variant={isMeeting ? 'info' : 'warning'} size="sm">
-                          {isMeeting ? 'Session' : 'Deadline'}
-                        </Badge>
-                      )}
-                    </div>
+                    <dl className="mt-4 grid grid-cols-3 gap-4">
+                      {[
+                        ['Present', present, 'text-green-700'],
+                        ['Late', late, 'text-amber-700'],
+                        ['Absent', absent, 'text-red-700'],
+                      ].map(([label, value, tone]) => (
+                        <div key={label as string}>
+                          <dt className="text-xs text-ink-faint">{label}</dt>
+                          <dd className={`figure mt-0.5 text-2xl ${tone}`}>{value as number}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <p className="mt-3 text-xs text-ink-faint">
+                      {recorded} of {expected} expected members recorded
+                    </p>
                   </div>
                 );
-              })}
-
-              {events.length === 0 && (
-                <div className="py-6 text-center text-sm text-slate-400">
-                  No upcoming events scheduled.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Top Standings + Contextual Prompts */}
-        <div className="space-y-6">
-          {/* Right Column: Member Reminders (for members) OR Top Standings (for management) */}
-          {isMember ? (
-            <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-                <span className="text-[12px] font-semibold text-slate-700 flex items-center">
-                  <Bell className="w-3.5 h-3.5 mr-1.5 rtl:mr-0 rtl:ml-1.5 text-blue-600" />
-                  {t('myReminders')}
-                </span>
-                <button
-                  onClick={() => onNavigateToTab('notifications')}
-                  className="inline-flex min-h-9 shrink-0 items-center rounded px-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                >
-                  {t('viewAll')} <ChevronRight aria-hidden="true" className="ml-0.5 h-3 w-3" />
-                </button>
-              </div>
-
-              <div className="divide-y divide-slate-100">
-                {reminders.slice(0, 4).map((rem) => {
-                  const isWhatsApp = rem.channel === 'whatsapp';
-                  return (
-                    <div key={rem.id} className="flex items-start justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
-                      <div className="flex items-start space-x-3 rtl:space-x-reverse min-w-0">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border mt-0.5 ${
-                          isWhatsApp ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-blue-50 border-blue-100 text-blue-600'
-                        }`}>
-                          {isWhatsApp ? <MessageSquare className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[13px] font-semibold text-slate-900 truncate">
-                            {rem.title || 'Operational Notice'}
-                          </span>
-                          <span className="text-[11px] text-slate-500 line-clamp-1">
-                            {rem.message_content}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            {rem.sent_at ? new Date(rem.sent_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {reminders.length === 0 && (
-                  <div className="py-6 text-center text-sm text-slate-400">
-                    {t('noReminders')}
-                  </div>
-                )}
-              </div>
+              })()}
             </div>
           ) : (
-            /* Top Standings / Evaluation Board for Management */
-            <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-                <span className="text-[12px] font-semibold text-slate-700 flex items-center">
-                  <Award className="w-3.5 h-3.5 mr-1.5 rtl:mr-0 rtl:ml-1.5 text-blue-600" />
-                  Member Evaluations & Standings
-                </span>
-                <button
-                  onClick={() => onNavigateToTab('scoreboard')}
-                  className="inline-flex min-h-9 shrink-0 items-center rounded px-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                >
-                  {t('viewAll')} <ChevronRight aria-hidden="true" className="ml-0.5 h-3 w-3" />
-                </button>
-              </div>
+            <EmptyState
+              title="No sessions recorded"
+              description="Once a session has been recorded it will appear here with its attendance."
+            />
+          )}
+        </section>
 
-              <div className="divide-y divide-slate-100">
-                {topStudents.map((student, idx) => {
-                  const badgeVariant = getRatingBadgeVariant(student.overall_rating || '');
-                  return (
-                    <div key={student.student_id} className="flex items-center justify-between p-3.5 hover:bg-slate-50/50 transition-colors">
-                      <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
-                        <span className="font-mono text-[11px] font-bold text-slate-400 w-5">
-                          #{idx + 1}
-                        </span>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[13px] font-bold text-slate-900 font-['Cairo'] truncate">
-                            {student.arabic_name}
-                          </span>
-                          <span className="text-[11px] text-slate-500 truncate">
-                            {student.student_name}
-                          </span>
-                        </div>
-                      </div>
+        {/* Secondary column: what is next, and who leads. */}
+        <div className="min-w-0 space-y-10 lg:col-span-2">
+          <section aria-labelledby="upcoming">
+            <div className="flex items-baseline justify-between gap-4 border-b border-ink-900/15 pb-3">
+              <h2 id="upcoming" className="font-display text-lg font-medium text-ink-900">
+                Coming up
+              </h2>
+              <TextButton onClick={() => onNavigateToTab('calendar')}>
+                Schedule
+                <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+              </TextButton>
+            </div>
 
-                      <div className="flex items-center space-x-3 rtl:space-x-reverse shrink-0 ml-3 rtl:ml-0 rtl:mr-3">
-                        <Badge variant={badgeVariant} size="sm">
-                          {student.overall_rating || 'Evaluated'}
-                        </Badge>
-
-                        <div className="text-right rtl:text-left flex flex-col min-w-[52px]">
-                          <span className="text-[12px] font-mono font-bold text-slate-800">
-                            {student.total_behavior_score}/23
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            Behavior
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {topStudents.length === 0 && (
-                  <div className="py-6 text-center text-sm text-slate-400">
-                    No student evaluation records found.
-                  </div>
+            {nextEvent ? (
+              <div className="pt-5">
+                <p className="text-xs text-ink-faint">{formatRelativeEventTime(nextEvent.start_time)}</p>
+                <h3 className="mt-1 font-display text-lg font-medium leading-snug text-ink-900">
+                  {nextEvent.title}
+                </h3>
+                {nextEvent.description && (
+                  <p className="mt-2 text-sm leading-6 text-ink-soft">{nextEvent.description}</p>
                 )}
               </div>
-            </div>
+            ) : (
+              <p className="pt-5 text-sm text-ink-faint">Nothing scheduled.</p>
+            )}
+
+            {events.length > 1 && (
+              <ul className="mt-6 space-y-3 border-t border-rule pt-4">
+                {events.slice(1, 4).map(event => (
+                  <li key={event.id} className="flex items-baseline gap-3">
+                    <span className="w-20 shrink-0 font-mono text-2xs text-ink-faint">
+                      {formatRelativeEventTime(event.start_time)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{event.title}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {topStudents.length > 0 && (
+            <section aria-labelledby="standings">
+              <div className="flex items-baseline justify-between gap-4 border-b border-ink-900/15 pb-3">
+                <h2 id="standings" className="font-display text-lg font-medium text-ink-900">
+                  Top evaluations
+                </h2>
+                <TextButton onClick={() => onNavigateToTab('scoreboard')}>
+                  All
+                  <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+                </TextButton>
+              </div>
+              <ol className="pt-2">
+                {topStudents.map((student, index) => (
+                  <li key={student.student_id} className="flex items-baseline gap-3 border-b border-rule py-3 last:border-0">
+                    <span className="w-5 shrink-0 font-mono text-2xs text-ink-faint tnum">{index + 1}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink-800" dir="auto">{student.student_name}</span>
+                    <span className="shrink-0 font-mono text-sm text-ink-900 tnum">
+                      {student.total_score ?? student.total_behavior_score ?? '—'}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
           )}
+        </div>
+      </div>
 
-          {/* Contextual Operations Starters (Functional & Honest, No Fake Shortcuts) */}
-          <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-xs p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5 uppercase tracking-wider">
-                <Bot className="w-3.5 h-3.5 text-blue-600" />
-                <span>Operational Action Starters</span>
-              </span>
-              <span className="text-[10px] font-medium text-slate-400">
-                Click to query agent
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {contextualPrompts.map((item, idx) => {
-                const IconComponent = item.icon;
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => onSendChatQuery(item.prompt)}
-                    className="p-3 bg-slate-50 hover:bg-white border border-slate-200/80 hover:border-blue-300 rounded-lg text-left transition-all group flex flex-col justify-between shadow-2xs hover:shadow-xs"
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <IconComponent className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-600 transition-colors" />
-                      <ArrowRight className="w-3 h-3 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">
-                        {item.title}
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">
-                        {item.desc}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+      {isMember && reminders.length > 0 && (
+        <section aria-labelledby="my-reminders">
+          <div className="flex items-baseline justify-between gap-4 border-b border-ink-900/15 pb-3">
+            <h2 id="my-reminders" className="font-display text-lg font-medium text-ink-900">
+              Reminders for you
+            </h2>
+            <TextButton onClick={() => onNavigateToTab('notifications')}>
+              All reminders
+              <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+            </TextButton>
           </div>
+          <ul className="pt-2">
+            {reminders.slice(0, 4).map(reminder => (
+              <li key={reminder.id} className="flex items-baseline gap-3 border-b border-rule py-3 last:border-0">
+                <Bell aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-ink-800" dir="auto">
+                    {reminder.title || reminder.message_content}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-ink-faint">
+                    {reminder.sent_at
+                      ? `Sent ${new Date(reminder.sent_at).toLocaleString()}`
+                      : reminder.status}
+                  </span>
+                </span>
+                <Badge variant={reminder.status?.toLowerCase() === 'sent' ? 'success' : 'neutral'}>
+                  {reminder.status}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* ── Assistant prompts ───────────────────────────────────────────
+          Rendered as an index of real questions the assistant can answer.
+          Clicking one asks it, so the affordance is genuinely functional. */}
+      <section aria-labelledby="assistant-queries">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-ink-900/15 pb-3">
+          <h2 id="assistant-queries" className="font-display text-lg font-medium text-ink-900">
+            Ask the assistant
+          </h2>
+          <p className="text-xs text-ink-faint">Questions about the records above</p>
         </div>
 
-      </div>
+        <ul className="grid gap-x-8 sm:grid-cols-2">
+          {contextualPrompts.map(prompt => {
+            const Icon = prompt.icon;
+            return (
+              <li key={prompt.title} className="border-b border-rule">
+                <button
+                  type="button"
+                  onClick={() => onSendChatQuery(prompt.prompt)}
+                  className="group flex w-full items-start gap-3 py-4 text-left transition-colors hover:bg-paper-100"
+                >
+                  <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint group-hover:text-indigo-700" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-ink-900">{prompt.title}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-ink-soft">{prompt.desc}</span>
+                  </span>
+                  <ArrowRight aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint opacity-0 transition-opacity group-hover:opacity-100" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </div>
   );
 };
+
 export default Dashboard;

@@ -27,7 +27,7 @@ export function MobileTabBar({ role, activeTab, onNavigate }: MobileTabBarProps)
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-rule bg-paper-100/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
     >
       <ul className="grid grid-cols-4">
         {items.map(item => {
@@ -39,7 +39,7 @@ export function MobileTabBar({ role, activeTab, onNavigate }: MobileTabBarProps)
                 onClick={() => onNavigate(item.id)}
                 aria-current={active ? 'page' : undefined}
                 className={`flex min-h-14 w-full flex-col items-center justify-center gap-1 px-1 py-2 text-2xs font-medium transition-colors ${
-                  active ? 'text-brand-700' : 'text-slate-500 hover:text-slate-900'
+                  active ? 'text-indigo-700' : 'text-ink-faint hover:text-ink-800'
                 }`}
               >
                 <item.icon aria-hidden="true" className="h-5 w-5" />

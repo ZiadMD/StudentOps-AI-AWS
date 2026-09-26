@@ -1,76 +1,113 @@
-import * as React from "react";
-import { cn } from "../../lib/utils";
+import * as React from 'react';
+import { cn } from '../../lib/utils';
 
+/**
+ * Panel.
+ *
+ * Deliberately not a heavy bordered box. By default a panel is bounded by a
+ * top rule only, so a page reads as a set of ruled sections on one sheet of
+ * paper rather than a grid of identical cards. Pass `framed` when a surface
+ * genuinely needs to lift off the canvas.
+ */
 export const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { framed?: boolean }
+>(({ className, framed, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-slate-200/90 bg-white text-slate-900 shadow-xs transition-all",
-      className
+      framed
+        ? 'rounded-lg border border-rule bg-paper-50 shadow-xs'
+        : 'border-t border-rule pt-5',
+      className,
     )}
     {...props}
   />
 ));
-Card.displayName = "Card";
+Card.displayName = 'Card';
 
-export const CardHeader = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
+/** Section eyebrow. Matches the small-caps label used in navigation. */
+export const CardEyebrow = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-5", className)}
-    {...props}
-  />
+  <p ref={ref} className={cn('eyebrow', className)} {...props} />
 ));
-CardHeader.displayName = "CardHeader";
+CardEyebrow.displayName = 'CardEyebrow';
 
 export const CardTitle = React.forwardRef<
-  HTMLParagraphElement,
+  HTMLHeadingElement,
   React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
-  <h3
+  <h2
     ref={ref}
     className={cn(
-      "text-sm md:text-base font-bold leading-none tracking-tight text-slate-900",
-      className
+      'font-display text-lg font-medium leading-tight tracking-[-0.015em] text-ink-900',
+      className,
     )}
     {...props}
   />
 ));
-CardTitle.displayName = "CardTitle";
+CardTitle.displayName = 'CardTitle';
 
 export const CardDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p
-    ref={ref}
-    className={cn("text-xs text-slate-500 mt-1 leading-relaxed", className)}
-    {...props}
-  />
+  <p ref={ref} className={cn('mt-1 text-sm leading-relaxed text-ink-soft', className)} {...props} />
 ));
-CardDescription.displayName = "CardDescription";
+CardDescription.displayName = 'CardDescription';
 
 export const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-5 pt-0", className)} {...props} />
+  <div ref={ref} className={cn('mt-4', className)} {...props} />
 ));
-CardContent.displayName = "CardContent";
+CardContent.displayName = 'CardContent';
 
 export const CardFooter = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("flex items-center p-5 pt-0", className)}
-    {...props}
-  />
+  <div ref={ref} className={cn('mt-4 flex items-center gap-3', className)} {...props} />
 ));
-CardFooter.displayName = "CardFooter";
+CardFooter.displayName = 'CardFooter';
+
+/**
+ * Figure tile.
+ *
+ * A headline number set in the display serif. The real alternative to a metric
+ * card with an icon in a tinted square: no decoration, one large figure, and a
+ * caption that states the operational context instead of a fabricated trend.
+ */
+export function FigureTile({
+  value,
+  label,
+  detail,
+  tone = 'neutral',
+  as: Tag = 'div',
+  className,
+}: {
+  value: React.ReactNode;
+  label: string;
+  detail?: React.ReactNode;
+  tone?: 'neutral' | 'compliant' | 'atRisk' | 'critical';
+  as?: 'div' | 'dd';
+  className?: string;
+}) {
+  const toneClass = {
+    neutral: 'text-ink-900',
+    compliant: 'text-green-700',
+    atRisk: 'text-amber-700',
+    critical: 'text-red-700',
+  }[tone];
+
+  return (
+    <Tag className={cn('min-w-0', className)}>
+      <dd className={cn('figure text-4xl sm:text-5xl', toneClass)}>{value}</dd>
+      <dt className="mt-2 text-sm font-medium text-ink-800">{label}</dt>
+      {detail && <p className="mt-0.5 text-xs leading-5 text-ink-soft">{detail}</p>}
+    </Tag>
+  );
+}
