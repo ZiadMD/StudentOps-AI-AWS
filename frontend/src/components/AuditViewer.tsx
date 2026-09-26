@@ -1,106 +1,185 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { RefreshCw, Search } from 'lucide-react';
 import { api } from '../api/client';
-import { AuditLogItem } from '../types';
-import { Search, RefreshCw } from 'lucide-react';
+import type { AuditLogItem } from '../types';
+import { EmptyState } from './ui/EmptyState';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
 
-export const AuditViewer: React.FC = () => {
+type StatusTone = 'neutral' | 'success' | 'warning' | 'danger';
+
+function statusTone(status: string): StatusTone {
+  const value = status.toLowerCase();
+  if (value.includes('error') || value.includes('fail') || value.includes('denied')) return 'danger';
+  if (value.includes('pending') || value.includes('confirm')) return 'warning';
+  if (value.includes('success') || value.includes('complete') || value.includes('confirm')) return 'success';
+  return 'neutral';
+}
+
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
+}
+
+/*
+ * Audit log.
+ *
+ * Entries are a static, paginated read of recorded actions. The previous
+ * version showed a "Streaming" indicator and a `system.log` terminal frame
+ * despite polling once on mount, which misrepresented the data.
+ */
+export function AuditViewer() {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('');
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      const data = await api.getAuditLogs();
-      setLogs(data);
-    } catch (err) {
-      console.error(err);
+      setLogs(await api.getAuditLogs());
+    } catch {
+      setError('The audit log could not be loaded.');
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    load();
   }, []);
 
-  const filteredLogs = logs.filter(l => 
-    l.intent.toLowerCase().includes(filter.toLowerCase()) || 
-    l.tool_name.toLowerCase().includes(filter.toLowerCase())
-  );
+  useEffect(() => { void load(); }, [load]);
+
+  const term = query.trim().toLowerCase();
+  const filtered = term
+    ? logs.filter(log =>
+      log.intent.toLowerCase().includes(term)
+      || log.tool_name.toLowerCase().includes(term)
+      || log.status.toLowerCase().includes(term))
+    : logs;
 
   return (
-    <div className="space-y-4 h-full flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b border-slate-200">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Audit & System Logs
-          </h2>
-          <p className="text-[12px] text-slate-500 mt-1">Immutable record of all agentic operations and HR changes.</p>
+    <div className="workspace-page min-w-0 space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+            Audit log
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-600">
+            Every recorded action taken in this workspace, newest first.
+          </p>
         </div>
-        
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-initial">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
-              placeholder="Grep logs..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-md text-[12px] font-mono focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 w-full sm:w-48 shadow-sm"
+
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:w-64 sm:flex-initial">
+            <label htmlFor="audit-search" className="sr-only">Search the audit log</label>
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              id="audit-search" type="search" value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Search actions"
+              className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
             />
           </div>
-          <button 
-            onClick={load}
-            className="p-1.5 text-slate-500 hover:text-slate-900 bg-white border border-slate-200 rounded-md shadow-sm transition-colors shrink-0"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <Button variant="secondary" onClick={() => void load()} aria-label="Reload the audit log">
+            <RefreshCw aria-hidden="true" className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 bg-[#0A0A0A] border border-slate-800 rounded-lg overflow-hidden flex flex-col shadow-xl">
-        <div className="px-4 py-2 border-b border-slate-800 bg-[#111] flex items-center justify-between">
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">system.log</span>
-          <span className="text-[10px] font-mono text-emerald-500 flex items-center">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
-            Streaming
-          </span>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 space-y-1.5 md:space-y-1">
-          {filteredLogs.map((log) => (
-            <div key={log.id} className="font-mono text-[11px] hover:bg-white/5 px-2 py-1.5 -mx-2 rounded transition-colors group flex flex-col md:flex-row md:items-start md:space-x-3 gap-1 md:gap-0">
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-slate-500 shrink-0 text-[10px] md:text-[11px]">
-                  {new Date(log.timestamp).toISOString().replace('T', ' ').substring(0, 19)}
-                </span>
-                
-                <span className={`shrink-0 text-[10px] md:text-[11px] ${
-                  log.status.includes('error') ? 'text-rose-400' :
-                  log.requires_confirmation && !log.confirmed ? 'text-amber-400' : 'text-blue-400'
-                }`}>
-                  [{log.status.toUpperCase()}]
-                </span>
-                
-                <span className="text-slate-400 shrink-0 truncate max-w-[120px] md:max-w-none md:w-28 text-[10px] md:text-[11px]">
-                  {log.tool_name}
-                </span>
-              </div>
-              
-              <span className="text-slate-300 break-words flex-1 text-[11px]">
-                {log.intent}
-              </span>
-            </div>
+      {error && (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </p>
+      )}
+
+      <p role="status" className="text-sm text-slate-500">
+        {loading ? 'Loading the audit log' : `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`}
+      </p>
+
+      {loading ? (
+        <div className="space-y-2" aria-hidden="true">
+          {[0, 1, 2, 3, 4].map(row => (
+            <div key={row} className="h-16 animate-pulse rounded-lg border border-slate-200 bg-slate-100" />
           ))}
-          
-          {filteredLogs.length === 0 && (
-            <div className="text-slate-500 font-mono text-[11px] text-center pt-8">
-              EOF: No logs match the specified filter.
-            </div>
-          )}
         </div>
-      </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title={term ? 'No matching entries' : 'No actions recorded yet'}
+          description={
+            term
+              ? 'Try a different search term.'
+              : 'Actions taken in the workspace will appear here.'
+          }
+        />
+      ) : (
+        <>
+          {/* Desktop: dense records. */}
+          <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block">
+            <table className="w-full border-collapse text-left text-sm">
+              <caption className="sr-only">Recorded actions, newest first</caption>
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <th scope="col" className="px-4 py-3 font-semibold">When</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Action</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Area</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Confirmation</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map(log => (
+                  <tr key={log.id} className="hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-500 tnum">
+                      {formatTimestamp(log.timestamp)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-900">{log.intent}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{log.tool_name}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {log.requires_confirmation ? (log.confirmed ? 'Confirmed' : 'Awaiting') : 'Not required'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={statusTone(log.status)}>{log.status}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Phone and tablet: the same records as stacked cards. */}
+          <ul className="space-y-2 md:hidden">
+            {filtered.map(log => (
+              <li key={log.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 text-sm font-medium text-slate-900">{log.intent}</p>
+                  <Badge variant={statusTone(log.status)} className="shrink-0">{log.status}</Badge>
+                </div>
+                <dl className="mt-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">When</dt>
+                    <dd className="text-right font-mono text-slate-700 tnum">{formatTimestamp(log.timestamp)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Area</dt>
+                    <dd className="truncate font-mono text-slate-700">{log.tool_name}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Confirmation</dt>
+                    <dd className="text-slate-700">
+                      {log.requires_confirmation ? (log.confirmed ? 'Confirmed' : 'Awaiting') : 'Not required'}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
-};
+}
