@@ -299,14 +299,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </span>
           </div>
 
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-baseline gap-2">
-            <span>Operations Overview</span>
-            {currentUser?.arabic_name && (
-              <span className="text-lg font-normal text-slate-400 font-['Cairo']">
-                · {currentUser.arabic_name}
-              </span>
-            )}
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Operations overview
           </h1>
+          {currentUser?.arabic_name && (
+            <p
+              lang="ar"
+              dir="rtl"
+              className="mt-1 font-arabic text-base text-slate-500"
+            >
+              {currentUser.arabic_name}
+            </p>
+          )}
           
           <p className="text-[13px] text-slate-500 max-w-2xl leading-relaxed">
             {currentUser?.team_name 
@@ -315,13 +319,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </p>
         </div>
         
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex shrink-0 items-center">
           <button 
             onClick={() => onNavigateToTab('chat')}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center space-x-2"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
           >
-            <Bot className="w-3.5 h-3.5 text-slate-200" />
-            <span>Open Agent Console</span>
+            <Bot aria-hidden="true" className="h-4 w-4" />
+            <span>Open assistant</span>
           </button>
         </div>
       </div>
@@ -443,7 +447,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* Split Views: Operational Telemetry & Standings */}
+      {/* Split Views: Recent activity and standings */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Left Column: Latest Meeting + Upcoming Schedule */}

@@ -124,7 +124,7 @@ export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
           <div className="min-w-0 space-y-2">
             <label htmlFor="register-arabic-name" className={authLabelClass}>
               <span lang="ar" dir="rtl" className="font-arabic">الاسم بالعربية</span>
-              <span className="ml-1.5 font-normal text-slate-500">optional</span>
+              <span className="ml-1.5 font-normal text-slate-500">(optional)</span>
             </label>
             <input
               id="register-arabic-name" name="arabic_name" type="text"
@@ -163,7 +163,7 @@ export function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
         <div className="space-y-2">
           <label htmlFor="register-team" className={authLabelClass}>
             Committee
-            <span className="ml-1.5 font-normal text-slate-500">optional</span>
+            <span className="ml-1.5 font-normal text-slate-500">(optional)</span>
           </label>
           <select
             id="register-team" name="team_id" value={teamId}
