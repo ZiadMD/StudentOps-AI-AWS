@@ -21,11 +21,12 @@ import { api } from '../api/client';
 import { DashboardStats, MeetingDetail, StudentScoreSummary, EventItem, UserProfile, ReminderItem } from '../types';
 import { ProgressBar } from './ui/ProgressBar';
 import { Badge } from './ui/Badge';
+import { type Tab } from './navigation';
 import { useLanguage } from '../context/LanguageContext';
 
 interface DashboardProps {
   currentUser?: UserProfile | null;
-  onNavigateToTab: (tab: string) => void;
+  onNavigateToTab: (tab: Tab) => void;
   onSendChatQuery: (query: string) => void;
 }
 

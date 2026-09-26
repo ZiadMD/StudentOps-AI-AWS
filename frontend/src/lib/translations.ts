@@ -4,24 +4,24 @@ export type Direction = 'ltr' | 'rtl';
 export const TRANSLATIONS: Record<Language, Record<string, string>> = {
   en: {
     // Brand & App
-    appName: 'StudentOps.AI',
+    appName: 'StudentOps',
     engineeringBranch: 'Engineering Branch',
 
     // Navigation Items
     dashboard: 'Overview',
-    chat: 'AI Agent Console',
-    students: 'Member Registry',
-    attendance: 'Meet Attendance',
+    chat: 'Assistant',
+    students: 'Member registry',
+    attendance: 'Attendance',
     scoreboard: 'Evaluations',
-    calendar: 'Schedule & Calendar',
-    tasks: 'Tasks & Sprints',
-    'task-reviews': 'Task Reviews',
-    qna: 'Committee Q&A',
-    feedback: 'Member Feedback',
-    reports: 'Executive Reports',
-    whatsapp: 'WhatsApp & Escalations',
+    calendar: 'Schedule',
+    tasks: 'Tasks',
+    'task-reviews': 'Task reviews',
+    qna: 'Questions',
+    feedback: 'Feedback',
+    reports: 'Reports',
+    whatsapp: 'Messages',
     notifications: 'Reminders',
-    audit: 'Audit Log',
+    audit: 'Audit log',
     workspaceNav: 'Workspace Navigation',
 
     // Footer & Account

@@ -4,71 +4,172 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222 47% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222 47% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221 83% 53%;
-    --radius: 0.75rem;
+    --canvas: 248 250 252;
+    --surface: 255 255 255;
+    --ink: 15 23 42;
+    --ink-muted: 100 116 139;
+    --hairline: 226 232 240;
+    --accent: 37 71 235;
+    --accent-soft: 238 244 255;
+    --compliant: 5 150 105;
+    --at-risk: 217 119 6;
+    --critical: 220 38 38;
+    --focus: #1d35d8;
+    --scrollbar-track: #f1f5f9;
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-hover: #94a3b8;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-padding-top: 5rem;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    background-color: #f8fafc;
-    color: #0f172a;
-    font-family: 'Plus Jakarta Sans', 'Inter', 'Cairo', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    background-color: rgb(var(--canvas));
+    color: rgb(var(--ink));
+    font-family: 'Plus Jakarta Sans', Inter, Cairo, system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
-    letter-spacing: -0.025em;
-    color: #0f172a;
+    font-family: 'Plus Jakarta Sans', Cairo, system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    color: rgb(var(--ink));
   }
 
   code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* A single visible focus treatment for every interactive element. */
+  :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+  }
+
+  /* Long member names and free text must never force a horizontal scrollbar. */
+  :where(p, h1, h2, h3, h4, dd, dt, li, td, th, span) {
+    overflow-wrap: anywhere;
   }
 }
 
-/* Ambient Radial Mesh Background */
-.bg-ambient-mesh {
-  background-color: #f8fafc;
-  background-image: 
-    radial-gradient(at 10% 10%, rgba(37, 99, 235, 0.04) 0px, transparent 50%),
-    radial-gradient(at 90% 10%, rgba(14, 165, 233, 0.04) 0px, transparent 50%),
-    radial-gradient(at 50% 90%, rgba(99, 102, 241, 0.03) 0px, transparent 50%);
+@layer components {
+  /* Every workspace page opts into this so a page can never overflow
+     horizontally regardless of the table markup inside it. */
+  .workspace-page {
+    min-width: 0;
+  }
+
+  .workspace-page table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .workspace-page :where(input, select, textarea) {
+    max-width: 100%;
+  }
+
+  .workspace-page :where(button, a) {
+    touch-action: manipulation;
+  }
+
+  .skip-link {
+    position: fixed;
+    top: -6rem;
+    left: 1rem;
+    z-index: 100;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: rgb(var(--ink));
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: top 150ms ease-out;
+  }
+
+  .skip-link:focus {
+    top: 1rem;
+  }
+}
+
+/* Tabular numerals keep metric columns and identifiers aligned. */
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
 /* Polished light scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scrollbar-thumb);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--scrollbar-hover);
+}
+
+/*
+ * Small-screen adaptations.
+ *
+ * Below 768px we enlarge controls to a 44px minimum touch target and pin
+ * inputs to 16px so iOS Safari does not zoom the viewport on focus.
+ */
+@media (max-width: 767px) {
+  :where(input, select, textarea) {
+    font-size: 16px !important;
+  }
+
+  .workspace-page :where(button, [role='button'], select, a[data-action]) {
+    min-height: 2.75rem;
+  }
+
+  [role='dialog'] {
+    max-height: calc(100dvh - 2rem);
+  }
+}
+
+/*
+ * Tablets share the phone navigation drawer rather than squeezing a
+ * 240px rail next to the content, which preserves usable line lengths.
+ */
+@media (max-width: 1023px) {
+  #app-sidebar {
+    width: min(20rem, 88vw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
