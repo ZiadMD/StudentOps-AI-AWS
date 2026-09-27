@@ -38,6 +38,16 @@ export default {
       divideColor: borders,
       ringColor: { slate: neutral('ring', [300, 500, 900]) },
       ringOffsetColor: { white: token('surface', '#ffffff') },
+      fontFamily: {
+        // The public landing page and the auth screens set their headings in a
+        // serif to read as an editorial masthead. The workspace pages keep the
+        // app default, so this only affects those public surfaces.
+        display: ['"Newsreader"', 'Cairo', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+      },
+      fontSize: {
+        '2xs': ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.02em' }],
+      },
       colors: {
         background: 'hsl(var(--background) / <alpha-value>)',
         foreground: 'hsl(var(--foreground) / <alpha-value>)',

@@ -2,6 +2,42 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+/* ---------------------------------------------------------------------
+ * Editorial helpers used by the public landing page and the sign-in and
+ * sign-up screens. They are scoped to those surfaces so they cannot change
+ * how the workspace pages render. Colours are expressed through the same
+ * slate and blue tokens the rest of the app uses.
+ * ------------------------------------------------------------------- */
+@layer components {
+  /* Small uppercase kicker above a heading. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--theme-text-500, #64748b));
+  }
+
+  /* A pull-quote style number for headline figures. */
+  .figure {
+    font-family: 'Newsreader', Cairo, Georgia, serif;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    line-height: 0.9;
+  }
+}
+
+@layer utilities {
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
 @layer base {
   :root {
     --background: 210 40% 98%;
