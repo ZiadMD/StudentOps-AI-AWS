@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Bell, Menu, Moon, Search, Sun } from 'lucide-react';
+import { Bell, Menu, Moon, Search } from 'lucide-react';
 import { api } from '../api/client';
-import { useTheme } from '../context/ThemeContext';
 import type { EscalationRecord, TaskItem, UserProfile, UserRole } from '../types';
 import { NAV_ITEMS, type Tab } from './Sidebar';
 import { ProfileAvatar } from './ui/ProfileAvatar';
@@ -134,7 +133,6 @@ function DeadlinePanel({ id, role, onNavigate }: { id: string; role: UserRole; o
 }
 
 export function WorkspaceHeader({ currentUser, onNavigate, onOpenNavigation, isMobileSidebarOpen }: WorkspaceHeaderProps) {
-  const { theme, toggleTheme } = useTheme();
   const id = useId();
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -148,7 +146,6 @@ export function WorkspaceHeader({ currentUser, onNavigate, onOpenNavigation, isM
   const results = NAV_ITEMS.filter(item => item.id !== 'profile' && item.roles.includes(currentUser.role)
     && `${item.label} ${ALIASES[item.id] ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()));
   const active = results[activeIndex];
-  const themeLabel = theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
 
   function closeNotifications() {
     setNotificationsOpen(false);
@@ -258,8 +255,11 @@ export function WorkspaceHeader({ currentUser, onNavigate, onOpenNavigation, isM
         )}
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-0.5 md:col-start-3 md:justify-self-end">
-        <button type="button" className={iconButton} title={themeLabel} aria-label={themeLabel} onClick={toggleTheme}>
-          {theme === 'light' ? <Moon className="h-5 w-5" aria-hidden="true" /> : <Sun className="h-5 w-5" aria-hidden="true" />}
+        {/* Theme toggle disabled while the dark palette is being decided. The
+            icon imports, the `useTheme` hook and the `dark:` utilities are all
+            still present, so restoring this button is the only change needed. */}
+        <button type="button" className={`${iconButton} hidden`} aria-hidden="true" tabIndex={-1}>
+          <Moon className="h-5 w-5" aria-hidden="true" />
         </button>
         <div ref={notificationRef} className="relative">
           <button ref={bellRef} type="button" className={iconButton} title="Notifications" aria-label="Notifications" aria-expanded={notificationsOpen} aria-haspopup="dialog" aria-controls={notificationsOpen ? `${id}-notifications` : undefined} onClick={() => {

@@ -3,23 +3,38 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 
+/**
+ * Dark mode is temporarily disabled while its palette is being decided, so the
+ * resolved theme is pinned to light. These tests lock that behaviour in: they
+ * prove a stored `dark` preference, a `prefers-color-scheme: dark` system
+ * setting and the context's own toggle can all no longer flip the interface.
+ * When dark mode is restored, this file should be replaced by the suite that
+ * covered the original behaviour.
+ */
+
 function ThemeConsumer() {
   const { theme, toggleTheme } = useTheme();
   return <button onClick={toggleTheme} aria-label="Toggle theme">{theme}</button>;
 }
 
 function mount() {
-  return render(<StrictMode><ThemeProvider><ThemeConsumer /></ThemeProvider></StrictMode>);
+  return render(
+    <StrictMode>
+      <ThemeProvider>
+        <ThemeConsumer />
+      </ThemeProvider>
+    </StrictMode>,
+  );
 }
 
 function systemTheme(dark: boolean) {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: dark })));
 }
 
-function expectTheme(theme: 'light' | 'dark') {
-  expect(screen.getByRole('button', { name: 'Toggle theme' })).toHaveTextContent(theme);
-  expect(document.documentElement.classList.contains('dark')).toBe(theme === 'dark');
-  expect(document.documentElement.style.colorScheme).toBe(theme);
+function expectPinnedLight() {
+  expect(screen.getByRole('button', { name: 'Toggle theme' })).toHaveTextContent('light');
+  expect(document.documentElement.classList.contains('dark')).toBe(false);
+  expect(document.documentElement.style.colorScheme).toBe('light');
 }
 
 beforeEach(() => {
@@ -38,76 +53,50 @@ afterEach(() => {
   document.documentElement.style.removeProperty('color-scheme');
 });
 
-describe('ThemeProvider', () => {
-  it.each(['light', 'dark'] as const)('restores saved %s ahead of the opposite system preference', theme => {
-    localStorage.setItem('studentops_theme', theme);
-    systemTheme(theme === 'light');
+describe('ThemeProvider with dark mode disabled', () => {
+  it.each(['light', 'dark'] as const)(
+    'ignores a stored %s preference and stays on light',
+    stored => {
+      localStorage.setItem('studentops_theme', stored);
+      systemTheme(stored === 'dark');
+      mount();
+      expectPinnedLight();
+    },
+  );
+
+  it.each([false, true])(
+    'ignores a dark system preference of %s and stays on light',
+    dark => {
+      systemTheme(dark);
+      mount();
+      expectPinnedLight();
+    },
+  );
+
+  it('never adds the dark class even after the toggle is called repeatedly', () => {
     mount();
-    expectTheme(theme);
+    const toggle = screen.getByRole('button', { name: 'Toggle theme' });
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      fireEvent.click(toggle);
+      expectPinnedLight();
+    }
+  });
+
+  it('preserves unrelated classes already on the document element', () => {
+    mount();
     expect(document.documentElement).toHaveClass('existing-root-class');
   });
 
-  it.each([false, true])('uses and persists system default when dark preference is %s', dark => {
-    systemTheme(dark);
+  it('persists light so a later reload does not restore a stale dark preference', () => {
+    localStorage.setItem('studentops_theme', 'dark');
     mount();
-    const expected = dark ? 'dark' : 'light';
-    expectTheme(expected);
-    expect(localStorage.getItem('studentops_theme')).toBe(expected);
-    expect(window.matchMedia).toHaveBeenCalledWith('(prefers-color-scheme: dark)');
-  });
-
-  it('ignores invalid stored values', () => {
-    localStorage.setItem('studentops_theme', 'sepia');
-    systemTheme(true);
-    mount();
-    expectTheme('dark');
-    expect(localStorage.getItem('studentops_theme')).toBe('dark');
-  });
-
-  it('toggles both ways, persists, and restores the choice after remount', () => {
-    const view = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle theme' }));
-    expectTheme('dark');
-    expect(localStorage.getItem('studentops_theme')).toBe('dark');
-    view.unmount();
-    mount();
-    expectTheme('dark');
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle theme' }));
-    expectTheme('light');
     expect(localStorage.getItem('studentops_theme')).toBe('light');
-    expect(document.documentElement).toHaveClass('existing-root-class');
   });
 
-  it('falls back to light if matchMedia is unavailable', () => {
-    vi.stubGlobal('matchMedia', undefined);
+  it('still surfaces light when the system preference lookup throws', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => { throw new Error('unsupported'); }));
     mount();
-    expectTheme('light');
-  });
-
-  it('falls back to light if matchMedia throws', () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => { throw new Error('Unavailable'); }));
-    mount();
-    expectTheme('light');
-  });
-
-  it('uses system default and keeps toggling when storage access is blocked', () => {
-    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => { throw new Error('Blocked'); });
-    systemTheme(true);
-    mount();
-    expectTheme('dark');
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle theme' }));
-    expectTheme('light');
-  });
-
-  it('keeps working when storage writes fail', () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Quota'); });
-    mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle theme' }));
-    expectTheme('dark');
-  });
-
-  it('requires a provider', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(() => render(<ThemeConsumer />)).toThrow('useTheme must be used within a ThemeProvider');
+    expectPinnedLight();
   });
 });
