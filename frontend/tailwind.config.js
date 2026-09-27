@@ -83,6 +83,9 @@ export default {
         stone: ramp(paper),
         neutral: ramp(paper),
         zinc: ramp(paper),
+        // The ink ramp carries every text and hairline colour in the app, so it
+        // must be registered under its own name as well as the neutral aliases.
+        ink: ramp(ink),
         slate: ramp(ink),
         gray: ramp(ink),
         indigo: ramp(indigo),
