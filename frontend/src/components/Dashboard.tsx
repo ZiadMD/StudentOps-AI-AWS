@@ -329,7 +329,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex items-center space-x-2 shrink-0">
           <button 
             onClick={() => onNavigateToTab('chat')}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center space-x-2"
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center space-x-2"
           >
             <Bot className="w-3.5 h-3.5 text-slate-200" />
             <span>Ask assistant</span>

@@ -105,7 +105,7 @@ function LinkedMemberDetails({ studentId }: { studentId: string }) {
 
   const { member } = state;
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-xs">
+    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm">
       {/* Collegiate Digital Pass Header Bar */}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-3.5">
         <div className="min-w-0">
@@ -193,7 +193,7 @@ export function ProfilePage({ currentUser }: ProfilePageProps) {
   return (
     <div className="mx-auto w-full min-w-0 max-w-4xl space-y-6 py-4 sm:py-6">
       {/* Modern Profile Identity Card (no background banner) */}
-      <header className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs sm:p-8">
+      <header className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
             <div className="shrink-0">
@@ -251,7 +251,7 @@ export function ProfilePage({ currentUser }: ProfilePageProps) {
               onClick={() => setSection(item.id)}
               className={`min-h-10 rounded-lg px-5 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
                 section === item.id
-                  ? 'bg-white text-slate-900 shadow-xs'
+                  ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
@@ -264,7 +264,7 @@ export function ProfilePage({ currentUser }: ProfilePageProps) {
       {/* Profile Content Panels */}
       <div id={profilePanelId} hidden={section !== 'profile'} className="space-y-6">
         {/* Membership Section */}
-        <section aria-labelledby={membershipId} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+        <section aria-labelledby={membershipId} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
           <div className="border-b border-slate-100 pb-4">
             <h2 id={membershipId} className="text-base font-semibold tracking-tight text-slate-900">Membership</h2>
             <p className="mt-0.5 text-xs text-slate-500">Your organizational student credential and verified standing.</p>
@@ -288,7 +288,7 @@ export function ProfilePage({ currentUser }: ProfilePageProps) {
         </section>
 
         {/* Contact & Affiliation Section */}
-        <section aria-labelledby={contactId} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+        <section aria-labelledby={contactId} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
           <div className="border-b border-slate-100 pb-4">
             <h2 id={contactId} className="text-base font-semibold tracking-tight text-slate-900">Contact</h2>
             <p className="mt-0.5 text-xs text-slate-500">Your primary communication channels and assigned committee.</p>
@@ -313,7 +313,7 @@ export function ProfilePage({ currentUser }: ProfilePageProps) {
       </div>
 
       {/* Account Settings Panel */}
-      <section id={accountPanelId} hidden={section !== 'account'} aria-labelledby={accountHeadingId} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+      <section id={accountPanelId} hidden={section !== 'account'} aria-labelledby={accountHeadingId} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
         <div className="border-b border-slate-100 pb-4">
           <h2 id={accountHeadingId} className="text-base font-semibold tracking-tight text-slate-900">Account access</h2>
           <p className="mt-0.5 text-xs text-slate-500">Permissions tier and account lifecycle information managed by your organization.</p>

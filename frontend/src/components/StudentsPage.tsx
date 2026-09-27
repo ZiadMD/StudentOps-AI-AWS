@@ -146,7 +146,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
               resetForm();
               setIsAddModalOpen(true);
             }}
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white rounded-lg text-sm font-semibold shadow-xs transition-all w-full sm:w-auto justify-center cursor-pointer"
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white rounded-lg text-sm font-semibold shadow-sm transition-all w-full sm:w-auto justify-center cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Member</span>
@@ -164,7 +164,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
             placeholder="Search by name, email, or code…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-xs transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-sm transition-all"
           />
         </div>
 
@@ -175,7 +175,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
               onClick={() => setStatusFilter(f)}
               className={`px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors ${
                 statusFilter === f
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -186,7 +186,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
       </div>
 
       {/* Table Container */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         {error ? (
           <div role="alert" className="p-5 text-sm text-rose-700"><p>{error.message}</p><button onClick={() => void refresh()} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry members</button></div>
         ) : loading ? (
@@ -577,7 +577,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ currentUser }) => {
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 transition-all cursor-pointer"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white rounded-lg text-xs font-semibold shadow-sm disabled:opacity-50 transition-all cursor-pointer"
             >
               {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>{submitting ? 'Enrolling…' : 'Enroll Member'}</span>

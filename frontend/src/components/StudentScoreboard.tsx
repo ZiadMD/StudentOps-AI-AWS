@@ -160,7 +160,7 @@ export const StudentScoreboard: React.FC<StudentScoreboardProps> = ({ currentUse
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 shadow-xs rounded-xl overflow-hidden">
+      <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
         {error ? (
           <div role="alert" className="p-5 text-sm text-rose-700"><p>{error.message}</p><button onClick={() => void loadData()} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry evaluations</button></div>
         ) : loading ? (

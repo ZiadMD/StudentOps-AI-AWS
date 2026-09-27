@@ -263,7 +263,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Logo / Workspace Info */}
               <div className="flex items-center space-x-2.5 overflow-hidden">
                 <div
-                  className="w-8 h-8 md:w-6 md:h-6 rounded-lg md:rounded-md bg-slate-900 flex items-center justify-center shrink-0 shadow-xs"
+                  className="w-8 h-8 md:w-6 md:h-6 rounded-lg md:rounded-md bg-slate-900 flex items-center justify-center shrink-0 shadow-sm"
                   title="StudentOps.AI"
                 >
                   <Layers className="w-4 h-4 md:w-3.5 md:h-3.5 text-white" />
@@ -332,7 +332,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   isDesktopCollapsed ? 'md:justify-center md:px-0' : 'justify-between px-3 md:px-2.5'
                 } py-3 md:py-[7px] rounded-xl md:rounded-md text-[15px] md:text-[13px] transition-colors ${
                   isActive
-                    ? 'bg-slate-900 text-white md:bg-slate-100 md:text-slate-900 font-semibold shadow-xs md:shadow-none'
+                    ? 'bg-slate-900 text-white md:bg-slate-100 md:text-slate-900 font-semibold shadow-sm md:shadow-none'
                     : 'text-slate-700 md:text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 active:bg-slate-100'
                 }`}
               >

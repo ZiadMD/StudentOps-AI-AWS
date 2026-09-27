@@ -25,7 +25,7 @@ export const StatCard: React.FC<StatCardProps> = ({
 }) => {
   return (
     <div className={cn(
-      "rounded-xl p-5 bg-white border border-slate-200/90 shadow-xs transition-all hover:shadow-sm hover:border-slate-300 flex flex-col justify-between",
+      "rounded-xl p-5 bg-white border border-slate-200/90 shadow-sm transition-all hover:shadow-sm hover:border-slate-300 flex flex-col justify-between",
       className
     )}>
       <div className="flex items-center justify-between">
