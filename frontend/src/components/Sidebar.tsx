@@ -11,7 +11,6 @@ import {
   Layers,
   Bell,
   ClipboardList,
-  LogOut,
   MessageSquare,
   X,
   PanelLeftClose,
@@ -42,9 +41,19 @@ export type Tab =
   | 'inbox'
   | 'follow-ups'
   | 'channel-settings'
+  | 'settings'
   | 'profile';
 
 export type Role = UserRole;
+
+/**
+ * Roles permitted to change the messaging channel. Channel settings is not
+ * merely read-only for everyone else, it is absent: a disabled control the
+ * viewer can never use is noise, and it invites the question why.
+ */
+export const CHANNEL_ADMIN_ROLES: Role[] = ['region_hr_head', 'hr_admin'];
+
+export const isChannelAdmin = (role: Role): boolean => CHANNEL_ADMIN_ROLES.includes(role);
 
 // Shared by navigation and the client-side route visibility guard.
 export const NAV_ITEMS: {
@@ -138,7 +147,18 @@ export const NAV_ITEMS: {
     id: 'channel-settings',
     label: 'Channel settings',
     icon: Settings,
-    roles: ['region_hr_head', 'hr_admin'],
+    roles: CHANNEL_ADMIN_ROLES,
+  },
+  {
+    // Reachable from the account menu, not the rail. It carries the language
+    // switch and a link to channel settings for the roles that may use it.
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings,
+    roles: [
+      'region_hr_head', 'committee_hr_leader', 'committee_head',
+      'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead', 'member',
+    ],
   },
   {
     id: 'notifications',
@@ -163,9 +183,8 @@ export const NAV_ITEMS: {
 export const NAV_GROUPS: { label: string; ids: Tab[] }[] = [
   { label: 'Workspace', ids: ['dashboard', 'calendar', 'tasks', 'task-reviews'] },
   { label: 'People', ids: ['students', 'attendance', 'scoreboard', 'feedback', 'qna'] },
-  { label: 'Operations & automation', ids: ['chat', 'inbox', 'follow-ups', 'notifications'] },
-  { label: 'Reports & oversight', ids: ['reports', 'audit'] },
-  { label: 'Settings', ids: ['channel-settings'] },
+  { label: 'Operations', ids: ['chat', 'inbox', 'follow-ups', 'notifications'] },
+  { label: 'Oversight', ids: ['reports', 'audit'] },
 ];
 
 export interface SidebarProps {
@@ -173,7 +192,6 @@ export interface SidebarProps {
   setActiveTab: (tab: Tab) => void;
   role: Role;
   currentUser?: UserProfile | null;
-  onLogout: () => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
   isDesktopCollapsed?: boolean;
@@ -185,7 +203,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   role,
   currentUser,
-  onLogout,
   isMobileOpen,
   setIsMobileOpen,
   isDesktopCollapsed = false,
@@ -359,23 +376,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </section>
           ))}
         </nav>
-      </div>
-
-      {/* Sign out footer */}
-      <div className={`p-4 md:p-3 border-t border-slate-200/70 space-y-2 md:space-y-1 shrink-0 ${
-        isDesktopCollapsed ? 'md:px-2 md:space-y-2' : ''
-      }`}>
-        {/* Sign out button */}
-        <button
-          onClick={onLogout}
-          title={isDesktopCollapsed ? 'Sign out' : undefined}
-          className={`w-full flex items-center ${
-            isDesktopCollapsed ? 'md:justify-center md:px-0' : 'space-x-3 md:space-x-2.5 px-3 md:px-2.5'
-          } py-2.5 md:py-1.5 rounded-xl md:rounded-md text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors text-[14px] md:text-[13px]`}
-        >
-          <LogOut className="w-5 h-5 md:w-4 md:h-4 text-slate-400 hover:text-rose-600 shrink-0" />
-          <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>Sign out</span>
-        </button>
       </div>
     </aside>
   );

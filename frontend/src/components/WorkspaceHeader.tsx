@@ -4,11 +4,13 @@ import { api } from '../api/client';
 import type { EscalationRecord, TaskItem, UserProfile, UserRole } from '../types';
 import { NAV_ITEMS, type Tab } from './Sidebar';
 import { ProfileAvatar } from './ui/ProfileAvatar';
+import { AccountMenu } from './ui/AccountMenu';
 
 export interface WorkspaceHeaderProps {
   currentUser: UserProfile;
   onNavigate: (tab: Tab) => void;
   onOpenNavigation: () => void;
+  onSignOut: () => void;
   isMobileSidebarOpen: boolean;
 }
 
@@ -132,7 +134,7 @@ function DeadlinePanel({ id, role, onNavigate }: { id: string; role: UserRole; o
   );
 }
 
-export function WorkspaceHeader({ currentUser, onNavigate, onOpenNavigation, isMobileSidebarOpen }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ currentUser, onNavigate, onOpenNavigation, onSignOut, isMobileSidebarOpen }: WorkspaceHeaderProps) {
   const id = useId();
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -271,9 +273,15 @@ export function WorkspaceHeader({ currentUser, onNavigate, onOpenNavigation, isM
           </button>
           {notificationsOpen && <DeadlinePanel key={`${currentUser.id}:${currentUser.role}`} id={`${id}-notifications`} role={currentUser.role} onNavigate={navigate} />}
         </div>
-        <button type="button" className={iconButton} title="My profile" aria-label="My profile" onClick={() => navigate('profile')}>
-          <ProfileAvatar key={currentUser.id} name={currentUser.full_name} />
-        </button>
+        <AccountMenu
+          role={currentUser.role}
+          fullName={currentUser.full_name}
+          avatar={<ProfileAvatar key={currentUser.id} name={currentUser.full_name} />}
+          onOpenProfile={() => navigate('profile')}
+          onOpenSettings={() => navigate('settings')}
+          onOpenChannelSettings={() => navigate('channel-settings')}
+          onSignOut={onSignOut}
+        />
       </div>
     </header>
   );

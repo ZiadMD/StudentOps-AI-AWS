@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { WorkspaceHeader } from './components/WorkspaceHeader';
 import { ThemeProvider } from './context/ThemeContext';
+import { LanguageProvider } from './context/LanguageContext';
+import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, Tab, Role } from './components/Sidebar';
 import { LoginPage }          from './components/auth/LoginPage';
 import { RegisterPage }       from './components/auth/RegisterPage';
@@ -125,7 +127,6 @@ function AppContent() {
         setActiveTab={setActiveTab}
         role={userRole}
         currentUser={currentUser}
-        onLogout={handleLogout}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
         isDesktopCollapsed={isDesktopCollapsed}
@@ -138,6 +139,7 @@ function AppContent() {
           currentUser={currentUser}
           onNavigate={setActiveTab}
           onOpenNavigation={() => setIsMobileSidebarOpen(true)}
+          onSignOut={handleLogout}
           isMobileSidebarOpen={isMobileSidebarOpen}
         />
 
@@ -170,6 +172,9 @@ function AppContent() {
             {activeTab === 'inbox'         && <WhatsAppAgentPage currentUser={currentUser} view="chat" />}
             {activeTab === 'follow-ups'    && <WhatsAppAgentPage currentUser={currentUser} view="escalations" />}
             {activeTab === 'channel-settings' && <WhatsAppAgentPage currentUser={currentUser} view="official" />}
+            {activeTab === 'settings' && (
+              <SettingsPage role={userRole} onOpenChannelSettings={() => setActiveTab('channel-settings')} />
+            )}
             {activeTab === 'notifications' && <NotificationsPage />}
             {activeTab === 'audit'         && <AuditViewer />}
             {activeTab === 'profile'       && <ProfilePage key={currentUser.id} currentUser={currentUser} />}
@@ -183,9 +188,11 @@ function AppContent() {
 export function App() {
   return (
     <ThemeProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
+      <LanguageProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

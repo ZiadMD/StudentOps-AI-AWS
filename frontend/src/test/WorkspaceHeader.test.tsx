@@ -1,9 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../api/client';
-import { NAV_ITEMS } from '../components/Sidebar';
 import { WorkspaceHeader, type WorkspaceHeaderProps } from '../components/WorkspaceHeader';
 import { ThemeProvider } from '../context/ThemeContext';
+import { LanguageProvider } from '../context/LanguageContext';
 import type { EscalationRecord, TaskItem, UserProfile, UserRole } from '../types';
 
 vi.mock('../api/client', () => ({ api: { getTasks: vi.fn(), getSlaEscalations: vi.fn() } }));
@@ -35,9 +35,16 @@ function deferred<T>() {
 }
 function mount(overrides: Partial<WorkspaceHeaderProps> = {}) {
   const props: WorkspaceHeaderProps = {
-    currentUser: user, onNavigate: vi.fn(), onOpenNavigation: vi.fn(), isMobileSidebarOpen: false, ...overrides,
+    currentUser: user, onNavigate: vi.fn(), onOpenNavigation: vi.fn(), onSignOut: vi.fn(),
+    isMobileSidebarOpen: false, ...overrides,
   };
-  const view = render(<ThemeProvider><WorkspaceHeader {...props} /></ThemeProvider>);
+  const view = render(
+    <ThemeProvider>
+      <LanguageProvider>
+        <WorkspaceHeader {...props} />
+      </LanguageProvider>
+    </ThemeProvider>,
+  );
   return { ...view, props };
 }
 function search(value: string) {
@@ -65,19 +72,18 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   localStorage.clear();
+  document.documentElement.dir = 'ltr';
+  document.documentElement.lang = 'en';
   document.documentElement.className = '';
   document.documentElement.style.removeProperty('color-scheme');
 });
 
 describe('WorkspaceHeader search and actions', () => {
-  it('renders a deterministic initials avatar in the profile button', () => {
-    const { props } = mount();
-    const profile = screen.getByRole('button', { name: 'My profile' });
-    expect(within(profile).queryByRole('img')).not.toBeInTheDocument();
-    const initials = within(profile).getByText('TM');
-    expect(initials).toHaveClass('rounded-full');
-    fireEvent.click(profile);
-    expect(props.onNavigate).toHaveBeenCalledWith('profile');
+  it('renders a deterministic initials avatar inside the account menu trigger', () => {
+    mount();
+    const trigger = screen.getByRole('button', { name: 'Account menu' });
+    expect(within(trigger).queryByRole('img')).not.toBeInTheDocument();
+    expect(within(trigger).getByText('TM')).toHaveClass('rounded-full');
   });
 
   it('renders only the hamburger and two icon actions, with 44px targets and no page heading', () => {
@@ -89,17 +95,19 @@ describe('WorkspaceHeader search and actions', () => {
     // pointer makes a larger target unnecessary.
     expect(screen.getByRole('combobox')).toHaveClass('h-11', 'md:h-8');
     // Three actions: the theme control is hidden while dark mode is paused, so
-    // the header exposes the hamburger, notifications and profile only.
+    // the header exposes the hamburger, notifications and the account menu.
     const buttons = within(header).getAllByRole('button').filter(button => !button.classList.contains('hidden'));
     expect(buttons).toHaveLength(3);
     for (const button of buttons) {
+      // The account menu trigger wraps the avatar rather than being an icon
+      // button, so only the hamburger and the bell carry the 44px target.
+      if (button.getAttribute('aria-label') === 'Account menu') continue;
       expect(button).toHaveClass('h-11', 'w-11', 'md:h-9', 'md:w-9');
-      expect(button).toHaveAttribute('title', button.getAttribute('aria-label'));
-      // Profile button contains initials text from the avatar; all others are icon-only
-      if (button.getAttribute('aria-label') !== 'My profile') {
-        expect(button.textContent).toBe('');
-      }
     }
+    // The account menu trigger keeps its own focus ring rather than the icon
+    // button sizing, because it wraps the avatar rather than sitting beside it.
+    expect(screen.getByRole('button', { name: 'Account menu' }).className)
+      .toContain('focus-visible:ring-2');
     expect(within(header).queryByRole('heading')).not.toBeInTheDocument();
     expect(within(header).queryByText(/Organization|breadcrumb/i)).not.toBeInTheDocument();
     const hamburger = screen.getByRole('button', { name: 'Open navigation' });
@@ -126,19 +134,56 @@ describe('WorkspaceHeader search and actions', () => {
     expect(api.getTasks).not.toHaveBeenCalled();
   });
 
-  it.each(roles)('only offers NAV_ITEMS allowed for %s, excluding profile', role => {
-    const { props } = mount({ currentUser: { ...user, role } });
-    search('');
-    expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(
-      NAV_ITEMS.filter(item => item.id !== 'profile' && item.roles.includes(role)).map(item => item.label),
-    );
-    expect(props.onNavigate).not.toHaveBeenCalled();
-    search('profile');
-    expect(screen.queryByRole('option')).not.toBeInTheDocument();
-    expect(screen.getByText('No matching pages.')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /profile/i })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'My profile' }));
+  it('opens the account menu from the avatar, showing profile, settings and sign out', () => {
+    const { props } = mount();
+    const trigger = screen.getByRole('button', { name: 'Account menu' });
+    expect(within(trigger).queryByRole('img')).not.toBeInTheDocument();
+    expect(within(trigger).getByText('TM')).toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    const menu = screen.getByRole('menu', { name: 'Account menu' });
+    expect(within(menu).getAllByRole('menuitem').map(item => item.textContent))
+      .toEqual(['Profile', 'Settings', 'Channel settings', 'Sign out']);
+
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Profile' }));
     expect(props.onNavigate).toHaveBeenCalledWith('profile');
+  });
+
+  it('marks sign out as a destructive action and keeps it out of the rail', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    const signOut = screen.getByRole('menuitem', { name: 'Sign out' });
+    expect(signOut.className).toContain('text-rose-600');
+  });
+
+  it('hides channel settings from the account menu for non-admin roles', () => {
+    for (const role of ['committee_member', 'member', 'team_lead', 'committee_hr_member'] as const) {
+      const view = mount({ currentUser: { ...user, role } });
+      fireEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+      expect(screen.queryByRole('menuitem', { name: 'Channel settings' })).not.toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
+  it('switches language from the account menu and persists the choice', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    const group = within(screen.getByRole('radiogroup', { name: 'Language' }));
+    const arabic = group.getByText('العربية');
+    expect(arabic).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(arabic);
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(localStorage.getItem('studentops_language')).toBe('ar');
+
+    // The menu stays open across the switch, and must now reflect the stored
+    // choice. Switching back clears the document direction so the shell is
+    // not left mirrored.
+    const after = within(screen.getByRole('radiogroup', { name: 'Language' }));
+    expect(after.getByText('العربية')).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(after.getByText('English'));
+    expect(document.documentElement.dir).toBe('ltr');
   });
 
   it.each([
@@ -163,6 +208,24 @@ describe('WorkspaceHeader search and actions', () => {
       search(value);
       expect(screen.queryByRole('option')).not.toBeInTheDocument();
     }
+  });
+
+  // Channel settings is gated by role in the rail, the account menu and the
+  // settings page. The search index is built from the same NAV_ITEMS table, so
+  // it must inherit the same gate or the page stays reachable by typing.
+  it('keeps channel settings out of search for roles that cannot administer it', () => {
+    mount({ currentUser: { ...user, role: 'member' } });
+    for (const value of ['channel', 'whatsapp channel']) {
+      search(value);
+      expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    }
+  });
+
+  it('surfaces channel settings in search for an administrator', () => {
+    const { props } = mount({ currentUser: { ...user, role: 'hr_admin' } });
+    search('channel');
+    fireEvent.click(screen.getByRole('option', { name: 'Channel settings' }));
+    expect(props.onNavigate).toHaveBeenCalledExactlyOnceWith('channel-settings');
   });
 
   it('supports arrow selection, wraparound, Enter and Escape with valid ARIA references', () => {
@@ -208,7 +271,7 @@ describe('WorkspaceHeader search and actions', () => {
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     fireEvent.focus(input);
-    fireEvent.blur(input, { relatedTarget: screen.getByRole('button', { name: 'My profile' }) });
+    fireEvent.blur(input, { relatedTarget: screen.getByRole('button', { name: 'Account menu' }) });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
@@ -404,7 +467,13 @@ describe('WorkspaceHeader deadline dropdown', () => {
     vi.mocked(api.getSlaEscalations).mockReturnValueOnce(pending.promise);
     const { rerender, props } = mount();
     openBell();
-    rerender(<ThemeProvider><WorkspaceHeader {...props} currentUser={{ ...user, id: 'usr_other', role: 'member' }} /></ThemeProvider>);
+    rerender(
+      <ThemeProvider>
+        <LanguageProvider>
+          <WorkspaceHeader {...props} currentUser={{ ...user, id: 'usr_other', role: 'member' }} />
+        </LanguageProvider>
+      </ThemeProvider>,
+    );
     await settle();
     await act(async () => { pending.resolve([followUp('Previous user record')]); });
     expect(screen.queryByText('Previous user record')).not.toBeInTheDocument();

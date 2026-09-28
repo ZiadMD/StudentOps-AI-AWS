@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, cleanup, render, screen, within } from '@testing-library/react';
 import { NAV_GROUPS, NAV_ITEMS, Sidebar, Tab, Role } from '../components/Sidebar';
 import { UserProfile } from '../types';
 
@@ -32,29 +32,41 @@ describe('Sidebar role-based navigation gating', () => {
   ])('scopes separate communication routes for %s', role => {
     render(<Sidebar {...defaultProps} role={role} />);
     const canCommunicate = role !== 'committee_member' && role !== 'member';
-    const canConfigure = role === 'region_hr_head' || role === 'hr_admin';
     for (const [id, label, allowed] of [
       ['inbox', 'Inbox', canCommunicate],
       ['follow-ups', 'Follow-ups', canCommunicate],
-      ['channel-settings', 'Channel settings', canConfigure],
     ] as const) {
       expect(NAV_ITEMS.find(item => item.id === id)?.roles.includes(role)).toBe(allowed);
       if (allowed) expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
       else expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
     }
-    expect(Boolean(screen.queryByRole('region', { name: 'Settings' }))).toBe(canConfigure);
-    expect(Boolean(screen.queryByRole('region', { name: 'Operations & automation' }))).toBe(canCommunicate);
+    expect(Boolean(screen.queryByRole('region', { name: 'Operations' }))).toBe(canCommunicate);
     expect(NAV_ITEMS.find(item => item.id === 'profile')?.roles).toContain(role);
     expect(screen.queryByRole('button', { name: /profile/i })).not.toBeInTheDocument();
   });
 
+  it('keeps channel settings and sign out out of the rail', () => {
+    // Both moved to the account menu in the header. Channel settings remains
+    // role-scoped in NAV_ITEMS, it is simply not rendered as a rail row.
+    for (const role of ['region_hr_head', 'hr_admin', 'committee_hr_member', 'member'] as const) {
+      render(<Sidebar {...defaultProps} role={role} />);
+      expect(screen.queryByRole('button', { name: 'Channel settings' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  it('gives every group at least two items so no heading heads a single row', () => {
+    for (const group of NAV_GROUPS) {
+      expect(group.ids.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   it('groups operations separately from channel settings without a legacy or profile entry', () => {
     render(<Sidebar {...defaultProps} role="hr_admin" />);
-    const operations = within(screen.getByRole('region', { name: 'Operations & automation' }));
+    const operations = within(screen.getByRole('region', { name: 'Operations' }));
     expect(operations.getAllByRole('button').map(button => button.getAttribute('aria-label')))
       .toEqual(['Operations Assistant', 'Inbox', 'Follow-ups', 'Reminders']);
-    expect(within(screen.getByRole('region', { name: 'Settings' })).getAllByRole('button'))
-      .toEqual([screen.getByRole('button', { name: 'Channel settings' })]);
     expect(NAV_GROUPS.flatMap(group => group.ids)).not.toContain('profile');
     expect(NAV_ITEMS.map(item => item.id)).not.toContain('whatsapp');
     expect(screen.queryByRole('button', { name: /communications|whatsapp/i })).not.toBeInTheDocument();
@@ -87,7 +99,7 @@ describe('Sidebar role-based navigation gating', () => {
   });
 
   it.each([
-    ['inbox', 'Inbox'], ['follow-ups', 'Follow-ups'], ['channel-settings', 'Channel settings'],
+    ['inbox', 'Inbox'], ['follow-ups', 'Follow-ups'],
   ] as const)('selects %s directly and closes the mobile drawer', (activeTab, label) => {
     render(<Sidebar {...defaultProps} activeTab={activeTab} role="hr_admin" isMobileOpen />);
     const item = screen.getByRole('button', { name: label });
@@ -97,12 +109,10 @@ describe('Sidebar role-based navigation gating', () => {
     expect(defaultProps.setIsMobileOpen).toHaveBeenCalledWith(false);
   });
 
-  it('preserves logout and desktop collapse controls', () => {
+  it('preserves desktop collapse controls and the keyboard shortcut', () => {
     const setIsDesktopCollapsed = vi.fn();
     const props = { ...defaultProps, role: 'hr_admin' as const, setIsDesktopCollapsed };
     const { rerender, unmount } = render(<Sidebar {...props} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(defaultProps.onLogout).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
     expect(setIsDesktopCollapsed).toHaveBeenLastCalledWith(true);
     rerender(<Sidebar {...props} isDesktopCollapsed />);
@@ -130,7 +140,15 @@ describe('Sidebar role-based navigation gating', () => {
     opener.focus();
     rerender(<><button>Open drawer</button><Sidebar {...props} isMobileOpen /></>);
     const first = screen.getByRole('link', { name: /StudentOps/ });
-    const last = screen.getByRole('button', { name: 'Sign out' });
+    // The drawer used to end at Sign out. It now ends at whichever control is
+    // last in the accessibility order, since the account menu in the header
+    // owns signing out. Assert the wrap still returns to the first control.
+    // In document order, so "last" means what a Tab actually reaches last.
+    const drawer = screen.getByRole('complementary');
+    const focusable = Array.from(
+      drawer.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]'),
+    );
+    const last = focusable[focusable.length - 1];
     expect(first).toHaveFocus();
     expect(document.body.style.overflow).toBe('hidden');
     fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
