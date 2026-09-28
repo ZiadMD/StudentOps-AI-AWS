@@ -1,5 +1,5 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Layers } from 'lucide-react';
 
 /*
  * Auth form primitives.
@@ -87,45 +87,60 @@ export function PasswordField({ id, value, onChange, autoComplete, disabled, inv
  * Two-column auth shell: context on the left for wide screens, form on the
  * right. Below `lg` the context column collapses to a compact header so the
  * form owns the full width on tablets and phones.
+ *
+ * The left column is a dark ink panel with a slow moving colour field behind
+ * the text. The panel is hidden below `lg`, so a phone never pays for the
+ * animation it cannot see.
  */
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900 lg:grid lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-      <div className="flex flex-col border-b border-slate-200 bg-slate-100 px-6 py-6 sm:px-10 lg:min-h-dvh lg:border-b-0 lg:border-r lg:px-12 lg:py-10 xl:px-16">
+    <div className="min-h-dvh bg-slate-50 text-slate-900 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="auth-panel flex min-h-0 flex-col overflow-y-auto px-6 py-6 sm:px-10 lg:h-dvh lg:min-h-0 lg:px-12 lg:py-10 xl:px-16">
+        <div aria-hidden="true" className="auth-panel__bloom auth-panel__bloom--one" />
+        <div aria-hidden="true" className="auth-panel__bloom auth-panel__bloom--two" />
+        <div aria-hidden="true" className="auth-panel__bloom auth-panel__bloom--three" />
+        <div aria-hidden="true" className="auth-panel__grid" />
+
         <a
           href="/"
           aria-label="StudentOps home"
-          className="w-fit rounded-sm font-display text-lg font-semibold tracking-[-0.02em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-4"
+          className="relative z-10 flex w-fit min-h-11 items-center gap-2.5 rounded-sm font-display text-lg font-semibold tracking-[-0.02em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
         >
+          <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/10">
+            <Layers aria-hidden="true" className="h-5 w-5 text-white" />
+          </span>
           StudentOps
         </a>
 
-        <aside aria-label="About StudentOps" className="hidden flex-1 flex-col justify-center py-16 lg:flex">
-          <p className="eyebrow mb-6">Operations for student organizations</p>
-          <h2 className="max-w-md font-display text-4xl font-medium leading-[1.12] tracking-[-0.025em] xl:text-5xl">
+        <aside aria-label="About StudentOps" className="relative z-10 my-auto hidden flex-col justify-center py-10 lg:flex">
+          <p className="mb-6 text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+            Operations for student organizations
+          </p>
+          <h2 className="max-w-md font-display text-4xl font-medium leading-[1.12] tracking-[-0.025em] text-white xl:text-5xl">
             The people, the sessions,
             <br />
             and the work in one place.
           </h2>
-          <p className="mt-6 max-w-sm text-base leading-7 text-slate-600">
+          <p className="mt-6 max-w-sm text-base leading-7 text-slate-300">
             Keep your member registry, attendance records and deliverables
             accurate without chasing spreadsheets.
           </p>
-          <dl className="mt-10 max-w-sm border-t border-slate-900/15 text-sm">
+
+          <dl className="mt-9 grid max-w-sm grid-cols-3 gap-2">
             {[
-              ['Members', 'Registry and committee assignments'],
-              ['Sessions', 'Attendance and absence follow-up'],
-              ['Tasks', 'Assignments, reviews and feedback'],
+              ['Members', 'Registry and assignments'],
+              ['Sessions', 'Attendance and follow-up'],
+              ['Tasks', 'Reviews and feedback'],
             ].map(([term, detail]) => (
-              <div key={term} className="flex items-baseline justify-between gap-6 border-b border-slate-200 py-3.5">
-                <dt className="font-medium text-slate-900">{term}</dt>
-                <dd className="text-right text-slate-600">{detail}</dd>
+              <div key={term} className="rounded-lg border border-white/10 bg-white/[0.06] p-3">
+                <dt className="text-xs font-semibold text-white">{term}</dt>
+                <dd className="mt-1 text-[0.6875rem] leading-relaxed text-slate-400">{detail}</dd>
               </div>
             ))}
           </dl>
         </aside>
 
-        <p className="hidden text-xs text-slate-500 lg:block">
+        <p className="relative z-10 hidden text-xs text-slate-400 lg:block">
           Access is granted by your organization administrator.
         </p>
       </div>

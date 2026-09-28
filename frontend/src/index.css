@@ -38,6 +38,122 @@
   }
 }
 
+/* ---------------------------------------------------------------------
+ * Animated backdrop for the sign-in and sign-up context panel.
+ *
+ * The panel is a dark ink field, so the movement comes from three slow
+ * drifting colour blooms rather than a rotating gradient. Rotating gradients
+ * read as a loading spinner and produce a visible seam where they wrap; a
+ * radial bloom has no seam and can drift off-canvas without a hard edge.
+ *
+ * The blooms are painted in `screen` blend so they lighten the ink instead of
+ * replacing it, which keeps white body text above AA contrast at all times.
+ * No `will-change` or `filter` is used, because both promote a full-panel
+ * layer for an animation that runs for the whole time the page is open.
+ * ------------------------------------------------------------------- */
+.auth-panel {
+  position: relative;
+  isolation: isolate;
+  background-color: #0b1220;
+  overflow: hidden;
+}
+
+/* The blooms themselves. Positioned by percentage so the composition holds at
+   any panel size, and oversized so a drifting blob never exposes an edge. */
+.auth-panel__bloom {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.auth-panel__bloom--one {
+  top: -22%;
+  left: -18%;
+  width: 78%;
+  height: 78%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(37 99 235 / 0.55) 0%,
+    rgb(37 99 235 / 0.18) 42%,
+    transparent 70%
+  );
+  animation: auth-drift-one 26s ease-in-out infinite alternate;
+}
+
+.auth-panel__bloom--two {
+  bottom: -26%;
+  right: -20%;
+  width: 72%;
+  height: 72%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(14 165 233 / 0.42) 0%,
+    rgb(14 165 233 / 0.14) 44%,
+    transparent 72%
+  );
+  animation: auth-drift-two 32s ease-in-out infinite alternate;
+}
+
+/* A third, slower violet bloom keeps the field from reading as two flat
+   colours once the first two have moved apart. */
+.auth-panel__bloom--three {
+  top: 34%;
+  left: 8%;
+  width: 62%;
+  height: 62%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(99 102 241 / 0.30) 0%,
+    rgb(99 102 241 / 0.10) 46%,
+    transparent 74%
+  );
+  animation: auth-drift-three 38s ease-in-out infinite alternate;
+}
+
+/* Transform-only keyframes: translate and scale stay on the compositor, so the
+   animation never triggers layout or paint on the panel's contents. */
+@keyframes auth-drift-one {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(18%, 14%, 0) scale(1.16); }
+}
+
+@keyframes auth-drift-two {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-16%, -12%, 0) scale(0.94); }
+}
+
+@keyframes auth-drift-three {
+  from { transform: translate3d(0, 0, 0) scale(0.96); }
+  to   { transform: translate3d(12%, -16%, 0) scale(1.2); }
+}
+
+/* Respect the OS setting. The blooms hold their resting position, so the panel
+   still reads as the coloured surface it is meant to be. The global block in
+   `prefers-reduced-motion` also clamps these, but this keeps them visible. */
+@media (prefers-reduced-motion: reduce) {
+  .auth-panel__bloom {
+    animation: none;
+    will-change: auto;
+  }
+}
+
+/* A hairline grid over the blooms. Gives the field a printed structure that
+   the soft colour would otherwise lack, and reads as texture at 1px. */
+.auth-panel__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, #000 30%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, #000 30%, transparent 78%);
+}
+
 @layer base {
   :root {
     --background: 210 40% 98%;

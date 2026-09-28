@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginPage } from '../components/auth/LoginPage';
 import { RegisterPage } from '../components/auth/RegisterPage';
@@ -148,6 +148,41 @@ describe('Login', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
     expect(password).toHaveAttribute('type', 'password');
     expect(password).toHaveValue('unchanged password');
+  });
+
+  it('gives the context panel a moving colour field behind its text', () => {
+    const { container } = render(<LoginPage onLogin={vi.fn()} onGoToRegister={vi.fn()} />);
+    const panel = container.querySelector<HTMLElement>('.auth-panel')!;
+
+    // Three drifting blooms plus the hairline grid. Each bloom must be marked
+    // decorative so a screen reader never announces an empty div.
+    const blooms = panel.querySelectorAll('.auth-panel__bloom');
+    expect(blooms).toHaveLength(3);
+    for (const bloom of blooms) {
+      expect(bloom).toHaveAttribute('aria-hidden', 'true');
+    }
+    expect(panel.querySelector('.auth-panel__grid')).toHaveAttribute('aria-hidden', 'true');
+
+    // The wordmark and the context copy must sit above the blooms, or the
+    // moving colour would render over the text.
+    for (const selector of ['a[aria-label="StudentOps home"]', 'aside[aria-label="About StudentOps"]']) {
+      expect(panel.querySelector(selector)!.className).toContain('z-10');
+    }
+  });
+
+  it('keeps the panel content readable by pairing light text with the dark field', () => {
+    const { container } = render(<LoginPage onLogin={vi.fn()} onGoToRegister={vi.fn()} />);
+    const aside = container.querySelector<HTMLElement>('aside[aria-label="About StudentOps"]')!;
+    const heading = within(aside).getByRole('heading', { level: 2 });
+    expect(heading.className).toContain('text-white');
+    // Every term and definition in the panel sits on the dark field, so each
+    // one has to carry a light text colour of its own.
+    for (const term of within(aside).getAllByRole('term')) {
+      expect(term.className).toContain('text-white');
+    }
+    for (const detail of within(aside).getAllByRole('definition')) {
+      expect(detail.className).toContain('text-slate-400');
+    }
   });
 
   it('routes to the sign-up screen from the join link', () => {
