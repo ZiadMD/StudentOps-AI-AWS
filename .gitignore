@@ -100,3 +100,9 @@ pnpm-debug.log*
 cdk.out/
 .serverless/
 samconfig.toml
+
+# ==============================
+# Local design tooling (not part of the build)
+# ==============================
+.specstory/
+exported-figma-html/
