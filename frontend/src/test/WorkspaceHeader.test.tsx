@@ -83,15 +83,17 @@ describe('WorkspaceHeader search and actions', () => {
   it('renders only the hamburger and two icon actions, with 44px targets and no page heading', () => {
     const { props } = mount();
     const header = screen.getByRole('banner');
-    expect(header).toHaveClass('sticky', 'top-0', 'z-30', 'h-14', 'md:grid');
+    expect(header).toHaveClass('sticky', 'top-0', 'z-30', 'h-14', 'md:h-12', 'md:grid');
     expect(screen.getByRole('combobox').parentElement).toHaveClass('md:col-start-2');
-    expect(screen.getByRole('combobox')).toHaveClass('md:h-9');
+    // The search field is 44px tall for touch and 32px from md up, where a
+    // pointer makes a larger target unnecessary.
+    expect(screen.getByRole('combobox')).toHaveClass('h-11', 'md:h-8');
     // Three actions: the theme control is hidden while dark mode is paused, so
     // the header exposes the hamburger, notifications and profile only.
     const buttons = within(header).getAllByRole('button').filter(button => !button.classList.contains('hidden'));
     expect(buttons).toHaveLength(3);
     for (const button of buttons) {
-      expect(button).toHaveClass('h-11', 'w-11');
+      expect(button).toHaveClass('h-11', 'w-11', 'md:h-9', 'md:w-9');
       expect(button).toHaveAttribute('title', button.getAttribute('aria-label'));
       // Profile button contains initials text from the avatar; all others are icon-only
       if (button.getAttribute('aria-label') !== 'My profile') {

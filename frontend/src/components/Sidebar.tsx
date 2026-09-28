@@ -316,8 +316,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Role-filtered groups keep related workflows together. */}
         <nav aria-label="Workspace pages" className="flex-1 overflow-y-auto px-3 py-3">
           {groups.map(group => (
-            <section key={group.label} aria-label={group.label} className="mb-4 last:mb-0">
-              <h2 className={`px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500 ${isDesktopCollapsed ? 'lg:sr-only' : ''}`}>{group.label}</h2>
+            <section key={group.label} aria-label={group.label} className="mb-3 last:mb-0">
+              <h2 className={`px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500 ${isDesktopCollapsed ? 'lg:sr-only' : ''}`}>{group.label}</h2>
               {group.items.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -330,7 +330,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 title={isDesktopCollapsed ? item.label : undefined}
                 className={`w-full flex items-center ${
                   isDesktopCollapsed ? 'md:justify-center md:px-0' : 'justify-between px-3 md:px-2.5'
-                } py-3 md:py-[7px] rounded-xl md:rounded-md text-[15px] md:text-[13px] transition-colors ${
+                } py-2.5 md:py-1.5 md:gap-1 rounded-xl md:rounded-md text-[15px] md:text-[13px] transition-colors ${
                   isActive
                     ? 'bg-slate-900 text-white md:bg-slate-100 md:text-slate-900 font-semibold shadow-sm md:shadow-none'
                     : 'text-slate-700 md:text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 active:bg-slate-100'
@@ -371,7 +371,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title={isDesktopCollapsed ? 'Sign out' : undefined}
           className={`w-full flex items-center ${
             isDesktopCollapsed ? 'md:justify-center md:px-0' : 'space-x-3 md:space-x-2.5 px-3 md:px-2.5'
-          } py-2.5 md:py-2 rounded-xl md:rounded-md text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors text-[14px] md:text-[13px]`}
+          } py-2.5 md:py-1.5 rounded-xl md:rounded-md text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors text-[14px] md:text-[13px]`}
         >
           <LogOut className="w-5 h-5 md:w-4 md:h-4 text-slate-400 hover:text-rose-600 shrink-0" />
           <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>Sign out</span>

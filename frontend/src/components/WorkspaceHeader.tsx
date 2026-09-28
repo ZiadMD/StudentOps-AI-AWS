@@ -18,8 +18,8 @@ const ALIASES: Partial<Record<Tab, string>> = {
   inbox: 'whatsapp conversations',
   'follow-ups': 'follow ups followups escalation escalations',
 };
-const iconButton = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:text-slate-300 dark:hover:bg-slate-800';
-const textButton = 'min-h-11 rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:hover:bg-slate-800';
+const iconButton = 'flex h-11 w-11 md:h-9 md:w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:text-slate-300 dark:hover:bg-slate-800';
+const textButton = 'min-h-11 md:min-h-9 rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:hover:bg-slate-800';
 
 // The API also returns naive UTC timestamps from the database.
 function timestamp(value: string): number {
@@ -202,7 +202,7 @@ export function WorkspaceHeader({ currentUser, onNavigate, onOpenNavigation, isM
   }, [notificationsOpen]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 min-w-0 items-center gap-2 border-b border-slate-200 bg-white px-3 md:grid md:grid-cols-[minmax(8.5rem,1fr)_minmax(0,28rem)_minmax(8.5rem,1fr)] md:gap-3 sm:px-6 dark:border-slate-700 dark:bg-slate-900">
+    <header className="sticky top-0 z-30 flex h-14 md:h-12 min-w-0 items-center gap-2 border-b border-slate-200 bg-white px-3 md:grid md:grid-cols-[minmax(8.5rem,1fr)_minmax(0,28rem)_minmax(8.5rem,1fr)] md:gap-3 sm:px-6 dark:border-slate-700 dark:bg-slate-900">
       <div className="shrink-0 md:min-w-0">
         <button type="button" className={`${iconButton} md:hidden`} title="Open navigation" aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded={isMobileSidebarOpen} onClick={onOpenNavigation}>
           <Menu className="h-5 w-5" aria-hidden="true" />
@@ -216,7 +216,7 @@ export function WorkspaceHeader({ currentUser, onNavigate, onOpenNavigation, isM
           ref={inputRef} type="text" role="combobox" aria-label="Search pages" placeholder="Search pages" title="Search pages (Ctrl+K / Cmd+K)"
           aria-autocomplete="list" aria-haspopup="listbox" aria-expanded={searchOpen} aria-controls={searchOpen ? `${id}-pages` : undefined}
           aria-activedescendant={searchOpen && active ? `${id}-page-${active.id}` : undefined} aria-keyshortcuts="Control+k Meta+k" autoComplete="off" value={query}
-          className="h-11 md:h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-base text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500 sm:pl-9 sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          className="h-11 md:h-8 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-base text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500 sm:pl-9 sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           onFocus={() => { setSearchOpen(true); setActiveIndex(-1); }}
           onChange={event => { setQuery(event.target.value); setSearchOpen(true); setActiveIndex(-1); }}
           onKeyDown={event => {
