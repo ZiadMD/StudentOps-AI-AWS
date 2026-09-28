@@ -51,11 +51,26 @@
  * No `will-change` or `filter` is used, because both promote a full-panel
  * layer for an animation that runs for the whole time the page is open.
  * ------------------------------------------------------------------- */
+/* The panel tracks the viewport height and stays put while the document
+   scrolls. This is what keeps a short, wide window from turning the panel
+   into its own scroll container: the page grows to fit the form, and the
+   panel simply holds position beside it. `top-0` is required alongside
+   `sticky` or the panel stops at its natural offset instead of pinning. */
 .auth-panel {
   position: relative;
   isolation: isolate;
   background-color: #0b1220;
   overflow: hidden;
+}
+
+/* Below `lg` the panel is only a wordmark, so it must not inherit the
+   viewport height and leave a tall empty block under a short form. */
+@media (min-width: 1024px) {
+  .auth-panel {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+  }
 }
 
 /* The blooms themselves. Positioned by percentage so the composition holds at

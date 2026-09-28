@@ -91,11 +91,16 @@ export function PasswordField({ id, value, onChange, autoComplete, disabled, inv
  * The left column is a dark ink panel with a slow moving colour field behind
  * the text. The panel is hidden below `lg`, so a phone never pays for the
  * animation it cannot see.
+ *
+ * Neither column scrolls on its own. The page grows to fit whichever side is
+ * taller and the document scrolls once, so a short, wide window cannot trap
+ * the panel in a fixed-height scroller. `.auth-panel` is `sticky` instead, so
+ * the colour field stays put while a long form like sign-up scrolls past it.
  */
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <div className="auth-panel flex min-h-0 flex-col overflow-y-auto px-6 py-6 sm:px-10 lg:h-dvh lg:min-h-0 lg:px-12 lg:py-10 xl:px-16">
+      <div className="auth-panel flex min-w-0 flex-col px-6 py-6 sm:px-10 lg:px-12 lg:py-10 xl:px-16">
         <div aria-hidden="true" className="auth-panel__bloom auth-panel__bloom--one" />
         <div aria-hidden="true" className="auth-panel__bloom auth-panel__bloom--two" />
         <div aria-hidden="true" className="auth-panel__bloom auth-panel__bloom--three" />
