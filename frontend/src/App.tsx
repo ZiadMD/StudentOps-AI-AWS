@@ -175,7 +175,7 @@ function AppContent() {
             {activeTab === 'settings' && (
               <SettingsPage role={userRole} onOpenChannelSettings={() => setActiveTab('channel-settings')} />
             )}
-            {activeTab === 'notifications' && <NotificationsPage />}
+            {activeTab === 'notifications' && <NotificationsPage currentUser={currentUser} />}
             {activeTab === 'audit'         && <AuditViewer />}
             {activeTab === 'profile'       && <ProfilePage key={currentUser.id} currentUser={currentUser} />}
           </div>

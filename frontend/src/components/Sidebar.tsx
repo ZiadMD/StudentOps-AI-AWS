@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useFocusContainment } from '../hooks/useFocusContainment';
+import { useLanguage } from '../context/LanguageContext';
 import {
   Bot,
   LayoutDashboard,
@@ -117,7 +118,9 @@ export const NAV_ITEMS: {
     id: 'qna',
     label: 'Committee Q&A',
     icon: MessageCircleQuestion,
-    roles: ['committee_head', 'committee_member', 'member', 'committee_hr_leader', 'hr_admin', 'team_lead'],
+    // region_hr_head is included because routes_questions already permits the
+    // role to answer; hiding the tab left the backend capability unreachable.
+    roles: ['committee_head', 'committee_member', 'member', 'committee_hr_leader', 'hr_admin', 'team_lead', 'region_hr_head'],
   },
   {
     id: 'feedback',
@@ -164,7 +167,10 @@ export const NAV_ITEMS: {
     id: 'notifications',
     label: 'Reminders',
     icon: Bell,
-    roles: ['region_hr_head', 'committee_hr_leader', 'hr_admin', 'team_lead'],
+    // Members and committee members can see their own reminders. The backend
+    // scopes GET /reminders to the recipient for these roles, so the page
+    // shows them their own alerts and nothing addressed to a committee.
+    roles: ['region_hr_head', 'committee_hr_leader', 'committee_head', 'committee_hr_member', 'committee_member', 'hr_admin', 'team_lead', 'member'],
   },
   {
     id: 'audit',
@@ -208,6 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDesktopCollapsed = false,
   setIsDesktopCollapsed,
 }) => {
+  const { t } = useLanguage();
   const visibleItems = NAV_ITEMS.filter(item => item.roles.includes(role));
   const sidebarRef = useRef<HTMLElement>(null);
   useFocusContainment(sidebarRef, isMobileOpen);
@@ -338,6 +345,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {group.items.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            // The untranslated label stays on aria-label so assistive tech and
+            // the collapsed tooltip read the same in both languages.
+            const localizedLabel = t(item.id, item.label);
             return (
               <button
                 key={item.id}
@@ -362,7 +372,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   />
                   <span className={isDesktopCollapsed ? 'md:hidden' : 'block'}>
-                    {item.label}
+                    {localizedLabel}
                   </span>
                 </div>
                 {item.isAgent && (

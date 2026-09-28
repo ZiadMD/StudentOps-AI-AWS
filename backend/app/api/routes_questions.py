@@ -117,10 +117,10 @@ async def answer_question(
     question_id: str,
     body: QuestionAnswerRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["committee_head", "team_lead", "hr_admin"]))
+    current_user: User = Depends(require_roles(["committee_head", "team_lead", "hr_admin", "region_hr_head"]))
 ):
     """
-    Committee Head answers a member's question.
+    Committee Head, HR Admin, or Regional HR Head answers a member's question.
     """
     res = await db.execute(select(MemberQuestion).where(MemberQuestion.id == question_id))
     q = res.scalar_one_or_none()

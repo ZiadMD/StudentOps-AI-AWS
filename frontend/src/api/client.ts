@@ -22,6 +22,7 @@ import {
   MemberFeedbackItem,
   MemberQuestionItem,
   CommitteeReportItem,
+  ReminderItem,
 } from '../types';
 
 import { memoryCache } from './cache';
@@ -371,6 +372,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ content }),
     }),
+
+  // Reminders & Notifications
+  getReminders: () => fetchJson<ReminderItem[]>('/automation/reminders'),
+  getReminder: (reminderId: string) =>
+    fetchJson<ReminderItem>(`/automation/reminders/${encodeURIComponent(reminderId)}`),
 
   // Audit Logs
   getAuditLogs: () => fetchJson<AuditLogItem[]>('/audit/logs'),

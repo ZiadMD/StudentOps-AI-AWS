@@ -40,7 +40,17 @@ describe('Sidebar role-based navigation gating', () => {
       if (allowed) expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
       else expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
     }
-    expect(Boolean(screen.queryByRole('region', { name: 'Operations' }))).toBe(canCommunicate);
+    // Members keep an Operations section because Reminders is scoped to their
+    // own inbox, so a bare check on the group no longer means "can communicate".
+    // Assert the two things that actually matter instead: the members' group
+    // holds only Reminders, and neither communication route leaked into it.
+    const operations = screen.queryByRole('region', { name: 'Operations' });
+    expect(operations !== null).toBe(true);
+    expect(within(operations as HTMLElement).getByRole('button', { name: 'Reminders' })).toBeInTheDocument();
+    if (!canCommunicate) {
+      expect(within(operations as HTMLElement).queryByRole('button', { name: 'Inbox' })).not.toBeInTheDocument();
+      expect(within(operations as HTMLElement).queryByRole('button', { name: 'Follow-ups' })).not.toBeInTheDocument();
+    }
     expect(NAV_ITEMS.find(item => item.id === 'profile')?.roles).toContain(role);
     expect(screen.queryByRole('button', { name: /profile/i })).not.toBeInTheDocument();
   });
@@ -176,6 +186,7 @@ describe('Sidebar role-based navigation gating', () => {
     expect(screen.getByRole('button', { name: /meet attendance/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /tasks & deliverables/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /committee q&a/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^reminders$/i })).toBeInTheDocument();
 
     // Forbidden administrative and evaluation tabs
     expect(screen.queryByRole('button', { name: /evaluations/i })).not.toBeInTheDocument();
@@ -199,13 +210,14 @@ describe('Sidebar role-based navigation gating', () => {
     expect(screen.getByRole('button', { name: /task reviews/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /evaluations/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /operations assistant/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /committee q&a/i })).toBeInTheDocument();
 
     // Should NOT see executive reports or audit log
     expect(screen.queryByRole('button', { name: /executive reports/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /audit log/i })).not.toBeInTheDocument();
   });
 
-  it('allows region_hr_head to access executive reports and audit log, but not technical task reviews', () => {
+  it('allows region_hr_head to access executive reports, audit log, and committee q&a', () => {
     render(
       <Sidebar
         {...defaultProps}
@@ -218,6 +230,8 @@ describe('Sidebar role-based navigation gating', () => {
     expect(screen.getByRole('button', { name: /executive reports/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /audit log/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Inbox' })).toBeInTheDocument();
+    // Requirement 2: HR Head MUST see Committee Q&A
+    expect(screen.getByRole('button', { name: /committee q&a/i })).toBeInTheDocument();
 
     // Technical task reviews are restricted to committee heads
     expect(screen.queryByRole('button', { name: /task reviews/i })).not.toBeInTheDocument();
