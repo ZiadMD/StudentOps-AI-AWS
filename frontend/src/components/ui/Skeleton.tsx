@@ -74,7 +74,7 @@ export const SkeletonCard: React.FC<{ className?: string }> = ({ className }) =>
       role="status"
       aria-busy="true"
       className={cn(
-        'p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3',
+        'p-4 bg-white border border-slate-200 rounded-xl shadow-sm space-y-3',
         className
       )}
     >
@@ -111,7 +111,7 @@ export const SkeletonStatCard: React.FC<{ className?: string }> = ({ className }
       role="status"
       aria-busy="true"
       className={cn(
-        'p-5 bg-white border border-slate-200/90 rounded-xl shadow-xs space-y-3',
+        'p-5 bg-white border border-slate-200/90 rounded-xl shadow-sm space-y-3',
         className
       )}
     >

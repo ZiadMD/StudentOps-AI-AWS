@@ -6,7 +6,6 @@ import {
   Search,
   ShieldCheck,
   Edit2,
-  Shield,
   MessageSquareHeart,
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
@@ -21,12 +20,13 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
   const toast = useToast();
   const [feedbacks, setFeedbacks] = useState<MemberFeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'REVIEWED' | 'ACTIONED'>('ALL');
 
   // Submit Feedback Modal (Member)
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [hrMemberName, setHrMemberName] = useState('Farah Tarek (Social Media HR Member)');
+  const [hrMemberName, setHrMemberName] = useState('');
   const [category, setCategory] = useState('COMMUNICATION');
   const [content, setContent] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
@@ -49,10 +49,11 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
     }
     try {
       setLoading(true);
+      setError(null);
       const data = await api.getFeedback();
       setFeedbacks(data);
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Unable to load feedback.');
     } finally {
       setLoading(false);
     }
@@ -64,12 +65,9 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
 
   if (isForbidden) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
-        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-          <Shield className="w-6 h-6" />
-        </div>
+      <div className="workspace-page min-w-0 space-y-6">
         <div>
-          <h2 className="text-base font-bold text-slate-900">Confidential HR Channel</h2>
+          <h2 className="text-[28px] leading-tight font-semibold text-slate-900">Confidential HR Channel</h2>
           <p className="text-xs text-slate-500 mt-1 leading-relaxed">
             Member evaluations regarding HR members flow directly to the HR Committee Leader and are confidential.
             HR Members and Committee Heads do not have access to peer evaluations.
@@ -134,13 +132,13 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
   });
 
   return (
-    <div className="space-y-6">
+    <div className="workspace-page min-w-0 space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col gap-5 border-b border-slate-200 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-              Member Feedback for HR Members
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">
+              Member Feedback
             </h2>
             {isHrHead && (
               <span className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
@@ -148,24 +146,25 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
               </span>
             )}
           </div>
-          <p className="text-[12px] text-slate-500 mt-0.5">
+          <p className="text-sm text-slate-600 mt-2">
             Members submit feedback regarding HR Members. Reviewed and actioned by the HR Committee Leader.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search feedback..."
+              aria-label="Search feedback"
+              placeholder="Search feedback…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-emerald-500 focus:bg-white w-48 transition-all"
+              className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-500 w-full sm:w-64 transition-all"
             />
           </div>
 
-          <div className="flex items-center border border-slate-200 rounded-md bg-white p-0.5 text-xs">
+          <div className="flex flex-wrap items-center border border-slate-200 rounded-lg bg-white p-1 text-xs [&>button]:min-h-9">
             <button
               onClick={() => setStatusFilter('ALL')}
               className={`px-2.5 py-1 rounded font-medium transition-colors ${
@@ -203,7 +202,7 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
           {isMember && (
             <button
               onClick={() => setShowSubmitModal(true)}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md shadow-sm text-[13px] font-medium flex items-center space-x-1.5 transition-colors"
+              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Submit HR Feedback</span>
@@ -215,6 +214,11 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
       {/* Feedbacks List */}
       {loading ? (
         <div className="p-12 text-center text-slate-500 text-sm">Loading member feedback records...</div>
+      ) : error ? (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-white p-5 text-sm text-rose-700">
+          <p>{error}</p>
+          <button onClick={loadFeedbacks} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry feedback</button>
+        </div>
       ) : filteredFeedbacks.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-500 space-y-2">
           <MessageSquareHeart className="w-8 h-8 text-slate-300 mx-auto" />
@@ -222,7 +226,7 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
           <p className="text-xs text-slate-400">
             {isMember
               ? 'Have input regarding your HR Member interaction, attendance support, or communication? Submit feedback to your HR Leader.'
-              : 'All member feedback for HR members has been processed.'}
+              : 'No feedback matches the current filters.'}
           </p>
         </div>
       ) : (
@@ -232,7 +236,7 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
               key={f.id}
               className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3 hover:border-slate-300 transition-colors"
             >
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
@@ -246,7 +250,7 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
                       <Badge variant="warning">Submitted to HR Leader</Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 break-words">
                     <span>
                       From: {f.arabic_name ? `${f.arabic_name} (${f.student_name})` : f.student_name || 'Member'}
                     </span>
@@ -258,12 +262,12 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
                     )}
                     <span>•</span>
                     <span>
-                      {new Date(f.submitted_at || f.created_at || Date.now()).toLocaleDateString([], {
+                      {f.submitted_at || f.created_at ? new Date((f.submitted_at || f.created_at)!).toLocaleDateString([], {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit',
-                      })}
+                      }) : 'Date unavailable'}
                     </span>
                   </div>
                 </div>
@@ -284,7 +288,7 @@ export const MemberFeedbackView: React.FC<MemberFeedbackViewProps> = ({ currentU
               </div>
 
               {/* Feedback Content */}
-              <p className="text-xs text-slate-700 bg-slate-50/70 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">
+              <p dir="auto" className="text-sm leading-relaxed text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-100 whitespace-pre-wrap break-words">
                 {f.content}
               </p>
 

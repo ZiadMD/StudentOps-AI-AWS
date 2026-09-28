@@ -152,6 +152,8 @@ export const api = {
   // Students & Scoreboards
   getStudents: (assignedOnly: boolean = false) =>
     fetchJson<Student[]>(`/students${assignedOnly ? '?assigned_only=true' : ''}`),
+  getStudent: (id: string, options?: RequestInit) =>
+    fetchJson<Student>(`/students/${encodeURIComponent(id)}`, options),
   createStudent: async (payload: StudentCreatePayload) => {
     const res = await fetchJson<Student>('/students', {
       method: 'POST',

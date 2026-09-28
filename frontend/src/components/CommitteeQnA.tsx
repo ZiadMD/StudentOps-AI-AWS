@@ -11,7 +11,6 @@ import {
 import { Badge } from './ui/Badge';
 import { Modal } from './ui/Modal';
 import { useToast } from '../context/ToastContext';
-import { useLanguage } from '../context/LanguageContext';
 
 interface CommitteeQnAProps {
   currentUser?: UserProfile | null;
@@ -19,9 +18,9 @@ interface CommitteeQnAProps {
 
 export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
   const toast = useToast();
-  const { t } = useLanguage();
   const [questions, setQuestions] = useState<MemberQuestionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'ANSWERED'>('ALL');
 
@@ -31,7 +30,7 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
   const [newContent, setNewContent] = useState('');
   const [submittingAsk, setSubmittingAsk] = useState(false);
 
-  // Committee Head / HR Head Answer Modal
+  // Committee Head Answer Modal
   const [answeringQuestion, setAnsweringQuestion] = useState<MemberQuestionItem | null>(null);
   const [answerText, setAnswerText] = useState('');
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
@@ -40,16 +39,16 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
   const canAnswer =
     currentUser?.role === 'committee_head' ||
     currentUser?.role === 'team_lead' ||
-    currentUser?.role === 'hr_admin' ||
-    currentUser?.role === 'region_hr_head';
+    currentUser?.role === 'hr_admin';
 
   const loadQuestions = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await api.getQuestions();
       setQuestions(data);
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Unable to load questions.');
     } finally {
       setLoading(false);
     }
@@ -107,64 +106,65 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="workspace-page min-w-0 space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end justify-between border-b border-slate-200 pb-5">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            {t('qnaTitle')}
+          <h2 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">
+            Questions & Answers
           </h2>
-          <p className="text-[12px] text-slate-500 mt-0.5">
-            {t('qnaSubtitle')}
+          <p className="text-sm text-slate-600 mt-2">
+            Member questions with answers from the Committee Head.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 rtl:space-x-reverse">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 rtl:left-auto rtl:right-3 top-1/2 -translate-y-1/2" />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder={t('searchPlaceholder')}
+              placeholder="Search inquiries..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 rtl:pl-3 rtl:pr-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-blue-500 focus:bg-white w-48 transition-all"
+              aria-label="Search inquiries"
+              className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-500 w-full sm:w-48 transition-all"
             />
           </div>
 
-          <div className="flex items-center border border-slate-200 rounded-md bg-white p-0.5 text-xs">
+          <div className="flex items-center border border-slate-200 rounded-lg bg-white p-1 text-xs">
             <button
               onClick={() => setStatusFilter('ALL')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+              className={`px-2.5 py-1.5 rounded-md font-medium transition-colors ${
                 statusFilter === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {t('all')}
+              All
             </button>
             <button
               onClick={() => setStatusFilter('OPEN')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                statusFilter === 'OPEN' ? 'bg-amber-100 text-amber-800' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1.5 rounded-md font-medium transition-colors ${
+                statusFilter === 'OPEN' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {t('open')}
+              Pending
             </button>
             <button
               onClick={() => setStatusFilter('ANSWERED')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                statusFilter === 'ANSWERED' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1.5 rounded-md font-medium transition-colors ${
+                statusFilter === 'ANSWERED' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {t('answered')}
+              Answered
             </button>
           </div>
 
           {isMember && (
             <button
               onClick={() => setShowAskModal(true)}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm text-[13px] font-medium flex items-center space-x-1.5 rtl:space-x-reverse transition-colors"
+              className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold flex items-center space-x-1.5 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{t('askHead')}</span>
+              <span>Ask Committee Head</span>
             </button>
           )}
         </div>
@@ -172,15 +172,17 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
 
       {/* Questions List */}
       {loading ? (
-        <div className="p-12 text-center text-slate-500 text-sm">Loading inquiries...</div>
+        <div role="status" className="p-8 text-slate-600 text-sm">Loading inquiries…</div>
+      ) : error ? (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-white p-5 text-sm text-rose-700"><p>{error}</p><button onClick={() => void loadQuestions()} className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-slate-900">Retry questions</button></div>
       ) : filteredQuestions.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-500 space-y-2">
           <HelpCircle className="w-8 h-8 text-slate-300 mx-auto" />
           <p className="font-medium text-slate-700">No questions found</p>
           <p className="text-xs text-slate-400">
             {isMember
-              ? 'Have a question about campaigns, reel formats, or guidelines? Click Ask Committee Head.'
-              : 'All member technical questions are answered.'}
+              ? 'Ask your Committee Head about your tasks or committee guidelines.'
+              : 'No questions match the current filters.'}
           </p>
         </div>
       ) : (
@@ -188,23 +190,23 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
           {filteredQuestions.map((q) => (
             <div
               key={q.id}
-              className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3 hover:border-slate-300 transition-colors"
+              className="bg-white border border-slate-200 rounded-xl p-5 space-y-3 hover:border-slate-300 transition-colors"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900">{q.title}</span>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 space-y-1 break-words">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-900">{q.title}</span>
                     {q.status === 'ANSWERED' ? (
                       <Badge variant="success">Answered</Badge>
                     ) : (
                       <Badge variant="warning">Awaiting Head Review</Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <span>
                       Asked by: {q.arabic_name ? `${q.arabic_name} (${q.student_name})` : q.student_name || 'Member'}
                     </span>
-                    <span>•</span>
+                    <span aria-hidden="true">·</span>
                     <span>{new Date(q.asked_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
@@ -215,25 +217,25 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
                       setAnsweringQuestion(q);
                       setAnswerText('');
                     }}
-                    className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium flex items-center gap-1 shrink-0"
+                    className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shrink-0"
                   >
                     <Send className="w-3 h-3" />
-                    <span>{t('answerQuestion')}</span>
+                    <span>Answer</span>
                   </button>
                 )}
               </div>
 
               {/* Question body */}
-              <p className="text-xs text-slate-700 bg-slate-50/70 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">
+              <p className="text-sm leading-relaxed text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">
                 {q.content}
               </p>
 
               {/* Answer if present */}
               {q.answer && (
-                <div className="bg-emerald-50/60 border border-emerald-100 rounded-lg p-3 space-y-1 text-xs">
-                  <div className="flex items-center gap-1.5 font-semibold text-emerald-800 text-[11px]">
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-sm">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-700 text-xs">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{t('headGuidance')}:</span>
+                    <span>Committee Head guidance:</span>
                     {q.answered_at && (
                       <span className="font-normal text-emerald-600">
                         ({new Date(q.answered_at).toLocaleDateString([], { month: 'short', day: 'numeric' })})
@@ -252,7 +254,7 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
       <Modal
         isOpen={showAskModal}
         onClose={() => setShowAskModal(false)}
-        title={t('askHead')}
+        title="Ask Committee Head"
         description="Submit a question regarding deliverables, workflow, or tools."
         size="md"
       >
@@ -264,7 +266,7 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
               placeholder="e.g., Target Aspect Ratio for Reel Submission"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
               required
             />
           </div>
@@ -276,7 +278,7 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
               placeholder="Describe your technical or workflow question in detail..."
               value={newContent}
               onChange={(e) => setNewContent(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
               required
             />
           </div>
@@ -287,14 +289,14 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
               onClick={() => setShowAskModal(false)}
               className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
             >
-              {t('cancel')}
+              Cancel
             </button>
             <button
               type="submit"
               disabled={submittingAsk}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold disabled:opacity-50"
             >
-              {submittingAsk ? t('submitting') : 'Send Inquiry'}
+              {submittingAsk ? 'Submitting…' : 'Send inquiry'}
             </button>
           </div>
         </form>
@@ -304,7 +306,7 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
       <Modal
         isOpen={!!answeringQuestion}
         onClose={() => setAnsweringQuestion(null)}
-        title={answeringQuestion ? `${t('answerQuestion')}: ${answeringQuestion.title}` : t('answerQuestion')}
+        title={answeringQuestion ? `Answer Question: ${answeringQuestion.title}` : "Answer Question"}
         size="md"
       >
         {answeringQuestion && (
@@ -317,14 +319,14 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
             <form onSubmit={handleAnswerSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  {t('headGuidance')}
+                  Official Guidance / Answer
                 </label>
                 <textarea
                   rows={4}
                   placeholder="Provide technical specifications, reference links, or directions..."
                   value={answerText}
                   onChange={(e) => setAnswerText(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
                   required
                 />
               </div>
@@ -335,14 +337,14 @@ export const CommitteeQnA: React.FC<CommitteeQnAProps> = ({ currentUser }) => {
                   onClick={() => setAnsweringQuestion(null)}
                   className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
-                  {t('cancel')}
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingAnswer}
-                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold disabled:opacity-50"
                 >
-                  {submittingAnswer ? t('submitting') : t('answerQuestion')}
+                  {submittingAnswer ? 'Posting…' : 'Publish answer'}
                 </button>
               </div>
             </form>

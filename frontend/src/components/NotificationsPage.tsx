@@ -214,9 +214,9 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ currentUse
               <button
                 key={tpl.label}
                 onClick={() => applyTemplate(tpl)}
-                className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-blue-400 hover:shadow-sm text-left rtl:text-right group transition-all"
+                className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:shadow-sm text-left rtl:text-right group transition-all"
               >
-                <tpl.icon className="w-4 h-4 text-slate-400 group-hover:text-blue-600 mb-2 transition-colors" />
+                <tpl.icon className="w-4 h-4 text-slate-400 group-hover:text-blue-700 mb-2 transition-colors" />
                 <div className="text-xs font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{tpl.label}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{tpl.audience}</div>
               </button>

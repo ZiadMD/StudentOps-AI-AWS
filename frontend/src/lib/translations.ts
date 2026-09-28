@@ -4,24 +4,27 @@ export type Direction = 'ltr' | 'rtl';
 export const TRANSLATIONS: Record<Language, Record<string, string>> = {
   en: {
     // Brand & App
-    appName: 'StudentOps.AI',
+    appName: 'StudentOps',
     engineeringBranch: 'Engineering Branch',
 
     // Navigation Items
     dashboard: 'Overview',
-    chat: 'AI Agent Console',
+    chat: 'Operations Assistant',
     students: 'Member Registry',
     attendance: 'Meet Attendance',
     scoreboard: 'Evaluations',
     calendar: 'Schedule & Calendar',
-    tasks: 'Tasks & Sprints',
+    tasks: 'Tasks & Deliverables',
     'task-reviews': 'Task Reviews',
     qna: 'Committee Q&A',
     feedback: 'Member Feedback',
     reports: 'Executive Reports',
-    whatsapp: 'WhatsApp & Escalations',
+    whatsapp: 'Inbox',
+    followups: 'Follow-ups',
     notifications: 'Reminders',
     audit: 'Audit Log',
+    'channel-settings': 'Channel settings',
+    profile: 'My Profile',
     workspaceNav: 'Workspace Navigation',
 
     // Footer & Account
@@ -110,7 +113,7 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
 
     // Navigation Items
     dashboard: 'نظرة عامة',
-    chat: 'مساعد الذكاء الاصطناعي',
+    chat: 'مساعد العمليات',
     students: 'سجل الأعضاء',
     attendance: 'حضور اللقاءات',
     scoreboard: 'التقييمات والأداء',
@@ -120,9 +123,12 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     qna: 'سؤال وجواب اللجنة',
     feedback: 'ملاحظات الأعضاء',
     reports: 'التقارير الإدارية',
-    whatsapp: 'واتساب والمتابعات',
-    notifications: 'التنبيهات والإشعارات',
+    whatsapp: 'الرسائل',
+    followups: 'المتابعات',
+    notifications: 'التنبيهات',
     audit: 'سجل العمليات',
+    'channel-settings': 'إعدادات القناة',
+    profile: 'ملفي الشخصي',
     workspaceNav: 'تنقلات مساحة العمل',
 
     // Footer & Account

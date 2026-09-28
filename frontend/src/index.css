@@ -2,6 +2,173 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+/* ---------------------------------------------------------------------
+ * Editorial helpers used by the public landing page and the sign-in and
+ * sign-up screens. They are scoped to those surfaces so they cannot change
+ * how the workspace pages render. Colours are expressed through the same
+ * slate and blue tokens the rest of the app uses.
+ * ------------------------------------------------------------------- */
+@layer components {
+  /* Small uppercase kicker above a heading. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--theme-text-500, #64748b));
+  }
+
+  /* A pull-quote style number for headline figures. */
+  .figure {
+    font-family: 'Newsreader', Cairo, Georgia, serif;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    line-height: 0.9;
+  }
+}
+
+@layer utilities {
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Animated backdrop for the sign-in and sign-up context panel.
+ *
+ * The panel is a dark ink field, so the movement comes from three slow
+ * drifting colour blooms rather than a rotating gradient. Rotating gradients
+ * read as a loading spinner and produce a visible seam where they wrap; a
+ * radial bloom has no seam and can drift off-canvas without a hard edge.
+ *
+ * The blooms are painted in `screen` blend so they lighten the ink instead of
+ * replacing it, which keeps white body text above AA contrast at all times.
+ * No `will-change` or `filter` is used, because both promote a full-panel
+ * layer for an animation that runs for the whole time the page is open.
+ * ------------------------------------------------------------------- */
+/* The panel tracks the viewport height and stays put while the document
+   scrolls. This is what keeps a short, wide window from turning the panel
+   into its own scroll container: the page grows to fit the form, and the
+   panel simply holds position beside it. `top-0` is required alongside
+   `sticky` or the panel stops at its natural offset instead of pinning. */
+.auth-panel {
+  position: relative;
+  isolation: isolate;
+  background-color: #0b1220;
+  overflow: hidden;
+}
+
+/* Below `lg` the panel is only a wordmark, so it must not inherit the
+   viewport height and leave a tall empty block under a short form. */
+@media (min-width: 1024px) {
+  .auth-panel {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+  }
+}
+
+/* The blooms themselves. Positioned by percentage so the composition holds at
+   any panel size, and oversized so a drifting blob never exposes an edge. */
+.auth-panel__bloom {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.auth-panel__bloom--one {
+  top: -22%;
+  left: -18%;
+  width: 78%;
+  height: 78%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(37 99 235 / 0.55) 0%,
+    rgb(37 99 235 / 0.18) 42%,
+    transparent 70%
+  );
+  animation: auth-drift-one 26s ease-in-out infinite alternate;
+}
+
+.auth-panel__bloom--two {
+  bottom: -26%;
+  right: -20%;
+  width: 72%;
+  height: 72%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(14 165 233 / 0.42) 0%,
+    rgb(14 165 233 / 0.14) 44%,
+    transparent 72%
+  );
+  animation: auth-drift-two 32s ease-in-out infinite alternate;
+}
+
+/* A third, slower violet bloom keeps the field from reading as two flat
+   colours once the first two have moved apart. */
+.auth-panel__bloom--three {
+  top: 34%;
+  left: 8%;
+  width: 62%;
+  height: 62%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(99 102 241 / 0.30) 0%,
+    rgb(99 102 241 / 0.10) 46%,
+    transparent 74%
+  );
+  animation: auth-drift-three 38s ease-in-out infinite alternate;
+}
+
+/* Transform-only keyframes: translate and scale stay on the compositor, so the
+   animation never triggers layout or paint on the panel's contents. */
+@keyframes auth-drift-one {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(18%, 14%, 0) scale(1.16); }
+}
+
+@keyframes auth-drift-two {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-16%, -12%, 0) scale(0.94); }
+}
+
+@keyframes auth-drift-three {
+  from { transform: translate3d(0, 0, 0) scale(0.96); }
+  to   { transform: translate3d(12%, -16%, 0) scale(1.2); }
+}
+
+/* Respect the OS setting. The blooms hold their resting position, so the panel
+   still reads as the coloured surface it is meant to be. The global block in
+   `prefers-reduced-motion` also clamps these, but this keeps them visible. */
+@media (prefers-reduced-motion: reduce) {
+  .auth-panel__bloom {
+    animation: none;
+    will-change: auto;
+  }
+}
+
+/* A hairline grid over the blooms. Gives the field a printed structure that
+   the soft colour would otherwise lack, and reads as texture at 1px. */
+.auth-panel__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, #000 30%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, #000 30%, transparent 78%);
+}
+
 @layer base {
   :root {
     --background: 210 40% 98%;
@@ -24,11 +191,106 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221 83% 53%;
     --radius: 0.75rem;
+    --scrollbar-track: #f1f5f9;
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-hover: #94a3b8;
+    --focus-outline: #0f766e;
+  }
+
+  html.dark {
+    color-scheme: dark;
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 40% 11%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 40% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 25% 73%;
+    --accent: 175 55% 15%;
+    --accent-foreground: 166 76% 80%;
+    --destructive: 350 89% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 27% 25%;
+    --input: 215 27% 25%;
+    --ring: 172 66% 50%;
+    --focus-outline: #5eead4;
+    --scrollbar-track: #111b2b;
+    --scrollbar-thumb: #475569;
+    --scrollbar-hover: #64748b;
+
+    /* RGB channels let Tailwind preserve /opacity, hover, focus and responsive
+       variants. These are property-specific: text-white and media stay intact. */
+    --theme-surface: 17 27 43;
+    --theme-bg-50: 11 18 32;
+    --theme-bg-100: 30 41 59;
+    --theme-bg-200: 42 57 78;
+    --theme-bg-300: 71 85 105;
+    --theme-bg-800: 51 65 85;
+    --theme-bg-900: 37 51 72;
+    --theme-text-400: 148 163 184;
+    --theme-text-500: 165 180 200;
+    --theme-text-600: 184 198 217;
+    --theme-text-700: 203 213 225;
+    --theme-text-800: 226 232 240;
+    --theme-text-900: 241 245 249;
+    --theme-border-50: 30 41 59;
+    --theme-border-100: 39 52 72;
+    --theme-border-200: 47 63 84;
+    --theme-border-300: 71 85 105;
+    --theme-border-400: 100 116 139;
+    --theme-border-500: 148 163 184;
+    --theme-border-800: 71 85 105;
+    --theme-border-900: 100 116 139;
+    --theme-ring-300: 100 116 139;
+    --theme-ring-500: 148 163 184;
+    --theme-ring-900: 94 234 212;
+
+    --theme-blue-soft: 19 39 69;
+    --theme-blue-text: 147 197 253;
+    --theme-blue-border: 42 76 121;
+    --theme-sky-soft: 12 42 60;
+    --theme-sky-text: 125 211 252;
+    --theme-sky-border: 28 81 111;
+    --theme-indigo-soft: 35 36 72;
+    --theme-indigo-text: 165 180 252;
+    --theme-indigo-border: 67 69 120;
+    --theme-purple-soft: 45 29 65;
+    --theme-purple-text: 216 180 254;
+    --theme-purple-border: 91 53 117;
+    --theme-emerald-soft: 12 46 39;
+    --theme-emerald-text: 110 231 183;
+    --theme-emerald-border: 28 88 67;
+    --theme-teal-soft: 14 47 47;
+    --theme-teal-text: 94 234 212;
+    --theme-teal-border: 31 89 84;
+    --theme-amber-soft: 52 38 19;
+    --theme-amber-text: 252 211 77;
+    --theme-amber-border: 104 76 29;
+    --theme-rose-soft: 57 26 39;
+    --theme-rose-text: 253 164 175;
+    --theme-rose-border: 112 47 64;
+    --theme-red-soft: 57 26 26;
+    --theme-red-text: 252 165 165;
+    --theme-red-border: 112 47 47;
+    --theme-green-soft: 19 46 30;
+    --theme-green-text: 134 239 172;
+    --theme-green-border: 38 88 54;
+    --theme-yellow-soft: 48 41 18;
+    --theme-yellow-text: 253 224 71;
+    --theme-yellow-border: 98 85 29;
+    --theme-orange-soft: 55 33 21;
+    --theme-orange-text: 253 186 116;
+    --theme-orange-border: 110 64 35;
   }
 
   body {
-    background-color: #f8fafc;
-    color: #0f172a;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-family: 'Plus Jakarta Sans', 'Inter', 'Cairo', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
@@ -36,7 +298,7 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
     letter-spacing: -0.025em;
-    color: #0f172a;
+    color: hsl(var(--foreground));
   }
 
   code, pre, .font-mono {
@@ -45,30 +307,95 @@
   }
 }
 
-/* Ambient Radial Mesh Background */
-.bg-ambient-mesh {
-  background-color: #f8fafc;
-  background-image: 
-    radial-gradient(at 10% 10%, rgba(37, 99, 235, 0.04) 0px, transparent 50%),
-    radial-gradient(at 90% 10%, rgba(14, 165, 233, 0.04) 0px, transparent 50%),
-    radial-gradient(at 50% 90%, rgba(99, 102, 241, 0.03) 0px, transparent 50%);
+/* Shared layout and interaction standards. */
+.bg-ambient-mesh { background-color: hsl(var(--background)); }
+html { scroll-padding-top: 5rem; }
+body { margin: 0; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 3px;
+}
+:where(p, h1, h2, h3, dd) { overflow-wrap: anywhere; }
+.skip-link {
+  position: fixed; top: -5rem; left: 1rem; z-index: 100;
+  border-radius: .5rem; padding: .75rem 1rem; background: #0f172a; color: white;
+}
+.skip-link:focus { top: 1rem; }
+.workspace-page { min-width: 0; }
+.workspace-page table { font-variant-numeric: tabular-nums; }
+.workspace-page :where(input, select, textarea) { max-width: 100%; }
+.workspace-page :where(button, a) { touch-action: manipulation; }
+#app-sidebar { background: #fff; }
+#app-sidebar > div:first-child > div:first-child { min-height: 4rem; }
+#app-sidebar nav { padding: 1rem .75rem; }
+#app-sidebar nav button { border-radius: .5rem; }
+/* The active row is styled entirely in Tailwind (bg-slate-100 plus a font
+   weight change) so it stays in one system with the rest of the shell. An
+   earlier hardcoded rule here painted the row teal with an inset left border,
+   which contradicted the palette and, because it also set a fixed min-height,
+   silently undid the row compaction done in the component. */
+/* Only hardcoded shared styles need selectors; utility colors use the tokens above. */
+html.dark #app-sidebar { background: hsl(var(--card)); }
+html.dark :where(input, select, textarea) { color-scheme: dark; }
+html.dark :where(input, textarea)::placeholder { color: #94a3b8; opacity: 1; }
+html.dark select option { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+html.dark :where(*, *::before, *::after) { --tw-ring-offset-color: hsl(var(--card)); }
+/* Do not lighten modal/drawer backdrops along with solid slate action buttons. */
+html.dark .bg-slate-900\/40 { background-color: rgb(2 6 23 / .7); }
+html.dark .bg-black\/5 { background-color: rgb(255 255 255 / .04); }
+html.dark .hover\:bg-black\/10:hover { background-color: rgb(255 255 255 / .08); }
+.drawer-close { display: none; }
+@media (min-width: 1024px) {
+  #app-sidebar[data-collapsed='false'] { width: 16rem; }
+}
+/* Tablets use the same accessible drawer as phones, preserving content width. */
+@media (max-width: 1023px) {
+  #app-sidebar {
+    position: fixed; inset: 0 auto 0 0; height: 100dvh; width: min(22rem, 100%);
+    visibility: hidden; transform: translateX(-100%); opacity: 0; pointer-events: none;
+  }
+  #app-sidebar[data-open='true'] { visibility: visible; transform: translateX(0); opacity: 1; pointer-events: auto; }
+  #app-sidebar .md\:hidden { display: block; }
+  #app-sidebar button[aria-label='Close navigation menu'],
+  #app-sidebar button[aria-label='Collapse sidebar'],
+  #app-sidebar button[aria-label='Expand sidebar'] { display: none; }
+  #app-sidebar .drawer-close { display: flex; }
+  /* Nav rows go back to touch sizing. The component sets a 28px row from md
+     up, but in this band the sidebar is a drawer over the content, so the
+     44px floor applies again regardless of viewport width. */
+  #app-sidebar nav button { justify-content: flex-start; padding: .75rem; min-height: 2.75rem; }
+  #app-sidebar nav button > div { gap: .75rem; }
+  .workspace-page :where(button, select, input:not([type='checkbox']):not([type='radio'])) { min-height: 2.75rem; }
+  /* The header hides its hamburger from md up, but in this band the sidebar is
+     still a drawer, so the trigger has to come back or the navigation is
+     unreachable on a tablet in portrait. */
+  header button[aria-label='Open navigation'] { display: flex; }
+}
+@media (max-width: 767px) {
+  :where(input, select, textarea) { font-size: 16px !important; }
+  [role='dialog'] { max-height: calc(100dvh - 2rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 
-/* Polished light scrollbar */
+/* Scrollbars follow the same theme as the surfaces they sit on. */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scrollbar-thumb);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--scrollbar-hover);
 }
+

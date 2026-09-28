@@ -97,7 +97,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             );
           },
           table: ({ children }) => (
-            <div className="overflow-x-auto my-3 border border-slate-200 rounded-lg shadow-xs">
+            <div className="overflow-x-auto my-3 border border-slate-200 rounded-lg shadow-sm">
               <table className="min-w-full text-left text-xs border-collapse">
                 {children}
               </table>
@@ -161,7 +161,7 @@ const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, cod
   };
 
   return (
-    <div className="my-3 rounded-lg border border-slate-200 bg-slate-900 text-slate-50 overflow-hidden text-[12.5px] font-mono shadow-xs">
+    <div className="my-3 rounded-lg border border-slate-200 bg-slate-900 text-slate-50 overflow-hidden text-[12.5px] font-mono shadow-sm">
       <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-950/60 border-b border-slate-800/80 text-[11px] text-slate-400">
         <span className="uppercase font-sans font-semibold tracking-wider text-slate-400 text-[10px]">
           {language || 'text'}

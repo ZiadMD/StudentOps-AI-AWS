@@ -19,6 +19,11 @@ import {
   AlertCircle,
   Users,
   ChevronLeft,
+  ThumbsUp,
+  Heart,
+  Hand,
+  Eye,
+  HandHelping,
 } from 'lucide-react';
 import { api, getWhatsAppWebSocketUrl } from '../api/client';
 import {
@@ -27,6 +32,8 @@ import {
   WhatsAppThreadSummary,
 } from '../types';
 import { useToast } from '../context/ToastContext';
+import { useWhatsAppThreadSync } from '../hooks/useWhatsAppThreadSync';
+import { Modal } from './ui/Modal';
 
 const isSafeMediaUrl = (url?: string | null): boolean => {
   if (!url) return false;
@@ -53,7 +60,14 @@ interface WhatsAppChatWindowProps {
   currentUser: UserProfile;
 }
 
-const QUICK_REACTIONS = ['👍', '❤️', '✅', '🙏', '👏', '👀'];
+const QUICK_REACTIONS = [
+  { value: '\u{1F44D}', label: 'Like', Icon: ThumbsUp },
+  { value: '\u2764\uFE0F', label: 'Love', Icon: Heart },
+  { value: '\u2705', label: 'Done', Icon: Check },
+  { value: '\u{1F64F}', label: 'Thanks', Icon: HandHelping },
+  { value: '\u{1F44F}', label: 'Applause', Icon: Hand },
+  { value: '\u{1F440}', label: 'Seen', Icon: Eye },
+];
 
 export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentUser }) => {
   const toast = useToast();
@@ -65,12 +79,14 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
   // State
   const [threads, setThreads] = useState<WhatsAppThreadSummary[]>([]);
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<WhatsAppChatMessage[]>([]);
+  const { messages, setMessages, loading: loadingMessages, error: messagesError,
+    refreshHistory, syncStatus } = useWhatsAppThreadSync(activeStudentId);
   const [searchQuery, setSearchQuery] = useState('');
   const [oversightMode, setOversightMode] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [threadsError, setThreadsError] = useState<string | null>(null);
+  const threadRequest = useRef(0);
 
   // Input state
   const [inputText, setInputText] = useState('');
@@ -80,7 +96,6 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
   const [activeMediaModal, setActiveMediaModal] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -89,60 +104,57 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
   // Load thread list
   const fetchThreads = async (oversight = oversightMode) => {
+    const request = ++threadRequest.current;
     try {
       setLoadingThreads(true);
+      setThreadsError(null);
       const data = await api.getWhatsAppThreads(oversight);
+      if (request !== threadRequest.current) return;
       setThreads(data);
-      if (data.length > 0 && !activeStudentId) {
-        setActiveStudentId(data[0].student_id);
+      setActiveStudentId(previous =>
+        data.some(thread => thread.student_id === previous) ? previous : data[0]?.student_id ?? null);
+    } catch (err) {
+      if (request === threadRequest.current) {
+        setThreadsError(err instanceof Error ? err.message : 'Unable to load conversations.');
       }
-    } catch (err) {
-      console.error('Failed to load WhatsApp threads', err);
     } finally {
-      setLoadingThreads(false);
+      if (request === threadRequest.current) setLoadingThreads(false);
     }
   };
 
-  // Load messages for active thread
-  const fetchMessages = async (studentId: string) => {
-    try {
-      setLoadingMessages(true);
-      const data = await api.getThreadMessages(studentId);
-      setMessages(data);
-      // Update thread unread count locally
-      setThreads((prev) =>
-        prev.map((t) => (t.student_id === studentId ? { ...t, unread_count: 0 } : t))
-      );
-    } catch (err) {
-      console.error('Failed to load thread messages', err);
-    } finally {
-      setLoadingMessages(false);
-    }
-  };
-
-  // Initial load
   useEffect(() => {
     fetchThreads(oversightMode);
+    return () => { threadRequest.current += 1; };
   }, [oversightMode]);
 
-  // When active thread changes
   useEffect(() => {
-    if (activeStudentId) {
-      fetchMessages(activeStudentId);
-      setReplyToMsg(null);
-      setEditingMsg(null);
-      setAttachedFile(null);
-    }
+    setReplyToMsg(null);
+    setEditingMsg(null);
+    setAttachedFile(null);
+    setActiveReactionMsgId(null);
+    setInputText('');
   }, [activeStudentId]);
 
-  // Scroll to bottom when messages update
+  // Reconcile sidebar metadata without refetching every thread on each poll.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!activeStudentId || loadingMessages) return;
+    const last = messages[messages.length - 1];
+    setThreads(previous => previous.map(thread => thread.student_id === activeStudentId
+      ? { ...thread, unread_count: messagesError ? thread.unread_count : 0,
+          last_message: last ?? thread.last_message }
+      : thread));
+  }, [activeStudentId, messages, loadingMessages, messagesError]);
+
+  // A background status/ack update must not pull readers back to the bottom.
+  const lastMessageId = messages[messages.length - 1]?.id;
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+  }, [activeStudentId, lastMessageId]);
 
   // WebSocket Live Connection
   useEffect(() => {
     let isMounted = true;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     const wsUrl = getWhatsAppWebSocketUrl();
 
     const connectWs = () => {
@@ -155,6 +167,9 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
         };
 
         socket.onmessage = (event) => {
+          if (!isMounted) return;
+          // The gateway sends plain-text "pong" keepalives; skip non-JSON frames.
+          if (typeof event.data !== 'string' || event.data.trim().toLowerCase() === 'pong') return;
           try {
             const parsed = JSON.parse(event.data);
             const { type, data } = parsed;
@@ -200,7 +215,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
             } else if (type === 'messages_synced') {
               const syncData = data as { student_id?: string };
               if (syncData?.student_id === activeStudentId) {
-                fetchMessages(activeStudentId);
+                refreshHistory();
               }
             }
           } catch (e) {
@@ -212,7 +227,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
           if (isMounted) {
             setWsConnected(false);
             // Reconnect after 4 seconds
-            setTimeout(() => {
+            reconnectTimer = setTimeout(() => {
               if (isMounted) connectWs();
             }, 4000);
           }
@@ -238,34 +253,10 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
     return () => {
       isMounted = false;
       clearInterval(pingInterval);
+      clearTimeout(reconnectTimer);
       wsRef.current?.close();
     };
-  }, [activeStudentId]);
-
-  // On-demand chat synchronization with OpenWA
-  const handleSyncChat = async () => {
-    if (!activeStudentId || syncing) return;
-    try {
-      setSyncing(true);
-      const res = await api.syncThreadMessages(activeStudentId);
-      setMessages(res.messages);
-      if (res.new_messages_count > 0) {
-        toast.success(`Synced ${res.new_messages_count} new message${res.new_messages_count > 1 ? 's' : ''}`);
-      } else {
-        toast.info('Chat history is up to date');
-      }
-      if (res.messages && res.messages.length > 0) {
-        const last = res.messages[res.messages.length - 1];
-        setThreads((prev) =>
-          prev.map((t) => (t.student_id === activeStudentId ? { ...t, last_message: last } : t))
-        );
-      }
-    } catch (err: any) {
-      toast.error(`Chat sync failed: ${err.message || 'Check gateway connection'}`);
-    } finally {
-      setSyncing(false);
-    }
-  };
+  }, [activeStudentId, setMessages, refreshHistory]);
 
   // Send message handler
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -370,38 +361,34 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-[750px] max-h-[85vh]">
+    <div className="min-w-0 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col h-[750px] max-h-[85dvh]">
       {/* Top Bar / Header */}
-      <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800">
+      <div className="bg-white text-slate-900 px-4 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200">
         <div className="flex items-center gap-2.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
           <h2 className="text-sm font-semibold tracking-tight">
-            WhatsApp Operational Chat
+            Shared inbox
           </h2>
-          <span className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-            OpenWA Official SIM
-          </span>
+
         </div>
         <div className="flex items-center gap-3">
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded ${
-              wsConnected ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-950 text-amber-300'
+              wsConnected ? 'text-slate-600' : 'text-amber-800'
             }`}
           >
             <span
+              aria-hidden="true"
               className={`w-1.5 h-1.5 rounded-full ${
-                wsConnected ? 'bg-emerald-400' : 'bg-amber-400'
+                wsConnected ? 'bg-teal-700' : 'bg-amber-600'
               }`}
             />
-            {wsConnected ? 'Live Socket Active' : 'Connecting Stream…'}
+            {wsConnected ? 'Live updates connected' : 'Live updates disconnected'}
           </span>
           <button
             type="button"
-            onClick={() => {
-              fetchThreads();
-              if (activeStudentId) fetchMessages(activeStudentId);
-            }}
-            className="p-1 rounded text-slate-400 hover:text-white transition-colors"
+            onClick={() => { fetchThreads(); }}
+            disabled={loadingThreads}
+            className="p-2.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             title="Refresh Conversations"
             aria-label="Refresh conversations"
           >
@@ -413,7 +400,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
       {/* Main 2-Column Split */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Threads List */}
-        <div className={`w-full sm:w-80 md:w-96 border-r border-slate-200 flex flex-col bg-slate-50/50 ${activeStudentId ? 'hidden sm:flex' : 'flex'}`}>
+        <div className={`w-full lg:w-72 xl:w-80 min-w-0 shrink-0 border-r border-slate-200 flex flex-col bg-slate-50 ${activeStudentId ? 'hidden lg:flex' : 'flex'}`}>
           {/* Search & Oversight Toggle */}
           <div className="p-3 border-b border-slate-200 space-y-2 bg-white">
             <div className="relative">
@@ -422,6 +409,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search assigned members"
                 placeholder="Search assigned members…"
                 className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-900"
               />
@@ -447,7 +435,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                   onClick={() => setOversightMode(!oversightMode)}
                   className={`text-[11px] font-semibold px-2 py-0.5 rounded transition-colors ${
                     oversightMode
-                      ? 'bg-purple-100 text-purple-800'
+                      ? 'bg-slate-900 text-white'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -464,6 +452,8 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 <RefreshCw className="w-4 h-4 animate-spin mr-2" />
                 Loading conversations…
               </div>
+            ) : threadsError ? (
+              <p role="alert" className="p-4 text-sm text-rose-700">{threadsError} Refresh conversations to retry.</p>
             ) : filteredThreads.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400">
                 <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
@@ -475,19 +465,20 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 return (
                   <button
                     key={thread.student_id}
+                    aria-current={isSelected ? 'true' : undefined}
                     onClick={() => setActiveStudentId(thread.student_id)}
-                    className={`w-full text-left p-3.5 transition-colors flex items-start gap-3 ${
+                    className={`w-full text-left p-3.5 border-l-2 transition-colors flex items-start gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-700 ${
                       isSelected
-                        ? 'bg-white border-l-4 border-l-slate-900 shadow-sm'
-                        : 'hover:bg-slate-100/70'
+                        ? 'bg-white border-l-teal-700'
+                        : 'border-l-transparent hover:bg-slate-100/70'
                     }`}
                   >
                     {/* Initials Avatar */}
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                         isSelected
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-200 text-slate-700'
+                          ? 'bg-slate-200 text-slate-900'
+                          : 'bg-slate-100 text-slate-600'
                       }`}
                     >
                       {thread.full_name.slice(0, 2).toUpperCase()}
@@ -506,11 +497,11 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-slate-500 font-arabic truncate" dir="rtl">
+                        <span className="text-[11px] text-slate-500 font-['Cairo'] truncate" dir="rtl">
                           {thread.arabic_name}
                         </span>
                         {thread.unread_count > 0 && (
-                          <span className="bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                          <span aria-label={`${thread.unread_count} unread messages`} className="bg-slate-200 text-slate-800 text-[11px] font-semibold px-1.5 rounded tabular-nums">
                             {thread.unread_count}
                           </span>
                         )}
@@ -534,16 +525,16 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
         </div>
 
         {/* Right Area: Conversation Stream */}
-        <div className={`flex-1 flex flex-col bg-[#F8FAFC] ${activeStudentId ? 'flex' : 'hidden sm:flex'}`}>
+        <div className={`min-w-0 flex-1 flex flex-col bg-slate-50 ${activeStudentId ? 'flex' : 'hidden lg:flex'}`}>
           {activeThread ? (
             <>
               {/* Active Conversation Top Header */}
-              <div className="bg-white px-4 sm:px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+              <div className="bg-white px-4 sm:px-5 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <button
                     type="button"
                     onClick={() => setActiveStudentId(null)}
-                    className="sm:hidden p-1.5 -ml-1 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 shrink-0"
+                    className="lg:hidden p-2.5 -ml-1 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 shrink-0"
                     aria-label="Back to conversations list"
                   >
                     <ChevronLeft className="w-5 h-5" />
@@ -552,22 +543,22 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                     {activeThread.full_name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 truncate">
+                    <div className="flex flex-wrap items-center gap-x-2 min-w-0">
                       <h3 className="text-xs font-bold text-slate-900 truncate">
                         {activeThread.full_name}
                       </h3>
-                      <span className="text-xs text-slate-500 font-arabic shrink-0" dir="rtl">
+                      <span className="text-xs text-slate-500 font-['Cairo'] break-words" dir="rtl">
                         ({activeThread.arabic_name})
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5 truncate">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 mt-0.5">
                       <span className="font-mono">{activeThread.phone}</span>
                       <span>•</span>
                       <span>{activeThread.student_code}</span>
                       {activeThread.assigned_hr_name && (
                         <>
                           <span>•</span>
-                          <span className="text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 text-[10px] truncate">
+                          <span className="text-slate-700 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 text-[10px] break-words">
                             HR: {activeThread.assigned_hr_name}
                           </span>
                         </>
@@ -577,17 +568,6 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleSyncChat}
-                    disabled={syncing}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 rounded-lg transition-colors border border-slate-200"
-                    title="Sync with WhatsApp"
-                    aria-label="Sync chat with WhatsApp"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-slate-900' : 'text-slate-500'}`} />
-                    <span className="hidden md:inline">{syncing ? 'Syncing…' : 'Sync Chat'}</span>
-                  </button>
                   <a
                     href={`tel:${activeThread.phone}`}
                     className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
@@ -599,13 +579,20 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 </div>
               </div>
 
+              <div className="border-b border-slate-200 bg-white px-4 sm:px-5 py-2 text-xs text-slate-600">
+                <p role="status" aria-live="polite" aria-atomic="true">{syncStatus}</p>
+                {messagesError && <p className="mt-1 text-rose-700">Channel sync unavailable: {messagesError} Saved messages remain available.</p>}
+              </div>
+
               {/* Message List Stream */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div aria-label="Conversation history" className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
                 {loadingMessages ? (
                   <div className="flex items-center justify-center h-full text-xs text-slate-400">
                     <RefreshCw className="w-4 h-4 animate-spin mr-2" />
                     Loading conversation history…
                   </div>
+                ) : messagesError && messages.length === 0 ? (
+                  <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">Conversation history could not be loaded. Automatic sync will retry when this page is visible and online.</p>
                 ) : messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 p-8 space-y-2">
                     <Shield className="w-8 h-8 text-slate-300" />
@@ -613,7 +600,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                       Start of conversation with {activeThread.full_name}
                     </p>
                     <p className="text-[11px] text-slate-400 max-w-sm">
-                      Messages sent here are routed via the official OpenWA account. Strict access isolation ensures only you can view and respond to this thread.
+                      Messages use the official WhatsApp account. Conversation access follows your committee assignment and oversight permissions.
                     </p>
                   </div>
                 ) : (
@@ -626,12 +613,15 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                       >
                         {/* Bubble Container */}
                         <div
-                          className={`relative max-w-md md:max-w-lg rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
+                          className={`relative min-w-0 max-w-[95%] lg:max-w-[85%] rounded-lg p-3 text-sm leading-relaxed ${
                             isHR
-                              ? 'bg-emerald-50 text-slate-900 border border-emerald-200 rounded-tr-none'
-                              : 'bg-white text-slate-900 border border-slate-200 rounded-tl-none'
+                              ? 'bg-slate-100 text-slate-900 border border-slate-200'
+                              : 'bg-white text-slate-900 border border-slate-200'
                           }`}
                         >
+                          <p className="mb-1.5 text-[11px] font-semibold text-slate-600">
+                            {isHR ? 'HR team' : msg.sender_type === 'SYSTEM' ? 'System' : activeThread.full_name}
+                          </p>
                           {/* Replied-to parent quote */}
                           {msg.reply_to_message_id && (
                             <div className="mb-2 p-2 rounded bg-black/5 border-l-2 border-slate-500 text-[11px] text-slate-600">
@@ -642,14 +632,13 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
                           {/* Media preview */}
                           {msg.message_type === 'image' && msg.media_url && isSafeMediaUrl(msg.media_url) && (
-                            <div className="mb-2 rounded-lg overflow-hidden border border-black/10 cursor-pointer">
+                            <button type="button" aria-label="Open image attachment" onClick={() => setActiveMediaModal(msg.media_url || null)} className="mb-2 block rounded-lg overflow-hidden border border-slate-200 focus-visible:ring-2 focus-visible:ring-slate-500">
                               <img
                                 src={msg.media_url}
                                 alt="Attachment"
                                 className="max-h-60 w-full object-cover"
-                                onClick={() => setActiveMediaModal(msg.media_url || null)}
                               />
-                            </div>
+                            </button>
                           )}
 
                           {msg.message_type === 'video' && msg.media_url && isSafeMediaUrl(msg.media_url) && (
@@ -708,7 +697,10 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                             <div className="absolute -bottom-2.5 right-2 flex items-center gap-1 bg-white border border-slate-200 rounded-full px-1.5 py-0.5 shadow-sm text-[11px]">
                               {msg.reactions.map((r, i) => (
                                 <span key={i} title={`From ${r.from}`}>
-                                  {r.emoji}
+                                  {(() => {
+                                    const reaction = QUICK_REACTIONS.find(item => item.value === r.emoji);
+                                    return reaction ? <reaction.Icon aria-label={reaction.label} className="h-3.5 w-3.5" /> : 'Reaction';
+                                  })()}
                                 </span>
                               ))}
                             </div>
@@ -717,7 +709,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
 
                         {/* Hover Actions: Reply, React, Edit */}
                         <div
-                          className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${
+                          className={`flex items-center gap-1 mt-1 [&_button]:min-h-9 [&_button]:min-w-9 ${
                             isHR ? 'mr-1' : 'ml-1'
                           }`}
                         >
@@ -745,16 +737,16 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                               <Smile className="w-3.5 h-3.5" />
                             </button>
                             {activeReactionMsgId === msg.id && (
-                              <div className="absolute bottom-full mb-1 left-0 bg-white border border-slate-200 rounded-lg shadow-lg p-1.5 flex items-center gap-1.5 z-20">
-                                {QUICK_REACTIONS.map((emoji) => (
+                              <div className={`absolute bottom-full mb-1 ${isHR ? 'right-0' : 'left-0'} bg-white border border-slate-200 rounded-lg shadow-lg p-1 grid grid-cols-3 z-20`}>
+                                {QUICK_REACTIONS.map(({ value, label, Icon }) => (
                                   <button
-                                    key={emoji}
+                                    key={value}
                                     type="button"
-                                    onClick={() => handleToggleReaction(msg.id, emoji)}
-                                    className="p-1 hover:bg-slate-100 rounded text-sm transition-transform hover:scale-125"
-                                    aria-label={`React with ${emoji}`}
+                                    onClick={() => handleToggleReaction(msg.id, value)}
+                                    className="p-2 hover:bg-slate-100 rounded text-slate-700"
+                                    aria-label={`React with ${label}`}
                                   >
-                                    {emoji}
+                                    <Icon className="h-4 w-4" />
                                   </button>
                                 ))}
                               </div>
@@ -855,6 +847,8 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                 </button>
 
                 <textarea
+                  aria-label="WhatsApp message"
+                  dir="auto"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => {
@@ -871,7 +865,7 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
                       : `Message ${activeThread.full_name}… (Shift+Enter for newline)`
                   }
                   rows={1}
-                  className="flex-1 text-xs border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-slate-900 resize-none max-h-32 bg-slate-50/50"
+                  className="min-w-0 flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-slate-900 resize-none max-h-32 bg-white"
                 />
 
                 <button
@@ -892,28 +886,9 @@ export const WhatsAppChatWindow: React.FC<WhatsAppChatWindowProps> = ({ currentU
         </div>
       </div>
 
-      {/* Lightbox image preview modal */}
-      {activeMediaModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setActiveMediaModal(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh]">
-            <img
-              src={activeMediaModal}
-              alt="Expanded Preview"
-              className="max-h-[85vh] max-w-full rounded-lg object-contain"
-            />
-            <button
-              onClick={() => setActiveMediaModal(null)}
-              className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full hover:bg-black/90"
-              aria-label="Close media preview"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
+      <Modal isOpen={Boolean(activeMediaModal)} onClose={() => setActiveMediaModal(null)} title="Image attachment" size="xl">
+        {activeMediaModal && <img src={activeMediaModal} alt="Expanded attachment" className="mx-auto max-h-[70vh] max-w-full rounded-lg object-contain" />}
+      </Modal>
     </div>
   );
 };

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, ChevronDown, ChevronRight, Code, Paperclip, CheckCircle2 } from 'lucide-react';
+import { Send, ChevronDown, ChevronRight, Code, CheckCircle2 } from 'lucide-react';
 import { ToolCallExecution, PendingConfirmation } from '../types';
 import { api, API_BASE } from '../api/client';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { MarkdownRenderer } from './ui/MarkdownRenderer';
 import { AgentMascot } from './AgentMascot';
-import { useAgentMascotState } from '../hooks/useAgentMascotState';
 
 export interface AgentMessage {
   role: 'user' | 'assistant';
@@ -44,27 +43,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
     }
   }, [initialQuery]);
 
-  // Find index of the latest assistant message
-  const latestAssistantIndex = messages.map(m => m.role).lastIndexOf('assistant');
-  const latestAssistantMsg = latestAssistantIndex >= 0 ? messages[latestAssistantIndex] : null;
-
-  const isLatestStreaming = Boolean(loading && latestAssistantMsg?.streaming);
-  const hasActiveTool = Boolean(
-    isLatestStreaming &&
-    latestAssistantMsg?.tool_traces &&
-    latestAssistantMsg.tool_traces.length > 0
-  );
-  const hasError = Boolean(
-    latestAssistantMsg?.content?.startsWith('**Error:**') ||
-    latestAssistantMsg?.content?.startsWith('**Connection error.**')
-  );
-
-  const mascotState = useAgentMascotState({
-    isStreaming: isLatestStreaming,
-    hasActiveTool,
-    isTyping: input.trim().length > 0,
-    hasError,
-  });
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const handleSend = useCallback(async (queryOverride?: string) => {
     const q = (queryOverride ?? input).trim();
@@ -225,10 +204,16 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
         return next;
       });
     } finally {
+      // EOF and aborted connections do not necessarily include a final SSE event.
+      setMessages(prev => prev.map((message, index) =>
+        index === assistantIdx ? { ...message, streaming: false } : message
+      ));
       setLoading(false);
       abortRef.current = null;
     }
   }, [input, loading]);
+
+  const latestAssistantIndex = messages.map(message => message.role).lastIndexOf('assistant');
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -238,23 +223,14 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC]">
+    <div className="flex min-w-0 flex-col h-full bg-slate-50">
       {/* Message stream */}
-      <div className="flex-1 overflow-y-auto w-full px-4 pt-6 pb-36">
+      <div className="flex-1 w-full min-w-0 px-4 pt-6 pb-44">
         <div className="max-w-3xl mx-auto space-y-8">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center mt-20 text-center space-y-4 opacity-90">
               <div className="w-14 h-14 flex items-center justify-center overflow-visible">
-                <AgentMascot
-                  size="lg"
-                  state={mascotState.state}
-                  expression={mascotState.expression}
-                  shape={mascotState.shape}
-                  color={mascotState.color}
-                  follow={true}
-                  targetRef={input.trim().length > 0 ? textareaRef : undefined}
-                  paper="#F8FAFC"
-                />
+                <AgentMascot size="lg" state="idle" follow targetRef={input.trim() ? textareaRef : undefined} paper="#F8FAFC" />
               </div>
               <h2 className="text-xl font-medium text-slate-900 tracking-tight">How can I help you today?</h2>
               <p className="text-sm text-slate-500 max-w-xs">
@@ -264,8 +240,6 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
           )}
 
           {messages.map((msg, i) => {
-            const isLatestAssistant = i === latestAssistantIndex;
-
             return (
               <div
                 key={i}
@@ -276,24 +250,21 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
                     {msg.content}
                   </div>
                 ) : (
-                  <div className="w-full max-w-3xl flex space-x-4">
-                    {isLatestAssistant ? (
+                  <div className="w-full max-w-3xl min-w-0 flex space-x-4">
+                    {i === latestAssistantIndex ? (
                       <div className="w-8 h-8 flex items-center justify-center shrink-0 mt-1 overflow-visible">
                         <AgentMascot
                           size="sm"
-                          state={mascotState.state}
-                          expression={mascotState.expression}
-                          shape={mascotState.shape}
-                          color={mascotState.color}
-                          follow={mascotState.followPointer}
-                          targetRef={input.trim().length > 0 ? textareaRef : undefined}
+                          state={!msg.streaming ? 'idle' : msg.content ? 'wide' : msg.tool_traces?.length ? 'orbit' : 'thinking'}
+                          follow={!msg.streaming}
+                          targetRef={input.trim() ? textareaRef : undefined}
                           paper="#F8FAFC"
                         />
                       </div>
                     ) : (
                       <div className="w-8 shrink-0" aria-hidden="true" />
                     )}
-                    <div className="flex-1 space-y-3 min-w-0">
+                    <div className="flex-1 space-y-3 min-w-0 break-words">
                       {/* Tool traces */}
                       {msg.tool_traces && msg.tool_traces.length > 0 && (
                         <div className="flex flex-col gap-2 mb-2">
@@ -318,7 +289,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
                                 <h4 className="text-sm font-semibold text-slate-900">Authorization Required</h4>
                                 <p className="text-xs text-slate-500 mt-0.5">Review and confirm before dispatching.</p>
                               </div>
-                              <pre className="p-3 bg-white border border-slate-200 rounded-lg font-mono text-[11px] text-slate-700 whitespace-pre-wrap overflow-x-auto">
+                              <pre className="p-3 bg-white border border-slate-200 rounded-lg font-mono text-xs text-slate-700 whitespace-pre-wrap break-all">
                                 {JSON.stringify(msg.pending_action, null, 2)}
                               </pre>
                               <div className="flex space-x-2">
@@ -353,7 +324,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
       <div
         className={`fixed bottom-0 right-0 left-0 transition-all duration-300 ${
           isDesktopCollapsed ? 'md:left-16' : 'md:left-60'
-        } bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC] to-transparent pt-6 md:pt-10 pb-4 md:pb-6 px-3 sm:px-4 z-20`}
+        } bg-gradient-to-t from-slate-50 via-slate-50 to-transparent pt-6 md:pt-10 pb-4 md:pb-6 px-3 sm:px-4 z-20`}
       >
         <div className="max-w-3xl mx-auto">
           <div className="relative bg-white border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden focus-within:border-slate-300 focus-within:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-all flex flex-col">
@@ -363,15 +334,15 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={loading}
+              aria-label="Message the operations assistant"
               placeholder="Ask about attendance, scores, tasks, or type anything…"
               className="w-full max-h-48 min-h-[56px] resize-none bg-transparent py-4 px-4 pr-12 text-[15px] outline-none text-slate-900 placeholder-slate-400 disabled:opacity-60"
               rows={1}
             />
             <div className="flex items-center justify-between px-3 pb-3 pt-1">
-              <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-lg hover:bg-slate-100">
-                <Paperclip className="w-4 h-4" />
-              </button>
+              <span className="text-xs text-slate-500">Enter to send · Shift+Enter for a new line</span>
               <button
+                aria-label="Send message"
                 onClick={() => handleSend()}
                 disabled={!input.trim() || loading}
                 className={`p-2 rounded-xl transition-all flex items-center justify-center ${
@@ -393,7 +364,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialQuery, onClearIniti
 const ToolAccordion: React.FC<{ trace: ToolCallExecution }> = ({ trace }) => {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border border-slate-200/60 bg-slate-50/50 rounded-lg overflow-hidden text-sm w-fit min-w-[280px]">
+    <div className="border border-slate-200/60 bg-slate-50/50 rounded-lg overflow-hidden text-sm w-full sm:w-fit sm:min-w-[280px] max-w-full">
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center justify-between w-full p-2.5 hover:bg-slate-100/50 transition-colors text-slate-600"

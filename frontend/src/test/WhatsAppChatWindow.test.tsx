@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { WhatsAppChatWindow } from '../components/WhatsAppChatWindow';
 import { ToastProvider } from '../context/ToastContext';
 import { api } from '../api/client';
@@ -65,14 +65,22 @@ const mockInitialMessages: WhatsAppChatMessage[] = [
   },
 ];
 
-describe('WhatsAppChatWindow On-Demand Synchronization', () => {
+describe('WhatsAppChatWindow automatic synchronization', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('WebSocket', class { close = vi.fn(); send = vi.fn(); });
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
     vi.mocked(api.getWhatsAppThreads).mockResolvedValue([...mockThreads]);
     vi.mocked(api.getThreadMessages).mockResolvedValue([...mockInitialMessages]);
+    vi.mocked(api.syncThreadMessages).mockResolvedValue({
+      success: true, student_id: 'std_ziad', synced_count: 1,
+      new_messages_count: 0, updated_messages_count: 0, messages: [...mockInitialMessages],
+    });
   });
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-  it('renders conversations list and Sync Chat button in header', async () => {
+  it('renders a shared inbox and inline sync status without a manual sync button', async () => {
     render(
       <ToastProvider>
         <WhatsAppChatWindow currentUser={mockHrUser} />
@@ -80,14 +88,15 @@ describe('WhatsAppChatWindow On-Demand Synchronization', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('WhatsApp Operational Chat')).toBeInTheDocument();
+      expect(screen.getByText('Shared inbox')).toBeInTheDocument();
       expect(screen.getAllByText('Ziad Mohamed').length).toBeGreaterThan(0);
       expect(screen.getByText('Hello Ziad, please confirm task status.')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /sync chat with whatsapp/i })).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Last synced');
+      expect(screen.queryByRole('button', { name: /sync chat/i })).not.toBeInTheDocument();
     });
   });
 
-  it('triggers api.syncThreadMessages when Sync Chat button is clicked', async () => {
+  it('automatically syncs on open without dispatching a message', async () => {
     const mockSyncedMessages: WhatsAppChatMessage[] = [
       ...mockInitialMessages,
       {
@@ -127,15 +136,9 @@ describe('WhatsAppChatWindow On-Demand Synchronization', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /sync chat with whatsapp/i })).toBeInTheDocument();
-    });
-
-    const syncBtn = screen.getByRole('button', { name: /sync chat with whatsapp/i });
-    fireEvent.click(syncBtn);
-
-    await waitFor(() => {
       expect(api.syncThreadMessages).toHaveBeenCalledWith('std_ziad');
       expect(screen.getAllByText('Task is completed and submitted on portal.').length).toBeGreaterThan(0);
     });
+    expect(api.sendThreadMessage).not.toHaveBeenCalled();
   });
 });

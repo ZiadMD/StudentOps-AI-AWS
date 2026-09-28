@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { LanguageProvider, useLanguage, LANGUAGE_STORAGE_KEY } from '../context/LanguageContext';
-import { SettingsModal } from '../components/ui/SettingsModal';
+import { SettingsPage } from '../components/SettingsPage';
 
 const TestComponent = () => {
   const { language, direction, isRtl, setLanguage, t } = useLanguage();
@@ -71,26 +71,15 @@ describe('LanguageContext and Settings Language Toggle', () => {
     expect(document.documentElement.dir).toBe('rtl');
   });
 
-  it('allows switching language via SettingsModal cleanly', () => {
+  it('allows switching language from the settings page cleanly', () => {
     render(
       <LanguageProvider>
-        <SettingsModal
-          isOpen={true}
-          onClose={() => {}}
-          currentUser={{
-            id: 'u1',
-            email: 'admin@studentops.org',
-            full_name: 'System Admin',
-            role: 'region_hr_head',
-            is_active: true,
-            created_at: '2026-01-01T00:00:00Z',
-          }}
-        />
+        <SettingsPage role="region_hr_head" onOpenChannelSettings={() => {}} />
       </LanguageProvider>
     );
 
-    // Verify Arabic button is present in settings modal
-    const arabicBtn = screen.getByRole('button', { name: /العربية/i });
+    // Verify Arabic button is present on the settings page
+    const arabicBtn = screen.getByRole('radio', { name: /حضور الجلسة/i });
     expect(arabicBtn).toBeInTheDocument();
 
     fireEvent.click(arabicBtn);

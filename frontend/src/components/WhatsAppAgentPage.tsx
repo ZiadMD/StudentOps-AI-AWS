@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   MessageSquare,
-  Shield,
   CheckCircle2,
   AlertTriangle,
   Send,
@@ -19,26 +18,41 @@ import {
 import { api } from '../api/client';
 import { UserProfile, OfficialWhatsAppStatus, EscalationRecord, Student, TaskItem } from '../types';
 import { WhatsAppChatWindow } from './WhatsAppChatWindow';
+import { Modal } from './ui/Modal';
 
 interface WhatsAppAgentPageProps {
   currentUser: UserProfile;
+  view: 'chat' | 'escalations' | 'official';
 }
 
-export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUser }) => {
+const viewDetails = {
+  chat: { title: 'Inbox', description: 'Read and reply to member conversations.' },
+  escalations: { title: 'Follow-ups', description: 'Review overdue member follow-ups and assigned HR responsibilities.' },
+  official: { title: 'Channel settings', description: 'Pair the organization’s WhatsApp account and send authorized official messages.' },
+};
+
+// Route and identity changes reset forms, dialogs, and pending resource state.
+export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = (props) => (
+  <CommunicationView key={`${props.view}:${props.currentUser.id}:${props.currentUser.role}:${props.currentUser.team_id ?? ''}`} {...props} />
+);
+
+const CommunicationView: React.FC<WhatsAppAgentPageProps> = ({ currentUser, view }) => {
   const isRegionHead = currentUser.role === 'region_hr_head' || currentUser.role === 'hr_admin';
   const isHrLeader = currentUser.role === 'committee_hr_leader';
   const isCommitteeHead = currentUser.role === 'committee_head' || currentUser.role === 'team_lead';
-
-  // Sub-view Tab State
-  const [activeView, setActiveView] = useState<'chat' | 'escalations' | 'official'>('chat');
+  const canLoad = view === 'escalations' || (view === 'official' && isRegionHead);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   // State
   const [status, setStatus] = useState<OfficialWhatsAppStatus | null>(null);
   const [escalations, setEscalations] = useState<EscalationRecord[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [tasks] = useState<TaskItem[]>([]);
+  const [loading, setLoading] = useState(canLoad);
+  const [refreshing, setRefreshing] = useState(canLoad);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [escalationsError, setEscalationsError] = useState<string | null>(null);
+  const [sendingOfficial, setSendingOfficial] = useState(false);
 
   // Link generator modal / state
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -61,36 +75,42 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
   const [newPhoneInput, setNewPhoneInput] = useState('');
   const [phoneSaveStatus, setPhoneSaveStatus] = useState<string | null>(null);
 
-  const loadData = async () => {
-    try {
-      setRefreshing(true);
-      const [waStatus, escList, stdList, tskList] = await Promise.all([
-        api.getWhatsAppStatus().catch(() => null),
-        api.getSlaEscalations().catch(() => []),
-        api.getStudents().catch(() => []),
-        api.getTasks().catch(() => []),
-      ]);
-      if (waStatus) setStatus(waStatus);
-      setEscalations(escList);
-      setStudents(stdList);
-      setTasks(tskList);
-      if (stdList.length > 0 && !selectedStudentId) {
-        setSelectedStudentId(stdList[0].id);
-      }
-      if (tskList.length > 0 && !selectedTaskId) {
-        setSelectedTaskId(tskList[0].id);
-      }
-    } catch {
-      // Handled cleanly
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const loadData = () => setRefreshVersion((version) => version + 1);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!canLoad) return;
+    let cancelled = false;
+    const load = async () => {
+      setRefreshing(true);
+      setStatusError(null);
+      setEscalationsError(null);
+      try {
+        if (view === 'official') {
+          const result = await api.getWhatsAppStatus();
+          if (!cancelled) setStatus(result);
+        } else {
+          const result = await api.getSlaEscalations();
+          if (!cancelled) setEscalations(result);
+        }
+      } catch (error: unknown) {
+        if (cancelled) return;
+        if (view === 'official') {
+          setStatus(null);
+          setStatusError(error instanceof Error ? error.message : 'Connection status unavailable.');
+        } else {
+          setEscalations([]);
+          setEscalationsError(error instanceof Error ? error.message : 'Follow-up records unavailable.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [view, canLoad, refreshVersion]);
 
   const handleGenerateLink = async () => {
     if (!selectedStudentId) return;
@@ -111,33 +131,37 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
 
   const handleSendOfficial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!officialPhone || !officialMsg) return;
+    if (view !== 'official' || !isRegionHead || !officialPhone.trim() || !officialMsg.trim() || sendingOfficial) return;
     try {
-      setBroadcastStatus('Sending...');
+      setSendingOfficial(true);
+      setBroadcastStatus('Sending…');
       const res = await api.sendOfficialWhatsApp({
         phone_number: officialPhone,
         message: officialMsg,
       });
       if (res.success) {
-        setBroadcastStatus('Message dispatched successfully via official daemon.');
+        setBroadcastStatus('Message sent through the official account.');
         setOfficialPhone('');
         setOfficialMsg('');
       } else {
         setBroadcastStatus(`Failed: ${res.error || 'Check container connectivity'}`);
       }
-    } catch (err: any) {
-      setBroadcastStatus(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      setBroadcastStatus(`Error: ${err instanceof Error ? err.message : 'Unable to send official message.'}`);
+    } finally {
+      setSendingOfficial(false);
     }
   };
 
   const handleFetchQr = async () => {
+    if (view !== 'official' || !isRegionHead || loadingQr) return;
     setShowQrModal(true);
     setLoadingQr(true);
     try {
       const res = await api.getWhatsAppQr();
       setQrPayload(res);
-    } catch (err: any) {
-      setQrPayload({ message: err.message || 'Unable to fetch pairing QR code' });
+    } catch (err: unknown) {
+      setQrPayload({ message: err instanceof Error ? err.message : 'Unable to fetch pairing QR code' });
     } finally {
       setLoadingQr(false);
     }
@@ -152,28 +176,19 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
       setPhoneSaveStatus('Saved!');
       setEditingPhone(false);
       setTimeout(() => setPhoneSaveStatus(null), 2500);
-    } catch (err: any) {
-      setPhoneSaveStatus(`Failed: ${err.message}`);
+    } catch (err: unknown) {
+      setPhoneSaveStatus(`Failed: ${err instanceof Error ? err.message : 'Unable to save phone number.'}`);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
-        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-        Loading WhatsApp Operations Console…
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="workspace-page min-w-0 space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              WhatsApp Operations & SLA Hub
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-tight">
+              {viewDetails[view].title}
             </h1>
             {isHrLeader && (
               <span className="text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded">
@@ -186,90 +201,51 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Dual-track messaging: Official automated broadcasts + zero-trust client-side links for personal follow-up.
+          <p className="text-sm text-slate-600 mt-2">
+            {viewDetails[view].description}
           </p>
         </div>
-        <button
+        {canLoad && <button
           onClick={loadData}
           disabled={refreshing}
           className="mt-3 sm:mt-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh Status
-        </button>
+          {view === 'official' ? 'Refresh Status' : 'Refresh follow-ups'}
+        </button>}
       </div>
 
-      {/* Sub-Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        <button
-          type="button"
-          onClick={() => setActiveView('chat')}
-          className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-            activeView === 'chat'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-          Chat Window
-        </button>
+      {view === 'official' && !isRegionHead && (
+        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          Channel settings are available only to region HR heads and HR administrators.
+        </p>
+      )}
 
-        <button
-          type="button"
-          onClick={() => setActiveView('escalations')}
-          className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-            activeView === 'escalations'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Flame className="w-3.5 h-3.5" />
-          SLA Escalations
-          {escalations.filter((e) => e.is_escalated).length > 0 && (
-            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full">
-              {escalations.filter((e) => e.is_escalated).length}
-            </span>
-          )}
-        </button>
-
-        {(isRegionHead || isHrLeader) && (
-          <button
-            type="button"
-            onClick={() => setActiveView('official')}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-              activeView === 'official'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            Official SIM & Daemon
-          </button>
-        )}
-      </div>
+      {loading && (
+        <div role="status" className="flex h-64 items-center text-sm text-slate-600">
+          <RefreshCw aria-hidden="true" className="mr-2 h-5 w-5 animate-spin" />
+          Loading {viewDetails[view].title.toLowerCase()}…
+        </div>
+      )}
 
       {/* Primary View: WhatsApp Chat Window */}
-      {activeView === 'chat' && (
+      {view === 'chat' && (
         <WhatsAppChatWindow currentUser={currentUser} />
       )}
 
-      {/* Track 1: Official Organization Daemon (Region HR Head / Leader view) */}
-      {activeView === 'official' && isRegionHead && (
+      {/* Official organization account: region HR heads and administrators only. */}
+      {view === 'official' && isRegionHead && !loading && (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-indigo-600" />
-              <h2 className="text-sm font-semibold text-slate-900">Official Organization Channel (ops_official)</h2>
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-900">Organization account</h2>
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handleFetchQr}
-                className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-semibold transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-sm font-semibold transition-colors"
               >
                 <QrCode className="w-3.5 h-3.5" />
-                Pair Official SIM (Scan QR)
+                Pair account
               </button>
               <span
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -286,7 +262,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                 ) : (
                   <>
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    {status?.status || 'Docker Daemon Disconnected'}
+                    {statusError ? 'Status unavailable' : status?.status || 'Status unavailable'}
                   </>
                 )}
               </span>
@@ -294,15 +270,16 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
           </div>
 
           <p className="text-xs text-slate-500 leading-relaxed">
-            Headless OpenWA daemon running in isolated Docker container. Used exclusively for scheduled Stage-1 reminders
-            and regional announcements. Personal coordinator numbers never touch this server.
+            Pair the organization’s WhatsApp account and send official messages to a specified recipient.
           </p>
 
+          {statusError && <p role="alert" className="text-sm text-rose-700">{statusError} Use Refresh Status to retry.</p>}
           <form onSubmit={handleSendOfficial} className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
             <div>
-              <label className="block text-[11px] font-medium text-slate-600 mb-1">Target Phone (+20...)</label>
+              <label htmlFor="official-phone" className="block text-[11px] font-medium text-slate-600 mb-1">Target Phone (+20...)</label>
               <input
-                type="text"
+                id="official-phone"
+                type="tel"
                 placeholder="+2010XXXXXXXX"
                 value={officialPhone}
                 onChange={(e) => setOfficialPhone(e.target.value)}
@@ -314,23 +291,25 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               <div className="flex gap-2">
                 <input
                   type="text"
+                  aria-label="Official message"
                   placeholder="Official notification content..."
                   value={officialMsg}
                   onChange={(e) => setOfficialMsg(e.target.value)}
-                  className="flex-1 text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="min-w-0 flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-900"
                 />
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                  disabled={sendingOfficial || !officialPhone.trim() || !officialMsg.trim()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-50"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  Dispatch
+                  {sendingOfficial ? 'Sending…' : 'Send'}
                 </button>
               </div>
             </div>
           </form>
           {broadcastStatus && (
-            <p className="text-xs font-mono text-slate-600 pt-1">{broadcastStatus}</p>
+            <p role="status" className="text-sm text-slate-600 pt-1">{broadcastStatus}</p>
           )}
         </div>
       )}
@@ -492,7 +471,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
       )}
 
       {/* 3-Day SLA Escalation Table */}
-      {activeView === 'escalations' && (
+      {view === 'escalations' && !loading && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -500,14 +479,16 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               <h2 className="text-sm font-semibold text-slate-900">3-Day SLA Escalation Monitor</h2>
             </div>
             <span className="text-xs text-slate-500">
-              {escalations.length} Active Flag{escalations.length === 1 ? '' : 's'}
+              {escalationsError ? 'Unavailable' : `${escalations.length} active flags`}
             </span>
           </div>
 
-          {escalations.length === 0 ? (
+          {escalationsError ? (
+            <p role="alert" className="p-5 text-sm text-rose-700">{escalationsError} Use Refresh follow-ups to retry.</p>
+          ) : escalations.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
               <UserCheck className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
-              All committee member follow-ups are on schedule. No overdue SLA breaches.
+              No follow-up flags were returned for your accessible members.
             </div>
           ) : (
             <>
@@ -520,7 +501,6 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                       <th className="py-3 px-4">Flag Reason</th>
                       <th className="py-3 px-4">Responsible HR</th>
                       <th className="py-3 px-4">SLA Status &amp; Age</th>
-                      <th className="py-3 px-4 text-right">Quick Follow-Up</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -563,19 +543,6 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                               <span className="font-mono text-slate-500 text-[11px]">{esc.days_open}d open</span>
                             )}
                           </div>
-                        </td>
-
-                        {/* Action */}
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => {
-                              setActiveView('chat');
-                            }}
-                            className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-medium text-[11px] shadow-2xs transition-colors"
-                          >
-                            <MessageSquare className="w-3 h-3" />
-                            <span>Open Chat</span>
-                          </button>
                         </td>
                       </tr>
                     ))}
@@ -622,19 +589,6 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                         Assigned to: <span className="font-medium text-slate-700">{esc.hr_member_name}</span>
                       </div>
                     </div>
-
-                    {/* Action */}
-                    <div className="pt-2 border-t border-slate-100">
-                      <button
-                        onClick={() => {
-                          setActiveView('chat');
-                        }}
-                        className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-2xs transition-colors"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Open WhatsApp Chat</span>
-                      </button>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -643,23 +597,8 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
         </div>
       )}
 
-      {/* Official WhatsApp SIM QR Pairing Modal */}
-      {showQrModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">Pair Official Organization SIM</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowQrModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Modal isOpen={view === 'official' && isRegionHead && showQrModal} onClose={() => setShowQrModal(false)} title="Pair organization account" size="md">
+          <div className="space-y-4">
 
             <div className="text-xs text-slate-600 space-y-2">
               <p className="font-medium text-slate-900">How to link the official organization phone number:</p>
@@ -689,14 +628,10 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
                 <div className="text-center space-y-2">
                   <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
                   <p className="text-xs text-slate-700 font-semibold">
-                    {qrPayload?.message || 'OpenWA Container Offline'}
+                    {qrPayload?.message || 'Pairing code unavailable'}
                   </p>
                   <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
-                    Start the OpenWA Docker daemon to display the live pairing QR code:
-                    <br />
-                    <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-800 text-[10px] mt-1.5 inline-block font-mono">
-                      docker compose up -d openwa
-                    </code>
+                    Refresh the pairing code, or ask your administrator to check the WhatsApp connection.
                   </p>
                 </div>
               )}
@@ -723,8 +658,7 @@ export const WhatsAppAgentPage: React.FC<WhatsAppAgentPageProps> = ({ currentUse
               </button>
             </div>
           </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 };
