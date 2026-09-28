@@ -329,16 +329,14 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 #app-sidebar { background: #fff; }
 #app-sidebar > div:first-child > div:first-child { min-height: 4rem; }
 #app-sidebar nav { padding: 1rem .75rem; }
-#app-sidebar nav button { min-height: 2.75rem; margin-bottom: .25rem; border-radius: .5rem; }
-#app-sidebar nav button[aria-current='page'] { background: #f0fdfa; color: #115e59; box-shadow: inset 3px 0 #0f766e; }
-#app-sidebar nav button[aria-current='page'] svg { color: #0f766e; }
+#app-sidebar nav button { border-radius: .5rem; }
+/* The active row is styled entirely in Tailwind (bg-slate-100 plus a font
+   weight change) so it stays in one system with the rest of the shell. An
+   earlier hardcoded rule here painted the row teal with an inset left border,
+   which contradicted the palette and, because it also set a fixed min-height,
+   silently undid the row compaction done in the component. */
 /* Only hardcoded shared styles need selectors; utility colors use the tokens above. */
 html.dark #app-sidebar { background: hsl(var(--card)); }
-html.dark #app-sidebar nav button[aria-current='page'] {
-  background: hsl(var(--accent)); color: hsl(var(--accent-foreground));
-  box-shadow: inset 3px 0 var(--focus-outline);
-}
-html.dark #app-sidebar nav button[aria-current='page'] svg { color: var(--focus-outline); }
 html.dark :where(input, select, textarea) { color-scheme: dark; }
 html.dark :where(input, textarea)::placeholder { color: #94a3b8; opacity: 1; }
 html.dark select option { background: hsl(var(--card)); color: hsl(var(--foreground)); }
@@ -363,9 +361,16 @@ html.dark .hover\:bg-black\/10:hover { background-color: rgb(255 255 255 / .08);
   #app-sidebar button[aria-label='Collapse sidebar'],
   #app-sidebar button[aria-label='Expand sidebar'] { display: none; }
   #app-sidebar .drawer-close { display: flex; }
-  #app-sidebar nav button { justify-content: flex-start; padding: .75rem; }
+  /* Nav rows go back to touch sizing. The component sets a 28px row from md
+     up, but in this band the sidebar is a drawer over the content, so the
+     44px floor applies again regardless of viewport width. */
+  #app-sidebar nav button { justify-content: flex-start; padding: .75rem; min-height: 2.75rem; }
   #app-sidebar nav button > div { gap: .75rem; }
   .workspace-page :where(button, select, input:not([type='checkbox']):not([type='radio'])) { min-height: 2.75rem; }
+  /* The header hides its hamburger from md up, but in this band the sidebar is
+     still a drawer, so the trigger has to come back or the navigation is
+     unreachable on a tablet in portrait. */
+  header button[aria-label='Open navigation'] { display: flex; }
 }
 @media (max-width: 767px) {
   :where(input, select, textarea) { font-size: 16px !important; }
