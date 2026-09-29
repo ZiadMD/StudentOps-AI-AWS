@@ -1,0 +1,31 @@
+flowchart TB
+    L["POST /api/auth/login<br/>rate_limit_login 60/min"] --> V1["Lookup candidates:<br/>exact identifier, or<br/>identifier + @studentops.org"]
+    V1 --> V2{"User found AND<br/>bcrypt.verify?"}
+    V2 -->|no| E401["401 Incorrect email or password"]
+    V2 -->|yes| V3{"user.is_active?"}
+    V3 -->|no| E403["403 Account deactivated"]
+    V3 -->|yes| TOK["Issue access JWT (type=access)<br/>Issue refresh JWT (type=refresh, jti=uuid4)"]
+    TOK --> SESS["INSERT RefreshSession(refresh_token_jti, expires_at)"]
+    SESS --> RET["200 TokenResponse"]
+
+    RET --> USE["Client stores access_token in localStorage<br/>key: studentops_access_token"]
+    USE --> CALL["Authorization: Bearer {access_token}"]
+    CALL --> DEC{"decode_token<br/>expired?"}
+    DEC -->|yes| R401["401 Token has expired"]
+    DEC -->|no| T{"type == access?"}
+    T -->|no| R401b["401 Could not validate credentials"]
+    T -->|yes| OK["Route handler runs"]
+
+    OK --> EXP{"access_token expired<br/>or logout?"}
+    EXP -->|refresh needed| RF["POST /api/auth/refresh"]
+    RF --> S1{"RefreshSession found by jti?"}
+    S1 -->|no| F401["401 Refresh session not found"]
+    S1 -->|yes| S2{"session.revoked_at set?"}
+    S2 -->|yes| REUSE["REUSE DETECTED<br/>Revoke ALL sessions for user<br/>401 Token reuse detected"]
+    S2 -->|no| S3{"user still active?"}
+    S3 -->|no| F401b["401 User account no longer active"]
+    S3 -->|yes| ROT["Revoke old session.<br/>Issue new access + refresh.<br/>INSERT new RefreshSession"]
+    ROT --> RET2["200 TokenResponse (rotated pair)"]
+
+    OK --> LOG["POST /api/auth/logout"]
+    LOG --> REV["Set revoked_at on the supplied jti.<br/>Access token remains valid until expiry."]

@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    actor HRM as Committee HR Member
+    participant API as FastAPI /api/students
+    participant Dep as verify_student_access
+    participant Svc as ScoringService
+    participant DB as Database
+
+    HRM->>API: PUT /api/students/{student_id}/behavior-score
+    API->>API: require_roles(["committee_hr_member","hr_admin"])
+    API->>Dep: verify_student_access(student_id, user, db)
+    alt role == committee_hr_member AND not assigned
+        Dep-->>API: 403 "you are not assigned to this member"
+    end
+    Dep-->>API: Student
+
+    API->>API: Validate ranges:<br/>group_interaction 0-5, social_media 0-5,<br/>hierarchy_rules 0-5, polite_conduct 0-8, interaction 0-5
+    loop For each of 5 categories
+        API->>DB: SELECT ScoreRecord WHERE student_id, category[, month]
+        alt Record exists
+            API->>DB: UPDATE points, notes, graded_by_user_id, updated_by
+        else New
+            API->>DB: INSERT ScoreRecord(max_points per category)
+        end
+    end
+    API->>DB: COMMIT
+    API->>Svc: get_student_score_summary(student_id, db)
+    Svc->>DB: SELECT AttendanceRecord, Submission, ScoreRecord
+    Svc->>Svc: behavior = group + social + hierarchy + polite
+    Svc->>Svc: rating: Outstanding if quality>=8.5 and behavior>=20 and absence==0<br/>Good if quality>=6.0 and behavior>=15 and absence<=2<br/>else Needs Improvement
+    Svc-->>API: StudentScoreSummary
+    API-->>HRM: 200 StudentScoreSummary
+
+    Note over API,DB: Committee Head is read-only. No endpoint in routes_students.py<br/>allows committee_head to write behavior scores.

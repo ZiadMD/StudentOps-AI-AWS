@@ -1,0 +1,47 @@
+sequenceDiagram
+    autonumber
+    participant OpenWA as OpenWA Gateway
+    participant Hook as POST /api/whatsapp/webhook
+    participant Svc as WhatsAppService
+    participant DB as Database
+    participant MGR as ws_manager
+    actor HR as HR Member (browser)
+
+    OpenWA->>Hook: event message.received
+    Hook->>Hook: Compare X-Webhook-Secret against OPENWA_WEBHOOK_SECRET
+    alt Secret missing or unconfigured
+        Hook-->>OpenWA: 401
+    else Secret mismatch
+        Hook-->>OpenWA: 403
+    end
+    Hook->>Hook: Parse JSON body
+    Hook->>Svc: handle_webhook_event(payload, db)
+
+    Svc->>DB: Normalize sender phone to E.164
+    Svc->>DB: SELECT Student WHERE phone matches
+    alt No matching student
+        Svc-->>Hook: 200 (ignored, logged)
+    end
+    Svc->>DB: SELECT student.assigned_hr_id
+    Svc->>DB: SELECT existing message by openwa_message_id
+    alt Message already stored
+        Svc->>DB: UPDATE status/ack (idempotent upsert)
+    else New message
+        Svc->>DB: INSERT WhatsAppChatMessage(sender_type=STUDENT, status=pending)
+    end
+    Svc->>MGR: push event to assigned HR socket
+    MGR-->>HR: WebSocket frame with new message
+    Svc-->>Hook: 200
+
+    Note over Hook,Svc: Also handles onAck (delivery/read receipts),<br/>onReaction, and onMessageEdit events.
+
+    HR->>Hook: WSS /api/whatsapp/ws?token={JWT}
+    Hook->>Hook: decode_token, load User, require role in<br/>{committee_hr_member, committee_hr_leader,<br/>region_hr_head, hr_admin}
+    alt Invalid or unauthorized
+        Hook-->>HR: close 1008 Policy Violation
+    end
+    Hook-->>HR: accept
+    loop Keepalive
+        HR->>Hook: "ping"
+        Hook-->>HR: "pong"
+    end

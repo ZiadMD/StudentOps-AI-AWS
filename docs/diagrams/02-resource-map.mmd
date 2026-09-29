@@ -1,0 +1,136 @@
+flowchart TB
+    subgraph Public["Public"]
+        R0["GET /"]
+        R1["POST /api/auth/register"]
+        R2["POST /api/auth/login"]
+        R3["POST /api/auth/refresh"]
+        R4["POST /api/auth/logout"]
+    end
+
+    subgraph Auth["Auth"]
+        A1["GET /api/auth/me"]
+        A2["GET /api/auth/teams"]
+        A3["POST /api/auth/teams<br/>hr_admin"]
+        A4["PATCH /api/auth/users/{user_id}/role<br/>hr_admin"]
+        A5["POST /api/auth/link-student"]
+        A6["POST /api/auth/logout-all"]
+    end
+
+    subgraph Students["Students"]
+        S1["GET /api/students"]
+        S2["POST /api/students"]
+        S3["GET /api/students/scoreboard/all"]
+        S4["GET /api/students/{student_id}"]
+        S5["GET /api/students/{student_id}/score"]
+        S6["PUT /api/students/{student_id}/behavior-score"]
+        S7["POST /api/students/assign-cohort"]
+        S8["PATCH /api/students/{student_id}/phone"]
+        S9["POST /api/students/{student_id}/bonus"]
+        S10["POST /api/students/{student_id}/invitation"]
+    end
+
+    subgraph Tasks["Tasks"]
+        T1["GET /api/tasks"]
+        T2["POST /api/tasks"]
+        T3["GET /api/tasks/{task_id}"]
+        T4["POST /api/tasks/{task_id}/assign"]
+        T5["GET /api/tasks/{task_id}/scores"]
+        T6["GET /api/tasks/{task_id}/submissions"]
+        T7["GET /api/tasks/submissions/{submission_id}"]
+        T8["GET /api/tasks/submissions/{submission_id}/score"]
+        T9["PUT /api/tasks/submissions/{submission_id}/review"]
+        T10["POST /api/tasks/{task_id}/submit"]
+    end
+
+    subgraph Attendance["Attendance"]
+        AT1["GET /api/attendance/meetings"]
+        AT2["POST /api/attendance/meetings"]
+        AT3["GET /api/attendance/meetings/{meeting_id}"]
+        AT4["POST /api/attendance/meetings/{meeting_id}/process"]
+        AT5["PUT /api/attendance/meetings/{meeting_id}/records/{student_id}/status"]
+    end
+
+    subgraph AgentR["Agent"]
+        G1["POST /api/agent/chat"]
+        G2["POST /api/agent/stream<br/>SSE"]
+        G3["POST /api/agent/confirm<br/>HITL"]
+        G4["GET /api/agent/tools"]
+    end
+
+    subgraph Whats["WhatsApp"]
+        W1["GET /api/whatsapp/status"]
+        W2["GET /api/whatsapp/qr"]
+        W3["POST /api/whatsapp/send-official"]
+        W4["POST /api/whatsapp/generate-link"]
+        W5["GET /api/whatsapp/escalations"]
+        W6["GET /api/whatsapp/threads"]
+        W7["GET /api/whatsapp/threads/{sid}/messages"]
+        W8["POST /api/whatsapp/threads/{sid}/messages"]
+        W9["POST /api/whatsapp/threads/{student_id}/sync"]
+        W10["POST /api/whatsapp/threads/{student_id}/media"]
+        W11["POST /api/whatsapp/threads/{student_id}/messages/{message_id}/reaction"]
+        W12["PUT /api/whatsapp/threads/{student_id}/messages/{message_id}"]
+        W13["POST /api/whatsapp/webhook<br/>X-Webhook-Secret"]
+        W14["WS /api/whatsapp/ws?token="]
+    end
+
+    subgraph Ops["Operations"]
+        O1["GET /api/automation/settings"]
+        O2["PUT /api/automation/settings"]
+        O3["POST /api/automation/trigger-run"]
+        O4["GET /api/automation/reminders"]
+        O5["GET /api/automation/logs"]
+        O6["GET /api/automation/reminders/{reminder_id}"]
+        O7["GET /api/audit/logs<br/>hr_admin"]
+        O8["GET /api/dashboard/stats"]
+        O9["GET /api/calendar/events"]
+        O10["POST /api/calendar/events"]
+    end
+
+    subgraph Comms["Communications"]
+        C1["POST /api/feedback"]
+        C2["GET /api/feedback"]
+        C3["PATCH /api/feedback/{feedback_id}/status"]
+        C4["POST /api/questions"]
+        C5["GET /api/questions"]
+        C6["POST /api/questions/{question_id}/answer"]
+        C7["GET /api/reports/committee/summary"]
+        C8["POST /api/reports/submit-to-head"]
+        C9["GET /api/reports"]
+        C10["POST /api/reports/{report_id}/acknowledge"]
+    end
+
+    R2 --> A1
+    A1 --> S1
+    S1 --> S3
+    S1 --> T1
+    T1 --> T3
+    T3 --> T7
+    T7 --> T9
+    AT1 --> AT3
+    AT3 --> AT4
+    AT4 --> AT5
+    S1 --> G1
+    G1 --> G2
+    G2 --> G3
+    G4 -.introspects.-> G1
+    S1 --> W6
+    W6 --> W7
+    W7 --> W8
+    W8 --> W9
+    W9 --> W14
+    W13 --> W14
+    S1 --> O1
+    O1 --> O3
+    O3 --> O4
+    S1 --> C1
+    C1 --> C2
+    C2 --> C3
+    C4 --> C5
+    C5 --> C6
+    C7 --> C8
+    C8 --> C9
+    C9 --> C10
+    W1 --> W2
+    W2 --> W3
+    O1 --> O9

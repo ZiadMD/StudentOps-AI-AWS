@@ -1,0 +1,42 @@
+flowchart TB
+    subgraph Bootstrap["Application bootstrap"]
+        B1["main.py lifespan startup"] --> B2["init_db()<br/>Base.metadata.create_all"]
+        B2 --> B3{"ENVIRONMENT == development<br/>AND sqlite in DATABASE_URL?"}
+        B3 -->|yes| B4["seed_all(session)"]
+        B3 -->|no| B5["No seed. Production must be migrated."]
+        B4 --> B6["scheduler.start()<br/>BackgroundScheduler 300s"]
+        B5 --> B6
+    end
+
+    subgraph Migration["Alembic - declared but not wired into startup"]
+        M1["alembic/env.py"] --> M2["3f35fadc1e13_baseline_schema"]
+        M2 --> M3["4b8c9d0e1f2a_add_student_invitations"]
+        M3 --> M4["5c9d2e7f1a3b_add_refresh_sessions"]
+        M4 --> M5["6d0e3f8a2b4c_add_usernames"]
+    end
+
+    subgraph SeedData["seed/seed_data.py - idempotent upserts"]
+        S1["4 Teams: team_media, team_ops, team_eng, team_tech"]
+        S2["8 Staff users with known dev passwords"]
+        S3["CORE_TEAM students with student_id linked"]
+        S4["Meetings, attendance, tasks, submissions,<br/>score_records, followup flags"]
+    end
+
+    subgraph Schema["Schema authority"]
+        SC1["backend/app/models/entities.py<br/>defines the 23 tables"]
+        SC2["create_all uses the model metadata,<br/>NOT the migration history"]
+    end
+
+    B2 --> SC1
+    B4 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    SC1 --> SC2
+
+    RISK["Consequence: a table added to entities.py is created by create_all<br/>even with no matching migration. A table removed from entities.py but still<br/>present in the database is never dropped. Alembic and the ORM can drift apart<br/>with no automated check."]
+    SC2 -.-> RISK
+    M5 -.-> RISK
+
+    note["validate_production_secrets in config.py raises at import time if<br/>ENVIRONMENT=production and JWT_SECRET_KEY is still the dev default,<br/>or if DATABASE_URL contains 'sqlite'."]
+    B1 -.-> note

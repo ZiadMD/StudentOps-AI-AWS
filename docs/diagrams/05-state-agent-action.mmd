@@ -1,0 +1,31 @@
+stateDiagram-v2
+    direction TB
+    [*] --> PENDING_CONFIRMATION : ReActAgent INTENT 2 reminder<br/>AuditService.record_action
+    PENDING_CONFIRMATION --> EXECUTING_CONFIRMATION : POST /agent/confirm confirmed=true<br/>atomic UPDATE WHERE status=PENDING_CONFIRMATION
+    PENDING_CONFIRMATION --> REJECTED : POST /agent/confirm confirmed=false
+
+    EXECUTING_CONFIRMATION --> EXECUTED : tool_send_reminder returned
+    EXECUTING_CONFIRMATION --> FAILED : tool_send_reminder raised
+
+    EXECUTED --> [*]
+    REJECTED --> [*]
+    FAILED --> [*]
+
+    note right of PENDING_CONFIRMATION
+        Replay guard. Any second POST
+        with the same action_id sees
+        status != PENDING_CONFIRMATION
+        and is rejected with 400. The
+        UPDATE ... WHERE status =
+        PENDING_CONFIRMATION also yields
+        409 on a concurrent race.
+    end note
+
+    note right of EXECUTED
+        The row is protected by database
+        triggers. UPDATE is only permitted
+        when id, action_id, intent, tool_name
+        and parameters are unchanged; DELETE
+        always raises. This is the only
+        permitted status transition.
+    end note

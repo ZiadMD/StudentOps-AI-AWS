@@ -1,0 +1,36 @@
+flowchart TB
+    REQ["Incoming request"] --> AUTHZ{"Authorization header<br/>present and valid?"}
+    AUTHZ -->|no| R401["401"]
+    AUTHZ -->|yes| LOAD["Load User row with eager team"]
+    LOAD --> ACTIVE{"is_active?"}
+    ACTIVE -->|no| R403A["403 Deactivated"]
+    ACTIVE -->|yes| ROLE{"Role guard<br/>require_roles([...])"}
+
+    ROLE -->|role not in list| R403B["403 Access forbidden:<br/>requires one of roles [...]"]
+
+    ROLE -->|allowed| FUNC{"Handler-specific<br/>resource check"}
+
+    FUNC --> F1{"verify_student_access<br/>student_id, mode"}
+    F1 --> F1A["region_hr_head / hr_admin<br/>ALLOW all students"]
+    F1 --> F1B["committee_head / hr_leader / team_lead<br/>ALLOW if student.team_id == caller.team_id"]
+    F1 --> F1C["committee_hr_member<br/>write: assigned_hr_id == caller.id<br/>read: assigned OR same team"]
+    F1 --> F1D["committee_member / member<br/>ALLOW only student.id == caller.student_id"]
+    F1 --> F1A & F1B & F1C & F1D
+
+    FUNC --> F2{"Query-level team filter<br/>Student.team_id == caller.team_id"}
+    FUNC --> F3{"Explicit field redaction<br/>scores set to null"}
+    FUNC --> F4{"Business rule gate<br/>e.g. committee_member blocked from /score"}
+
+    F1B --> DENY["403 Forbidden"]
+    F1C --> DENY
+    F1D --> DENY
+    F2 --> EMPTY["Empty result set (fail closed)"]
+    F3 --> REDACT["200 with sensitive fields nulled"]
+    F4 --> DENY
+
+    F1A --> OK["200 Response"]
+    REDACT --> OK
+    EMPTY --> OK
+
+    note["Layering: three independent checks.<br/>1. require_roles - coarse role gate per endpoint.<br/>2. verify_student_access / inline team_id comparison - object gate.<br/>3. Query WHERE clause - row gate.<br/>Frontend NAV_ITEMS roles is NOT a security boundary."]
+    REQ -.-> note

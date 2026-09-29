@@ -1,0 +1,75 @@
+flowchart LR
+    subgraph ReadOnly["READ_ONLY tools"]
+        T1["get_student"]
+        T2["search_students"]
+        T3["list_students"]
+        T4["get_student_contacts"]
+        T5["get_upcoming_meetings"]
+        T6["get_meeting"]
+        T7["get_meeting_attendance"]
+        T8["get_student_attendance"]
+        T9["get_upcoming_events"]
+        T10["get_tasks"]
+        T11["get_pending_submissions"]
+        T12["get_student_score"]
+        T13["get_scores"]
+        T14["prepare_reminder"]
+    end
+
+    subgraph External["EXTERNAL_ACTION tools"]
+        T15["send_reminder<br/>requires confirmation"]
+    end
+
+    subgraph Tables["Tables read"]
+        DB1[("students")]
+        DB2[("teams")]
+        DB3[("meetings")]
+        DB4[("attendance_records")]
+        DB5[("participant_sessions")]
+        DB6[("tasks")]
+        DB7[("submissions")]
+        DB8[("score_records")]
+        DB9[("events")]
+        DB10[("agent_action_audits")]
+        DB11[("reminder_logs")]
+    end
+
+    subgraph ExternalSys["External calls"]
+        X1["ScoringService"]
+        X2["CalendarService / MockCalendarProvider"]
+        X3["ReminderService / MessagingProvider"]
+    end
+
+    T1 --> DB1
+    T2 --> DB1
+    T3 --> DB1
+    T4 --> DB1
+    T5 --> DB3
+    T6 --> DB3
+    T7 --> DB4
+    T7 --> DB1
+    T8 --> DB4
+    T8 --> DB3
+    T9 --> DB9
+    T9 --> X2
+    T10 --> DB6
+    T11 --> DB7
+    T11 --> DB1
+    T12 --> DB8
+    T12 --> DB4
+    T12 --> DB7
+    T13 --> DB8
+    T13 --> DB1
+    T14 --> DB1
+    T14 --> X2
+    T15 --> DB1
+    T15 --> DB3
+    T15 --> X3
+    T15 --> DB11
+
+    note["No agent tool writes to students, tasks, submissions,<br/>score_records, or attendance_records. Every write in the system<br/>goes through a REST endpoint gated by require_roles."]
+
+    classDef ro fill:#f0fdf4,stroke:#15803d,color:#14532d
+    classDef ex fill:#fef2f2,stroke:#b91c1c,color:#7f1d1d
+    class T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14 ro
+    class T15 ex

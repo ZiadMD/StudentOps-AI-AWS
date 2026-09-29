@@ -1,0 +1,28 @@
+flowchart TB
+    R1["region_hr_head<br/>Regional HR Head / Vice HR"]
+    R2["hr_admin<br/>HR Administrator (legacy, system-wide)"]
+    R3["committee_hr_leader<br/>Committee HR Leader"]
+    R4["committee_head<br/>Committee Head (Technical)"]
+    R4 -.equivalence.-> R4B["team_lead<br/>Team Lead (legacy alias)"]
+    R5["committee_hr_member<br/>Committee HR Member"]
+    R6["committee_member<br/>Committee Member"]
+    R6 -.equivalence.-> R6B["member<br/>Member (legacy alias)"]
+
+    R1 -->|delegates| R3
+    R3 -->|oversees| R5
+    R5 -->|handles cohort| R6
+    R3 -->|escalates reports to| R1
+    R1 -->|acknowledges reports from| R3
+
+    R2 --- R1
+
+    classDef reg fill:#ede9fe,stroke:#6d28d9,color:#2e1065
+    classDef lead fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a
+    classDef tech fill:#dcfce7,stroke:#15803d,color:#14532d
+    classDef hrm fill:#fef3c7,stroke:#b45309,color:#78350f
+    classDef mem fill:#f1f5f9,stroke:#475569,color:#0f172a
+    class R1,R2 reg
+    class R3 lead
+    class R4,R4B tech
+    class R5 hrm
+    class R6,R6B mem

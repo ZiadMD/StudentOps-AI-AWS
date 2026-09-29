@@ -1,0 +1,40 @@
+sequenceDiagram
+    autonumber
+    actor Member as Committee Member
+    participant SPA as React SPA
+    participant API as FastAPI /api/tasks
+    participant Head as Committee Head
+    participant DB as Database
+
+    Member->>SPA: Open task detail
+    SPA->>API: POST /api/tasks/{task_id}/submit
+    API->>API: require_roles(["committee_member","member"])
+    API->>DB: SELECT Task WHERE id = task_id
+    API->>DB: SELECT Submission WHERE task_id AND student_id
+    alt No existing submission
+        API->>DB: INSERT Submission(status = ON_TIME | LATE)
+    else Existing PENDING submission
+        API->>DB: UPDATE Submission SET status, submitted_at, file_url
+    end
+    API-->>SPA: 200 SubmissionSchema (scores redacted to null)
+    SPA-->>Member: "Submitted"
+
+    Note over Head,DB: Committee Head reviews the deliverable
+    Head->>API: PUT /api/tasks/submissions/{submission_id}/review
+    API->>API: require_roles(["committee_head","team_lead","hr_admin"])
+    API->>DB: SELECT Submission JOIN Student JOIN Task
+    API->>API: Check student.team_id == caller.team_id
+    alt Cross-committee
+        API-->>Head: 403 Forbidden
+    else Same committee
+        API->>API: Reject score > task.max_score
+        API->>DB: UPDATE Submission SET score, technical_score,<br/>reviewer_notes, reviewed_at, graded_by_user_id
+        API->>DB: AuditService.record_action(REVIEW_TASK_SUBMISSION)
+        API-->>Head: 200 SubmissionSchema
+    end
+
+    Note over Head,DB: HR reads scores only, never deliverables
+    Head->>API: GET /api/tasks/{task_id}/scores
+    API->>API: Reject committee_member / member with 403
+    API->>DB: SELECT Submission JOIN Student (team scoped)
+    API-->>Head: 200 [TaskScoreItemSchema] (no file_url)

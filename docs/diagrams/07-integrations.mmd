@@ -1,0 +1,38 @@
+flowchart TB
+    subgraph In["Integrations in code"]
+        I1["Google Meet Conference Records<br/>GoogleMeetAttendanceProvider"]
+        I2["Google Calendar API v3<br/>GoogleCalendarProvider"]
+        I3["OpenWA / whatsapp-web.js<br/>OpenWAProvider"]
+        I4["Cloudflare Tunnel<br/>cloudflared"]
+        I5["Groq API"]
+        I6["OpenRouter API"]
+        I7["Supabase PostgreSQL<br/>SQLAlchemy asyncpg"]
+        I8["Mock providers<br/>MockAttendanceProvider<br/>MockCalendarProvider<br/>MockMessagingProvider"]
+    end
+
+    I1 --> S1["Implemented as a stub.<br/>get_raw_meeting_attendance has a pass<br/>body and always returns None.<br/>No REST call is issued."]
+    I2 --> S2["Stub. get_upcoming_events<br/>returns an empty list.<br/>create_event echoes the input.<br/>CalendarService reads the DB table<br/>instead, so the UI still works."]
+
+    I3 --> S3["Fully implemented, 746 lines.<br/>10 httpx calls with timeouts<br/>from 3s to 15s. Used for the<br/>official channel, per-HR chat,<br/>media, reactions, edits, webhook."]
+
+    I4 --> S4["Infra only, in docker-compose.yml.<br/>Exposes a self-hosted OpenWA<br/>container to the internet."]
+
+    I5 --> S5["Primary LLM. OpenAI-compatible<br/>chat completions, stream true,<br/>45s timeout."]
+
+    I6 --> S6["Secondary LLM. Same shape,<br/>plus HTTP-Referer and X-Title."]
+
+    I7 --> S7["Production data tier via PgBouncer<br/>transaction pooler on 6543.<br/>Prepared statement caches are<br/>disabled for pooled URLs."]
+
+    I8 --> S8["Selected when ENVIRONMENT != production<br/>AND MESSAGING_PROVIDER != openwa.<br/>Keeps demos and tests deterministic."]
+
+    SEL{"use_live_providers<br/>= ENVIRONMENT==production<br/>OR MESSAGING_PROVIDER==openwa"}
+    SEL -->|true| I1
+    SEL -->|true| I2
+    SEL -->|false| I8
+
+    MSG{"MESSAGING_PROVIDER"}
+    MSG -->|mock| M1["MockMessagingProvider<br/>records in memory, no network"]
+    MSG -->|openwa| I3
+    MSG -->|other| M2["Factory raises ValueError"]
+
+    note["Not an integration: boto3 is declared in pyproject.toml and<br/>requirements.txt but is never imported anywhere in backend/app or api.<br/>There is no AWS SDK usage in the running application."]

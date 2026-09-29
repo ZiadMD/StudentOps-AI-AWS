@@ -1,0 +1,48 @@
+sequenceDiagram
+    autonumber
+    actor HR as HR Leader
+    participant SPA as AgentChat.tsx
+    participant API as POST /api/agent/stream
+    participant ReAct as ReActAgent
+    participant LLM as Groq
+    participant OR as OpenRouter
+    participant Audit as agent_action_audits
+
+    SPA->>API: fetch with ReadableStream reader
+    API-->>SPA: HTTP 200 text/event-stream
+    Note right of API: Headers: Cache-Control no-cache,<br/>X-Accel-Buffering no, Connection keep-alive
+
+    API->>ReAct: is_deterministic_intent(query)
+    ReAct-->>API: false
+
+    API->>ReAct: CONVERSATION_STATE["{user_id}:{conversation_id}"]
+    ReAct->>ReAct: history.append({ role: "user", content: query })
+
+    API->>LLM: Tier 1 POST /chat/completions (stream true, timeout 45s)
+    alt LLM yields tokens
+        loop Each SSE data: chunk
+            LLM-->>API: choices[0].delta.content
+            API-->>SPA: data: {"type":"token","content":"..."}
+        end
+    else LLM errors or returns 0 tokens
+        API->>OR: Tier 2 POST /chat/completions (stream true, timeout 45s)
+        alt OpenRouter returns 200
+            loop Each SSE data: chunk
+                OR-->>API: choices[0].delta.content
+                API-->>SPA: data: {"type":"token","content":"..."}
+            end
+        else OpenRouter 429 or exception
+            API->>LLM: Tier 2b retry Groq once
+        end
+    end
+
+    alt All providers unavailable
+        API-->>SPA: Tier 3 local deterministic text, word by word
+    end
+
+    API->>ReAct: history.append({ role: "assistant", ... })
+    ReAct->>ReAct: state["history"] = history[-20:]
+    API->>Audit: INSERT LLM_STREAM_CHAT (response truncated to 500 chars)
+    API-->>SPA: data: {"type":"done","requires_confirmation":false,"audit_id":null}
+
+    Note over SPA: Frontend buffers tokens and flushes on a 40ms timer.<br/>On type=tool it appends a tool trace chip.<br/>On type=error it marks the message failed.

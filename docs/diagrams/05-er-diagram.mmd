@@ -1,0 +1,315 @@
+erDiagram
+    TEAMS ||--o{ USERS : "employs"
+    TEAMS ||--o{ STUDENTS : "contains"
+    TEAMS ||--o{ MEETINGS : "scopes"
+    TEAMS ||--o{ TASKS : "scopes"
+    TEAMS ||--o{ EVENTS : "scopes"
+    USERS ||--o{ REFRESH_SESSIONS : "holds"
+    USERS ||--o| STUDENTS : "linked via student_id"
+    USERS ||--o{ STUDENTS : "assigned as HR"
+    USERS ||--o{ MEETINGS : "responsible_user"
+    USERS ||--o{ TASKS : "creates"
+    USERS ||--o{ SUBMISSIONS : "grades"
+    USERS ||--o{ SCORE_RECORDS : "grades"
+    USERS ||--o{ MEMBER_FOLLOWUP_STATUSES : "owns flag"
+    USERS ||--o{ WHATSAPP_CHAT_MESSAGES : "assigned_hr"
+    USERS ||--o{ MEMBER_FEEDBACKS : "subject_hr"
+    USERS ||--o{ MEMBER_FEEDBACKS : "reviewer"
+    USERS ||--o{ MEMBER_QUESTIONS : "answers"
+    USERS ||--o{ COMMITTEE_REPORTS : "submits"
+    USERS ||--o{ AUTOMATION_SETTINGS : "configures"
+    USERS ||--o{ STUDENT_INVITATIONS : "issues"
+
+    STUDENTS ||--o{ STUDENT_INVITATIONS : "claims"
+    STUDENTS ||--o{ MEETING_ASSIGNMENTS : "assigned to"
+    STUDENTS ||--o{ PARTICIPANT_SESSIONS : "matched as"
+    STUDENTS ||--o{ ATTENDANCE_RECORDS : "receives"
+    STUDENTS ||--o{ TASK_ASSIGNMENTS : "assigned"
+    STUDENTS ||--o{ SUBMISSIONS : "submits"
+    STUDENTS ||--o{ SCORE_RECORDS : "scored"
+    STUDENTS ||--o{ REMINDER_LOGS : "recipient"
+    STUDENTS ||--o{ TASK_REMINDERS : "reminded"
+    STUDENTS ||--o{ WHATSAPP_CHAT_MESSAGES : "conversation"
+    STUDENTS ||--o{ MEMBER_FOLLOWUP_STATUSES : "flagged"
+    STUDENTS ||--o{ MEMBER_FEEDBACKS : "author"
+    STUDENTS ||--o{ MEMBER_QUESTIONS : "asks"
+
+    MEETINGS ||--o{ PARTICIPANT_SESSIONS : "raw logs"
+    MEETINGS ||--o{ ATTENDANCE_RECORDS : "produces"
+    MEETINGS ||--o{ MEETING_ASSIGNMENTS : "assigns"
+    TASKS ||--o{ TASK_ASSIGNMENTS : "assigns"
+    TASKS ||--o{ SUBMISSIONS : "collects"
+    TASKS ||--o{ TASK_REMINDERS : "reminds about"
+
+    TEAMS {
+        string id PK
+        string name UK
+        string code UK
+        text description
+        datetime created_at
+    }
+    USERS {
+        string id PK
+        string email UK
+        string hashed_password
+        string full_name
+        string arabic_name
+        string role
+        string team_id FK
+        string student_id FK
+        boolean is_active
+        datetime created_at
+    }
+    REFRESH_SESSIONS {
+        string id PK
+        string user_id FK
+        string refresh_token_jti UK
+        datetime expires_at
+        datetime created_at
+        datetime revoked_at
+    }
+    STUDENTS {
+        string id PK
+        string student_code UK
+        string full_name
+        string arabic_name
+        string email UK
+        string phone
+        string university
+        string role
+        string status
+        string team_id FK
+        string assigned_hr_id FK
+        datetime created_at
+    }
+    STUDENT_INVITATIONS {
+        string id PK
+        string student_id FK
+        string token_hash UK
+        string created_by_user_id FK
+        datetime expires_at
+        boolean is_used
+        datetime used_at
+        string used_by_user_id FK
+        datetime created_at
+    }
+    MEETINGS {
+        string id PK
+        string meeting_code UK
+        string title
+        string topic
+        datetime start_time
+        datetime end_time
+        int duration_minutes
+        string meet_url
+        string status
+        int session_number
+        string responsible_user_id FK
+        string team_id FK
+        datetime created_at
+    }
+    PARTICIPANT_SESSIONS {
+        string id PK
+        string meeting_id FK
+        string raw_display_name
+        string raw_email
+        datetime join_time
+        datetime leave_time
+        int duration_seconds
+        string matched_student_id FK
+    }
+    MEETING_ASSIGNMENTS {
+        string id PK
+        string meeting_id FK
+        string student_id FK
+        datetime assigned_at
+    }
+    ATTENDANCE_RECORDS {
+        string id PK
+        string meeting_id FK
+        string student_id FK
+        string status
+        float match_confidence
+        datetime first_join
+        datetime last_leave
+        float total_duration_minutes
+        text excuse_reason
+        string excuse_status
+        string policy_version
+        datetime recorded_at
+    }
+    TASKS {
+        string id PK
+        int task_number UK
+        string title
+        text description
+        datetime deadline
+        float max_score
+        string score_rule
+        string created_by_user_id FK
+        string team_id FK
+        datetime created_at
+    }
+    TASK_ASSIGNMENTS {
+        string id PK
+        string task_id FK
+        string student_id FK
+        datetime assigned_at
+    }
+    SUBMISSIONS {
+        string id PK
+        string task_id FK
+        string student_id FK
+        datetime submitted_at
+        string status
+        float score
+        float technical_score
+        string file_url
+        text reviewer_notes
+        datetime reviewed_at
+        string graded_by_user_id FK
+    }
+    SCORE_RECORDS {
+        string id PK
+        string student_id FK
+        string category
+        float points
+        float max_points
+        string month
+        string graded_by_user_id FK
+        string notes
+        string updated_by
+        datetime created_at
+    }
+    EVENTS {
+        string id PK
+        string title
+        text description
+        string event_type
+        datetime start_time
+        datetime end_time
+        string location
+        string meet_url
+        boolean is_mandatory
+        datetime created_at
+    }
+    REMINDER_LOGS {
+        string id PK
+        string recipient_id FK
+        string recipient_name
+        string recipient_phone
+        string channel
+        text message_content
+        string status
+        datetime sent_at
+        string trigger_source
+    }
+    TASK_REMINDERS {
+        string id PK
+        string task_id FK
+        string student_id FK
+        string channel
+        int stage
+        string status
+        text message_text
+        datetime sent_at
+    }
+    AGENT_ACTION_AUDITS {
+        string id PK
+        string action_id UK
+        string user_id
+        string intent
+        string tool_name
+        text parameters
+        text result
+        boolean requires_confirmation
+        boolean confirmed
+        string status
+        datetime timestamp
+    }
+    MEMBER_FOLLOWUP_STATUSES {
+        string id PK
+        string student_id FK
+        string hr_member_id FK
+        string flagged_reason
+        datetime flagged_at
+        datetime last_contacted_at
+        string status
+        boolean is_escalated
+        text notes
+        datetime created_at
+    }
+    WHATSAPP_CHAT_MESSAGES {
+        string id PK
+        string openwa_message_id
+        string student_id FK
+        string assigned_hr_id FK
+        string sender_type
+        string sender_id
+        string sender_phone
+        string recipient_phone
+        string message_type
+        text content
+        text media_url
+        string media_filename
+        string media_mimetype
+        string status
+        int ack_status
+        string reply_to_message_id
+        boolean is_edited
+        text reactions
+        text raw_payload
+        datetime created_at
+        datetime delivered_at
+        datetime read_at
+    }
+    AUTOMATION_SETTINGS {
+        string id PK
+        string user_id FK "unique"
+        boolean attendance_enabled
+        int attendance_grace_minutes
+        text attendance_message
+        boolean task_pre_enabled
+        int task_pre_hours
+        text task_pre_message
+        boolean task_post_enabled
+        int task_post_delay_hours
+        text task_post_message
+        boolean whatsapp_enabled
+        datetime updated_at
+    }
+    MEMBER_FEEDBACKS {
+        string id PK
+        string student_id FK
+        string hr_member_id FK
+        string hr_member_name
+        string category
+        text content
+        datetime submitted_at
+        string reviewed_by_user_id FK
+        datetime reviewed_at
+        string status
+        text notes
+    }
+    MEMBER_QUESTIONS {
+        string id PK
+        string student_id FK
+        string team_id FK
+        string title
+        text content
+        string status
+        datetime asked_at
+        string answered_by_user_id FK
+        text answer
+        datetime answered_at
+    }
+    COMMITTEE_REPORTS {
+        string id PK
+        string team_id FK
+        string submitted_by_user_id FK
+        string report_title
+        text metrics_summary
+        text notes
+        datetime submitted_at
+        datetime acknowledged_at
+    }

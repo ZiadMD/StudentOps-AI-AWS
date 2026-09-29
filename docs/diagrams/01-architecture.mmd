@@ -1,0 +1,85 @@
+flowchart TB
+    subgraph Client["Client Layer"]
+        SPA["React 19 SPA<br/>Vite + TypeScript + Tailwind<br/>frontend/src/App.tsx"]
+        SSE["AgentChat SSE Reader<br/>ReadableStream<br/>components/AgentChat.tsx"]
+        WS["WhatsApp WebSocket Client<br/>hooks/useWhatsAppThreadSync.ts"]
+    end
+
+    subgraph Edge["Edge / Hosting"]
+        VERCEL["Vercel Edge<br/>vercel.json rewrites<br/>/api/* to api/index.py"]
+        OPENWA["OpenWA Headless Gateway<br/>Docker :2785<br/>WhatsApp Web.js"]
+    end
+
+    subgraph API["FastAPI Application - backend/app/main.py"]
+        MW["SecurityHeadersMiddleware<br/>CORS + CSP + HSTS"]
+        AUTH["Auth / JWT<br/>api/routes_auth.py"]
+        RBAC["RBAC Dependencies<br/>core/dependencies.py<br/>require_roles + verify_student_access"]
+        REST["Domain Routers<br/>students, tasks, attendance,<br/>whatsapp, feedback, questions,<br/>reports, automation, calendar, audit"]
+        AGENT["Agent API<br/>api/routes_agent.py<br/>chat / stream / confirm"]
+    end
+
+    subgraph AgentCore["Agent Engine - backend/app/agent"]
+        REACT["ReActAgent.run_step<br/>agent/react_agent.py"]
+        TOOLS["Tool Registry<br/>agent/tools.py<br/>15 tools"]
+        HITL["HITL Gate<br/>/agent/confirm<br/>AgentActionAudit"]
+    end
+
+    subgraph SVC["Policy Services - backend/app/services"]
+        ATT["AttendanceService<br/>AttendancePolicyEngine<br/>70% / 50% rules"]
+        SCO["ScoringService<br/>behavior /23, task /10"]
+        AUT["AutomationEngine<br/>BackgroundScheduler 300s"]
+        REM["ReminderService"]
+        IDM["IdentityMatcher"]
+        AUD["AuditService"]
+        WAC["WhatsAppService"]
+    end
+
+    subgraph Providers["Providers - backend/app/providers"]
+        MEET["GoogleMeetAttendanceProvider"]
+        GCAL["GoogleCalendarProvider"]
+        MSG["MessagingProvider<br/>mock | openwa"]
+        OWAP["OpenWAProvider<br/>httpx + timeouts"]
+    end
+
+    subgraph Data["Persistence"]
+        DB[("SQLAlchemy 2.0 async<br/>SQLite aiosqlite (dev)<br/>PostgreSQL asyncpg (prod)")]
+    end
+
+    subgraph LLM["External LLM"]
+        GROQ["Groq API<br/>openai/gpt-oss-120b"]
+        OR["OpenRouter API<br/>nemotron-3-super"]
+    end
+
+    SPA --> VERCEL
+    SSE --> VERCEL
+    WS --> VERCEL
+    VERCEL --> MW
+    MW --> AUTH
+    MW --> RBAC
+    MW --> REST
+    MW --> AGENT
+    AGENT --> REACT
+    REACT --> TOOLS
+    REACT --> HITL
+    TOOLS --> ATT
+    TOOLS --> SCO
+    TOOLS --> REM
+    TOOLS --> IDM
+    REST --> AUT
+    REST --> WAC
+    REACT --> AUD
+    TOOLS --> DB
+    REST --> DB
+    AUD --> DB
+    HITL --> DB
+    ATT --> MEET
+    REM --> MSG
+    WAC --> OWAP
+    OWAP --> OPENWA
+    REACT --> GROQ
+    REACT --> OR
+
+    classDef ext fill:#fff7ed,stroke:#c2410c,color:#7c2d12
+    classDef data fill:#f1f5f9,stroke:#334155,color:#0f172a
+    class OPENWA,GROQ,OR ext
+    class DB data

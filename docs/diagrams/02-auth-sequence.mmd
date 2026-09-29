@@ -1,0 +1,41 @@
+sequenceDiagram
+    autonumber
+    actor Client as Client
+    participant API as FastAPI
+    participant OAuth as oauth2_scheme
+    participant Sec as core/security.py
+    participant DB as Database
+
+    Client->>API: Any protected request
+    API->>OAuth: get_current_user(token, db)
+    OAuth-->>API: None when Authorization header absent
+    Note over API: No header -> 401 "Authentication required"
+
+    API->>Sec: decode_token(token)
+    alt Token signature invalid
+        Sec-->>API: jwt.PyJWTError
+        API-->>Client: 401 "Could not validate credentials" + WWW-Authenticate: Bearer
+    else Token expired
+        Sec-->>API: jwt.ExpiredSignatureError
+        API-->>Client: 401 "Token has expired. Please log in again or refresh your session."
+    end
+
+    Sec-->>API: payload { sub, email, role, team_id, type, exp, iat }
+    API->>API: Require payload.type == "access"
+    alt Refresh token used as access token
+        API-->>Client: 401 credentials_exception
+    end
+
+    API->>DB: SELECT User WHERE id = payload.sub (selectinload team)
+    alt User row missing
+        API-->>Client: 401 "User account no longer exists."
+    end
+
+    API->>API: get_current_active_user -> require is_active
+    alt user.is_active == false
+        API-->>Client: 403 "User account is deactivated."
+    end
+
+    API-->>Client: Current User object to the route handler
+
+    Note over API,DB: No token revocation check on access tokens.<br/>Access tokens live ACCESS_TOKEN_EXPIRE_MINUTES and are stateless.<br/>Only refresh tokens are tracked in refresh_sessions and revocable.

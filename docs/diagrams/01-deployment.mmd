@@ -1,0 +1,48 @@
+flowchart TB
+    subgraph Prod["Production - Vercel Serverless"]
+        V1["Vercel Edge Network<br/>TLS termination, HSTS"]
+        V2["Static Assets<br/>frontend/dist SPA"]
+        V3["Serverless Function<br/>api/index.py<br/>maxDuration 60s"]
+        V4["Vercel Env Vars<br/>injected at runtime"]
+    end
+
+    subgraph App["Application"]
+        A1["FastAPI ASGI app<br/>app.main:app"]
+        A2["SecurityHeadersMiddleware<br/>nosniff, DENY, CSP, HSTS"]
+        A3["Uvicorn (local dev)"]
+    end
+
+    subgraph DataTier["Data Tier"]
+        D1[("Supabase PostgreSQL<br/>PgBouncer transaction pooler<br/>port 6543")]
+        D2[("SQLite aiosqlite<br/>local dev only")]
+    end
+
+    subgraph SelfHosted["Self-hosted Sidecar - never on Vercel"]
+        S1["OpenWA Container<br/>openwa/wa-automate:latest<br/>port 2785"]
+        S2["WhatsApp Web.js session<br/>volume openwa_data"]
+        S3["Cloudflare Tunnel<br/>cloudflared tunnel run"]
+    end
+
+    subgraph Third["Third-party APIs"]
+        T1["Google Meet / Calendar API"]
+        T2["Groq API"]
+        T3["OpenRouter API"]
+    end
+
+    V1 --> V2
+    V1 --> V3
+    V3 --> A1
+    A1 --> A2
+    V4 -.-> A1
+    A3 --> A1
+    A1 --> D1
+    A1 -.dev only.-> D2
+    A1 --> S1
+    S1 --> S2
+    S3 --> S1
+    A1 --> T1
+    A1 --> T2
+    A1 --> T3
+
+    note1["A1 cannot reach S1 from Vercel serverless.<br/>Self-hosted OpenWA must be exposed via<br/>the Cloudflare Tunnel, and OPENWA_API_URL<br/>must point at that public URL."]
+    A1 -.-> note1

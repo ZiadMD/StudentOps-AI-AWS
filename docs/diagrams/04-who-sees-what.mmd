@@ -1,0 +1,63 @@
+flowchart TB
+    subgraph Who["Who sees what"]
+
+    subgraph Region["region_hr_head / hr_admin"]
+        RA1["Students: all committees"]
+        RA2["Scores: full scoreboard"]
+        RA3["Attendance: all meetings"]
+        RA4["Tasks: scores only, NOT submissions"]
+        RA5["Feedback: read-only oversight"]
+        RA6["Reports: list + acknowledge"]
+        RA7["Audit logs: yes"]
+        RA8["WhatsApp: oversight=true, all threads"]
+        RA9["Role management: hr_admin only"]
+    end
+
+    subgraph Leader["committee_hr_leader"]
+        CL1["Students: own team_id only"]
+        CL2["Scores: own team cohort"]
+        CL3["Attendance: own team"]
+        CL4["Tasks: scores only, NOT submissions"]
+        CL5["Feedback: full content, own team, can action"]
+        CL6["Reports: own team, submit upward"]
+        CL7["Audit logs: no"]
+        CL8["WhatsApp: oversight=true, own team"]
+        CL9["Cohort assignment: yes"]
+    end
+
+    subgraph Head["committee_head / team_lead"]
+        CH1["Students: own team only"]
+        CH2["Scores: VIEW ONLY, cannot write"]
+        CH3["Attendance: own team"]
+        CH4["Tasks: full submissions, can review and grade"]
+        CH5["Feedback: BLOCKED 403"]
+        CH6["Reports: blocked"]
+        CH7["Audit logs: no"]
+        CH8["Q and A: can answer"]
+    end
+
+    subgraph Hrm["committee_hr_member"]
+        HM1["Students: assigned cohort or own team"]
+        HM2["Scores: own cohort, can WRITE behavior /23"]
+        HM3["Attendance: own team, can process and correct"]
+        HM4["Tasks: scores only, NOT submissions"]
+        HM5["Feedback: BLOCKED 403"]
+        HM6["Escalations: own flags only"]
+        HM7["WhatsApp: assigned students only"]
+    end
+
+    subgraph Member["committee_member / member"]
+        M1["Students: own record only"]
+        M2["Scores: scoreboard BLOCKED 403.<br/>Own /{id}/score returns own only"]
+        M3["Attendance: own record only, no max_score"]
+        M4["Tasks: own submissions, scores redacted to null"]
+        M5["Feedback: submit + own feedback"]
+        M6["Q and A: ask and view own"]
+        M7["Agent: BLOCKED 403"]
+        M8["Reminders: own only"]
+    end
+    end
+
+    NOTE["Redaction, not just filtering: committee members receive a 200 with<br/>score, technical_score, reviewer_notes, graded_by_user_id and<br/>max_score explicitly set to null by the server."]
+    M2 -.-> NOTE
+    M4 -.-> NOTE
