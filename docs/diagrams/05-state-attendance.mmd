@@ -1,0 +1,32 @@
+stateDiagram-v2
+    direction TB
+    [*] --> PENDING_APPROVAL : POST /attendance/meetings/{id}/process
+    PENDING_APPROVAL --> PRESENT : delay <= 10m<br/>AND duration >= 70%
+    PENDING_APPROVAL --> LATE : duration >= 50%
+    PENDING_APPROVAL --> UNEXCUSED_ABSENT : no session<br/>OR duration < 50%
+    PENDING_APPROVAL --> EXCUSED_ACCEPTED : HR sets excuse_status
+    PENDING_APPROVAL --> EXCUSED_MODERATE : HR sets excuse_status
+    PENDING_APPROVAL --> EXCUSED_REJECTED : HR sets excuse_status
+
+    PRESENT --> EXCUSED_ACCEPTED : manual excuse
+    LATE --> EXCUSED_ACCEPTED : manual excuse
+    UNEXCUSED_ABSENT --> EXCUSED_ACCEPTED : manual excuse
+    EXCUSED_REJECTED --> EXCUSED_ACCEPTED : HR overturns
+
+    UNEXCUSED_ABSENT --> [*] : MemberFollowupStatus<br/>flagged_reason = ABSENT_{code}
+
+    note right of UNEXCUSED_ABSENT
+        Attractor state. Every reprocess run
+        re-evaluates and can move a student
+        into this state, and the automation
+        cycle writes a PENDING_APPROVAL
+        ReminderLog for it.
+    end note
+
+    note right of PENDING_APPROVAL
+        The name is misleading. PENDING_APPROVAL
+        is a ReminderLog.status value, not an
+        AttendanceRecord.status. All six
+        AttendanceRecord statuses are terminal;
+        only excuse overrides are reversible.
+    end note

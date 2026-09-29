@@ -1,0 +1,48 @@
+sequenceDiagram
+    autonumber
+    participant Life as FastAPI lifespan
+    participant Sch as BackgroundScheduler<br/>interval 300s
+    participant Eng as AutomationEngine
+    participant DB as Database
+    actor HR as HR Leader
+
+    Life->>Sch: scheduler.start()
+    loop Every 300 seconds
+        Sch->>Eng: run_cycle(session)
+        Eng->>Eng: run_attendance_cycle()
+        Eng->>DB: SELECT Meetings in last 48h
+        loop Each meeting past end + grace
+            Eng->>DB: SELECT AttendanceRecord status = UNEXCUSED_ABSENT
+            Eng->>DB: SELECT existing ReminderLog by trigger_source
+            alt Not already sent (idempotency key AUTOMATION_ATTENDANCE_{meeting_id})
+                Eng->>Eng: render_template(whitelist: name, session_name, meeting_time)
+                Eng->>DB: INSERT ReminderLog(status = PENDING_APPROVAL)
+            end
+        end
+        Eng->>Eng: run_task_cycle()
+        loop Each task with deadline >= now - 7 days
+            alt Pre-deadline window (task_pre_hours)
+                Eng->>DB: get_task_reminder_candidates(pre_deadline=True)
+                Eng->>DB: INSERT TaskReminder(stage=1) + ReminderLog
+            end
+            alt Past post_trigger_time (deadline + task_post_delay_hours)
+                Eng->>DB: get_task_reminder_candidates(pre_deadline=False)
+                Eng->>DB: INSERT TaskReminder(stage=2) + ReminderLog
+                alt student.assigned_hr_id present
+                    Eng->>DB: INSERT MemberFollowupStatus(OVERDUE_TASK, PENDING)
+                end
+            end
+        end
+        Eng->>Eng: run_pre_meeting_cycle()
+        loop Each meeting in next 24h
+            Eng->>DB: SELECT students via MeetingAssignment
+            Eng->>DB: INSERT ReminderLog(trigger_source = AUTOMATION_PRE_MEETING_{id})
+        end
+        Eng->>DB: COMMIT
+    end
+    Note over Eng,DB: Every queued message is PENDING_APPROVAL. Nothing is transmitted<br/>by the scheduler. Human approval is required downstream.
+
+    HR->>Sch: POST /api/automation/trigger-run
+    HR->>Eng: require_roles(["region_hr_head","committee_hr_leader","hr_admin"])
+    Eng-->>HR: 200 { status, triggered_by, results }
+    HR->>DB: GET /api/automation/reminders (review queue)

@@ -1,0 +1,47 @@
+flowchart TB
+    START["POST /api/agent/chat or /api/stream"] --> AUTH["get_current_active_user<br/>is_active check"]
+    AUTH --> RBAC{"require_roles<br/>6 HR and leadership roles"}
+    RBAC -->|deny| E403["403 Access forbidden"]
+    RBAC -->|allow| RL["rate_limit_agent<br/>25 requests / 60s per IP"]
+    RL --> CTX["Build PermissionContext<br/>user_id, role, team_id,<br/>is_admin_override, is_confirmed_action=False<br/>frozen Pydantic model"]
+
+    CTX --> STATE["CONVERSATION_STATE key =<br/>'{user_id}:{conversation_id}'<br/>LRU 1000 entries, TTL 24h"]
+
+    STATE --> DET{"is_deterministic_intent(query)?"}
+
+    DET -->|Greeting| G["Static bilingual greeting"]
+    DET -->|Help| H["Static capability list"]
+    DET -->|Stats| S1["get_meeting_attendance<br/>get_upcoming_events"]
+    DET -->|Attendance| S2["extract_student_attendance_query<br/>get_student_attendance or<br/>get_meeting_attendance"]
+    DET -->|Reminder| S3["get_upcoming_meetings<br/>prepare_reminder<br/>HITL PENDING_CONFIRMATION"]
+    DET -->|Score| S4["extract_student_query<br/>tool_get_student identity resolve<br/>get_student_score"]
+    DET -->|Task| S5["get_pending_submissions"]
+    DET -->|Calendar| S6["get_upcoming_events"]
+    DET -->|No match| LLM["call_openrouter or stream_openrouter"]
+
+    LLM --> T1["Tier 1 Groq"]
+    T1 -->|error or 0 tokens| T2["Tier 2 OpenRouter"]
+    T2 -->|429 or error| T3["Tier 2b Groq retry"]
+    T3 -->|unavailable| T4["Tier 3 Local deterministic text"]
+
+    S1 --> AUTHZ
+    S2 --> AUTHZ
+    S3 --> HITLGATE
+    S4 --> AUTHZ
+    S5 --> AUTHZ
+    S6 --> AUTHZ
+
+    AUTHZ{"execute_tool:<br/>role in TOOL_DEFINITIONS.required_roles<br/>AND context.is_admin_override?"}
+    AUTHZ -->|deny| EF["{ error: Unauthorized }, FAILED"]
+    AUTHZ -->|allow| SCOPE["Team scope filter applied inside handler"]
+    SCOPE --> AUD[("AuditService.record_action")]
+    EF --> AUD
+    AUD --> RESP["AgentChatResponse"]
+
+    HITLGATE["tool_send_reminder without confirmation"] --> HITC{"context.is_confirmed_action?"}
+    HITC -->|false| PREP["tool_prepare_reminder<br/>REQUIRES_CONFIRMATION"]
+    HITC -->|true via /api/agent/confirm| SEND["provider.send_batch"]
+    PREP --> AUD
+    SEND --> RESP
+
+    RESP --> END["SSE type=done or JSON response"]

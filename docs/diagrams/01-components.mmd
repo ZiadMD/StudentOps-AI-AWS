@@ -1,0 +1,92 @@
+flowchart LR
+    subgraph Core["core/"]
+        C1["config.py<br/>Pydantic Settings<br/>validate_production_secrets"]
+        C2["database.py<br/>engine + AsyncSessionLocal<br/>get_db / init_db"]
+        C3["security.py<br/>bcrypt hash/verify<br/>JWT create/decode"]
+        C4["dependencies.py<br/>get_current_user<br/>require_roles<br/>verify_student_access"]
+        C5["rate_limiter.py<br/>SlidingWindowRateLimiter"]
+    end
+
+    subgraph Model["models/"]
+        M1["entities.py<br/>24 SQLAlchemy tables"]
+        M2["schemas.py<br/>Pydantic v2 contracts<br/>PermissionContext frozen"]
+    end
+
+    subgraph Agent["agent/"]
+        A1["prompts.py<br/>SYSTEM_PROMPT"]
+        A2["react_agent.py<br/>run_step + is_deterministic_intent<br/>BoundedConversationState"]
+        A3["tools.py<br/>TOOL_DEFINITIONS<br/>TOOL_REGISTRY"]
+    end
+
+    subgraph Svc["services/"]
+        S1["attendance_service.py<br/>AttendancePolicyEngine"]
+        S2["scoring_service.py"]
+        S3["automation_service.py<br/>run_cycle + scheduler"]
+        S4["reminder_service.py"]
+        S5["identity_matcher.py"]
+        S6["audit_service.py"]
+        S7["whatsapp_service.py"]
+        S8["whatsapp_connection_manager.py"]
+        S9["calendar_service.py"]
+    end
+
+    subgraph Prov["providers/"]
+        P1["attendance_provider.py<br/>Google + Mock"]
+        P2["calendar_provider.py<br/>Google + Mock"]
+        P3["messaging_provider.py<br/>factory: mock|openwa"]
+        P4["openwa_provider.py"]
+    end
+
+    subgraph Api["api/"]
+        R1["routes_auth"]
+        R2["routes_students"]
+        R3["routes_tasks"]
+        R4["routes_attendance"]
+        R5["routes_whatsapp"]
+        R6["routes_agent"]
+        R7["routes_feedback"]
+        R8["routes_questions"]
+        R9["routes_reports"]
+        R10["routes_automation"]
+        R11["routes_dashboard"]
+        R12["routes_calendar"]
+        R13["routes_audit"]
+    end
+
+    Seed["seed/seed_data.py"]
+    Mig["alembic/versions<br/>4 migrations"]
+
+    R1 --> C3
+    R1 --> C4
+    R2 --> S2
+    R2 --> C4
+    R3 --> C4
+    R4 --> S1
+    R5 --> S7
+    R6 --> A2
+    R7 --> C4
+    R8 --> C4
+    R9 --> C4
+    R10 --> S3
+    R11 --> C4
+    R12 --> S9
+    R13 --> S6
+    C4 --> C5
+    C4 --> C1
+    A2 --> A3
+    A3 --> S1
+    A3 --> S2
+    A3 --> S4
+    A3 --> S5
+    S1 --> P1
+    S4 --> P3
+    S7 --> P4
+    S9 --> P2
+    A2 --> A1
+    A2 --> M2
+    R1 --> M2
+    R2 --> M1
+    C2 --> M1
+    Seed --> M1
+    Mig --> M1
+    S3 --> C2

@@ -1,0 +1,28 @@
+stateDiagram-v2
+    direction TB
+    [*] --> PENDING : MemberFollowupStatus inserted
+    PENDING --> CONTACTED : POST /whatsapp/generate-link<br/>sets last_contacted_at
+    PENDING --> PENDING : GET /whatsapp/escalations<br/>days_open < 3
+    PENDING --> PENDING : days_open >= 3 and status != RESOLVED<br/>is_escalated computed true in serializer
+    CONTACTED --> CONTACTED : additional generate-link calls
+    CONTACTED --> [*] : RESOLVED
+    PENDING --> RESOLVED : RESOLVED
+
+    note right of PENDING
+        Two separate representations.
+        The status column only ever holds
+        PENDING or CONTACTED. The
+        is_escalated boolean column is
+        never written to true by app code;
+        escalation is derived at read time
+        from (utcnow - flagged_at).days >= 3.
+    end note
+
+    note right of RESOLVED
+        Unreachable. No endpoint, no agent
+        tool and no scheduler writes the
+        literal string RESOLVED into this
+        column. The transition exists in the
+        entity comment and in the read query
+        filter only.
+    end note

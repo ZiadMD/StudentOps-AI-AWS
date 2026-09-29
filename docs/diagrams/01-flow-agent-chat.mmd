@@ -1,0 +1,48 @@
+sequenceDiagram
+    autonumber
+    actor HR as HR Leader (browser)
+    participant SPA as AgentChat.tsx
+    participant API as POST /api/agent/stream
+    participant ReAct as ReActAgent
+    participant Tools as TOOL_REGISTRY
+    participant DB as Database
+    participant LLM as Groq / OpenRouter
+
+    HR->>SPA: "Who was absent from today's meeting?"
+    SPA->>API: POST /api/agent/stream (Bearer token)
+    API->>API: rate_limit_agent (25/min per IP)
+    API->>API: require_roles([...6 HR/lead roles])
+
+    API->>ReAct: is_deterministic_intent(query)
+    ReAct-->>API: true (matched "absent"/"attendance")
+
+    API->>ReAct: run_step(query, conversation_id, user_role, team_id, user_id)
+    ReAct->>ReAct: Build PermissionContext(user_id, role, team_id,<br/>is_admin_override, is_confirmed_action=False)
+    ReAct->>ReAct: state key = "{user_id}:{conversation_id}"
+
+    ReAct->>Tools: execute_tool("get_meeting_attendance", {meeting_id:"latest"})
+    Tools->>Tools: Check TOOL_DEFINITIONS.required_roles vs context.role
+    alt Role not permitted
+        Tools-->>ReAct: { error: "Unauthorized..." }, FAILED
+    else Permitted
+        Tools->>Tools: Apply team scope (Student.team_id == context.team_id)
+        Tools->>DB: SELECT AttendanceRecord JOIN Student
+        Tools-->>ReAct: { summary, present_students, absent_students }, SUCCESS
+    end
+
+    ReAct->>DB: AuditService.record_action(QUERY_ATTENDANCE)
+    ReAct-->>API: AgentChatResponse(response, tool_executions, audit_id)
+
+    API-->>SPA: SSE event type=tool (tool_name, status, result)
+    loop Word by word
+        API-->>SPA: SSE event type=token (content)
+    end
+    API-->>SPA: SSE event type=done (requires_confirmation=false, audit_id)
+
+    Note over SPA,DB: Fallback path when is_deterministic_intent is false
+    API->>DB: CONVERSATION_STATE["{user_id}:{conversation_id}"].history
+    API->>LLM: stream_groq (tier 1) -> OpenRouter (tier 2)
+    LLM-->>API: SSE data: chunks
+    API-->>SPA: SSE event type=token
+    API->>DB: AuditService.record_action(LLM_STREAM_CHAT, response truncated to 500 chars)
+    API-->>SPA: SSE event type=done

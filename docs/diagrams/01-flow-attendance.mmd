@@ -1,0 +1,55 @@
+sequenceDiagram
+    autonumber
+    actor HR as Committee HR Member
+    participant API as FastAPI /api/attendance
+    participant Eng as AttendancePolicyEngine
+    participant Prov as GoogleMeetAttendanceProvider
+    actor GMeet as Google Meet
+    participant IDM as IdentityMatcher
+    participant DB as Database
+
+    HR->>API: POST /api/attendance/meetings/{meeting_id}/process
+    API->>API: require_roles(["committee_hr_member","hr_admin"])
+    API->>DB: SELECT Meeting
+    alt Other committee's meeting
+        API-->>HR: 403 Forbidden
+    end
+    API->>Eng: process_meeting_attendance(meeting_id, db)
+
+    Eng->>DB: SELECT assigned students (MeetingAssignment, else team_id)
+    Eng->>Prov: get_raw_meeting_attendance(meeting_code)
+    Prov->>GMeet: Fetch conference record participants
+    GMeet-->>Prov: display_name, email, join_time, leave_time, duration
+    Prov-->>Eng: RawMeetingAttendance.sessions
+
+    Eng->>DB: DELETE ParticipantSession WHERE meeting_id (idempotency reset)
+
+    loop For each raw participant session
+        Eng->>IDM: match_participant(display_name, email, students)
+        IDM-->>Eng: MatchResult(student_id, confidence, matched_by)
+        IDM->>IDM: Tier 1 exact email (1.0)<br/>Tier 2 Arabic name<br/>Tier 3 Latin name
+        Eng->>DB: INSERT ParticipantSession
+    end
+
+    loop For each assigned student
+        Eng->>Eng: first_join = MIN(join_time)<br/>total_duration = SUM(seconds)/60
+        alt No session
+            Eng->>Eng: status = UNEXCUSED_ABSENT
+        else Has session
+            Eng->>Eng: delay = first_join - meeting_start<br/>pct = duration / meeting_duration * 100
+            alt delay <= 10m AND pct >= 70
+                Eng->>Eng: status = PRESENT
+            else pct >= 50
+                Eng->>Eng: status = LATE
+            else
+                Eng->>Eng: status = UNEXCUSED_ABSENT
+            end
+        end
+        alt status == UNEXCUSED_ABSENT
+            Eng->>DB: INSERT MemberFollowupStatus(flagged_reason = ABSENT_{code}, status = PENDING)
+        end
+    end
+
+    Eng->>DB: COMMIT
+    Eng-->>API: [AttendanceRecord]
+    API-->>HR: 200 { success, processed_count }

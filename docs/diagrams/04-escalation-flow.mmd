@@ -1,0 +1,36 @@
+flowchart TB
+    subgraph Abs["Absenteeism path"]
+        A1["AttendanceRecord.status = UNEXCUSED_ABSENT"] --> A2["INSERT MemberFollowupStatus<br/>flagged_reason = ABSENT_{meeting_code}<br/>status = PENDING, is_escalated = false"]
+        A2 --> A3["hr_member_id = student.assigned_hr_id<br/>fallback: committee_hr_leader of the team"]
+    end
+
+    subgraph Task["Overdue task path"]
+        T1["run_task_cycle stage 2<br/>now >= deadline + task_post_delay_hours"] --> T2["get_task_reminder_candidates"]
+        T2 --> T3{"student.assigned_hr_id present?"}
+        T3 -->|yes| T4["INSERT MemberFollowupStatus<br/>flagged_reason = OVERDUE_TASK<br/>status = PENDING, is_escalated = false"]
+    end
+
+    subgraph Contact["Contact event"]
+        C1["POST /api/whatsapp/generate-link"] --> C2{"PENDING flag for this student?"}
+        C2 -->|yes| C3["SET last_contacted_at = utcnow()<br/>SET status = CONTACTED"]
+    end
+
+    subgraph Escalate["Escalation evaluation - read only"]
+        E1["GET /api/whatsapp/escalations"] --> E2["days_open = (utcnow - flagged_at).days"]
+        E2 --> E3{"days_open >= 3<br/>AND status != RESOLVED?"}
+        E3 -->|yes| E4["Response field is_escalated = true<br/>(computed in the serializer)"]
+    end
+
+    A3 --> E1
+    T4 --> E1
+    C3 --> E1
+
+    GAP1["GAP: status is never set to ESCALATED and is_escalated column<br/>is never set to true by application code.<br/>routes_reports.py counts status IN (PENDING, ESCALATED)<br/>so the aggregate always collapses to PENDING."]
+    E4 -.-> GAP1
+    GAP1 --> GAP2["GAP: no notification is emitted.<br/>There is no outbound message, email or WebSocket push<br/>when a follow-up breaches the 3 day SLA."]
+    GAP2 --> GAP3["GAP: no RESOLVED transition path exists.<br/>No endpoint sets status = RESOLVED."]
+
+    E4 --> VIS["Visible to: committee_hr_leader (team),<br/>region_hr_head / hr_admin (all),<br/>committee_hr_member (own flags only)"]
+
+    classDef gap fill:#fef2f2,stroke:#b91c1c,color:#7f1d1d,stroke-dasharray: 5 5
+    class GAP1,GAP2,GAP3 gap

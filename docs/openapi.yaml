@@ -1,0 +1,4207 @@
+openapi: 3.1.0
+info:
+  title: StudentOps AI
+  description: StudentOps AI - AI-powered HR & Student Operations Platform
+  version: 1.0.0
+paths:
+  /api/auth/register:
+    post:
+      tags:
+      - Auth
+      summary: Register User
+      description: 'Registers a new user account, creates credentials, links existing
+        Student entity if present,
+
+        and returns initial JWT access & refresh tokens.
+
+
+        SECURITY ENFORCEMENT:
+
+        - All self-registrations are strictly created as ''member''.
+
+        - Elevated roles (hr_admin, team_lead) can only be assigned by existing HR
+        Admins.
+
+        - Password complexity is validated server-side.'
+      operationId: register_user_api_auth_register_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegisterRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/login:
+    post:
+      tags:
+      - Auth
+      summary: Login User
+      description: 'Authenticates a user via email and password (JSON body),
+
+        returning access and refresh JWT tokens.
+
+        Protected by server-side brute-force rate limiting.'
+      operationId: login_user_api_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/refresh:
+    post:
+      tags:
+      - Auth
+      summary: Refresh Access Token
+      description: Validates a JWT refresh token, checks for revocation, rotates the
+        session, and returns fresh tokens.
+      operationId: refresh_access_token_api_auth_refresh_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/me:
+    get:
+      tags:
+      - Auth
+      summary: Get Current User Profile
+      description: Returns the authenticated user's profile and active organization
+        role.
+      operationId: get_current_user_profile_api_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/auth/teams:
+    get:
+      tags:
+      - Auth
+      summary: List Teams
+      description: Lists all teams in the organization for selection and scoping.
+      operationId: list_teams_api_auth_teams_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/TeamResponse'
+                type: array
+                title: Response List Teams Api Auth Teams Get
+    post:
+      tags:
+      - Auth
+      summary: Create Team
+      description: Creates a new organizational team (HR Admin only).
+      operationId: create_team_api_auth_teams_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/auth/users/{user_id}/role:
+    patch:
+      tags:
+      - Auth
+      summary: Update User Role
+      description: 'Updates a user''s role (HR Admin only).
+
+        Prevents unauthorized privilege escalation by requiring admin authorization.'
+      operationId: update_user_role_api_auth_users__user_id__role_patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleUpdateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/link-student:
+    post:
+      tags:
+      - Auth
+      summary: Link Student Profile
+      description: 'Securely links an existing authenticated user account to a Student
+        profile using a trusted HR-issued invitation token.
+
+        Enforces single-use, email binding, and prevents account hijacking.'
+      operationId: link_student_profile_api_auth_link_student_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentLinkRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: Logout
+      description: Revokes the provided refresh token to end the session.
+      operationId: logout_api_auth_logout_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/auth/logout-all:
+    post:
+      tags:
+      - Auth
+      summary: Logout All
+      description: Revokes all active sessions for the current user.
+      operationId: logout_all_api_auth_logout_all_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+  /api/dashboard/stats:
+    get:
+      tags:
+      - Dashboard
+      summary: Get Dashboard Stats
+      description: 'Computes dashboard metrics tailored to user role:
+
+        - hr_admin: global organizational metrics.
+
+        - team_lead: team-scoped operational metrics.
+
+        - member: personal performance and upcoming events.'
+      operationId: get_dashboard_stats_api_dashboard_stats_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/agent/chat:
+    post:
+      tags:
+      - Agent
+      summary: Chat With Agent
+      description: Processes a natural language query through the ReAct Agent (full
+        response).
+      operationId: chat_with_agent_api_agent_chat_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentChatMessage'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentChatResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/agent/stream:
+    post:
+      tags:
+      - Agent
+      summary: Stream Chat With Agent
+      description: "Streams the agent response as Server-Sent Events (SSE).\n\nEvent\
+        \ types:\n  data: {\"type\": \"tool\", \"tool_name\": \"...\", \"status\"\
+        : \"...\", \"result\": {...}}\n  data: {\"type\": \"token\", \"content\":\
+        \ \"...\"}\n  data: {\"type\": \"done\", \"requires_confirmation\": bool,\
+        \ \"pending_confirmation\": {...} | null}\n  data: {\"type\": \"error\", \"\
+        message\": \"...\"}"
+      operationId: stream_chat_with_agent_api_agent_stream_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentChatMessage'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/agent/confirm:
+    post:
+      tags:
+      - Agent
+      summary: Confirm Action
+      description: 'Confirms or cancels a pending sensitive agent action.
+
+        Enforces atomic status checking to prevent replay attacks and verifies role/team
+        authorization boundaries.'
+      operationId: confirm_action_api_agent_confirm_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionConfirmationRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/agent/tools:
+    get:
+      tags:
+      - Agent
+      summary: Get Registered Tools
+      description: Lists all available tools and schema specifications (Authenticated
+        users only).
+      operationId: get_registered_tools_api_agent_tools_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+  /api/students:
+    get:
+      tags:
+      - Students
+      summary: List Students
+      description: 'Lists student records with automatic organizational scoping:
+
+        - region_hr_head / hr_admin: sees all students across all teams.
+
+        - committee_head / committee_hr_leader / team_lead: sees only members belonging
+        to their assigned team_id.
+
+        - committee_hr_member: sees students assigned to them or in their committee.
+
+        - committee_member / member: sees only their own student profile.'
+      operationId: list_students_api_students_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: role
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+      - name: status_filter
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status Filter
+      - name: assigned_only
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Assigned Only
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudentResponse'
+                title: Response List Students Api Students Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Students
+      summary: Create Student
+      description: 'Registers a new member with committee scoping and duplicate prevention.
+
+        - region_hr_head / hr_admin: can create members across any committee or unassigned.
+
+        - committee_head / committee_hr_leader / team_lead / committee_hr_member:
+        restricted to their committee.
+
+        - committee_member / member: forbidden (HTTP 403).'
+      operationId: create_student_api_students_post
+      security:
+      - OAuth2PasswordBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/students/scoreboard/all:
+    get:
+      tags:
+      - Students
+      summary: Get All Scoreboards
+      description: 'Retrieves scoreboards with scoping:
+
+        - region_hr_head / hr_admin: full ground-truth scoreboard.
+
+        - committee_head / committee_hr_leader / team_lead: scoreboard filtered to
+        students in their team.
+
+        - committee_hr_member: scoreboard for assigned cohort or committee.
+
+        - committee_member: strictly forbidden (scores are confidential).
+
+        - member (legacy): personal scorecard summary.'
+      operationId: get_all_scoreboards_api_students_scoreboard_all_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/StudentScoreSummary'
+                type: array
+                title: Response Get All Scoreboards Api Students Scoreboard All Get
+      security:
+      - OAuth2PasswordBearer: []
+  /api/students/{student_id}:
+    get:
+      tags:
+      - Students
+      summary: Get Student
+      description: Retrieves a student record after verifying permission boundary.
+      operationId: get_student_api_students__student_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/students/{student_id}/score:
+    get:
+      tags:
+      - Students
+      summary: Get Student Score
+      description: Retrieves a student scorecard after verifying permission boundary.
+      operationId: get_student_score_api_students__student_id__score_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentScoreSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/students/{student_id}/behavior-score:
+    put:
+      tags:
+      - Students
+      summary: Update Behavior Score
+      description: 'Submits or updates behavior scores (/23) for a student.
+
+        Committee Head is strictly read-only and cannot call this endpoint.
+
+        Committee HR Member can only grade their assigned cohort or committee students.'
+      operationId: update_behavior_score_api_students__student_id__behavior_score_put
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BehaviorScoreUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentScoreSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/students/assign-cohort:
+    post:
+      tags:
+      - Students
+      summary: Assign Student Cohort
+      description: 'Assigns a cohort of students to a specific HR Member.
+
+        Managed by Committee HR Leader or Regional Head.'
+      operationId: assign_student_cohort_api_students_assign_cohort_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignCohortRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/students/{student_id}/phone:
+    patch:
+      tags:
+      - Students
+      summary: Update Student Phone
+      description: Updates a student's phone number. Prevents duplicates.
+      operationId: update_student_phone_api_students__student_id__phone_patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentPhoneUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/students/{student_id}/bonus:
+    post:
+      tags:
+      - Students
+      summary: Award Student Bonus
+      description: 'Awards bonus points to a member.
+
+        Authoritative workflow: HR Leader can give bonuses to members.
+
+        Committee Head and Members are strictly forbidden.'
+      operationId: award_student_bonus_api_students__student_id__bonus_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BonusAwardRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentScoreSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/students/{student_id}/invitation:
+    post:
+      tags:
+      - Students
+      summary: Create Student Invitation
+      description: 'Generates a cryptographically secure, single-use invitation token
+        for a student profile.
+
+        Requires write-level access to the student (scoped to committee HR, committee
+        heads, regional heads, or HR admins).
+
+        Regular members are strictly forbidden.'
+      operationId: create_student_invitation_api_students__student_id__invitation_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/StudentInvitationCreateRequest'
+              - type: 'null'
+              title: Payload
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentInvitationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/attendance/meetings:
+    get:
+      tags:
+      - Attendance
+      summary: List Meetings
+      operationId: list_meetings_api_attendance_meetings_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+    post:
+      tags:
+      - Attendance
+      summary: Create Meeting
+      description: 'Schedules a new meeting and sets the session number and explicit
+        member assignments.
+
+        Social Media Committee Head owns operational meeting and session scheduling.'
+      operationId: create_meeting_api_attendance_meetings_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetingCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/attendance/meetings/{meeting_id}:
+    get:
+      tags:
+      - Attendance
+      summary: Get Meeting Attendance
+      description: 'Retrieves meeting detail and attendance records scoped by role:
+
+        - hr_admin / region_hr_head: sees all attendee records.
+
+        - committee_head / committee_hr_leader / committee_hr_member: sees attendees
+        for their committee.
+
+        - member: sees only their own attendance record for this meeting.'
+      operationId: get_meeting_attendance_api_attendance_meetings__meeting_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: meeting_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Meeting Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingDetailResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/attendance/meetings/{meeting_id}/process:
+    post:
+      tags:
+      - Attendance
+      summary: Reprocess Meeting
+      description: 'Triggers the deterministic attendance policy processor for a meeting.
+
+        HR Member takes attendance, which records statuses and flags absent members
+        for human WhatsApp follow-up.'
+      operationId: reprocess_meeting_api_attendance_meetings__meeting_id__process_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: meeting_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Meeting Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/attendance/meetings/{meeting_id}/records/{student_id}/status:
+    put:
+      tags:
+      - Attendance
+      summary: Update Attendance Status
+      description: 'HR manually updates attendance status or excuse.
+
+        Requires matching committee.'
+      operationId: update_attendance_status_api_attendance_meetings__meeting_id__records__student_id__status_put
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: meeting_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Meeting Id
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualAttendanceUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecordSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/calendar/events:
+    get:
+      tags:
+      - Calendar
+      summary: Get Events
+      operationId: get_events_api_calendar_events_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventSchema'
+                title: Response Get Events Api Calendar Events Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Calendar
+      summary: Create Event
+      operationId: create_event_api_calendar_events_post
+      security:
+      - OAuth2PasswordBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tasks:
+    get:
+      tags:
+      - Tasks
+      summary: List Tasks
+      operationId: list_tasks_api_tasks_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/TaskSchema'
+                type: array
+                title: Response List Tasks Api Tasks Get
+      security:
+      - OAuth2PasswordBearer: []
+    post:
+      tags:
+      - Tasks
+      summary: Create Task
+      description: 'Creates a new task with optional explicit student assignments.
+
+        Social Media Committee Head responsibility.
+
+        Follows fail-closed rule: empty assignments will not trigger reminders.'
+      operationId: create_task_api_tasks_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/tasks/{task_id}:
+    get:
+      tags:
+      - Tasks
+      summary: Get Task
+      operationId: get_task_api_tasks__task_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Task Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tasks/{task_id}/assign:
+    post:
+      tags:
+      - Tasks
+      summary: Assign Students To Task
+      description: Explicitly assigns students to a task.
+      operationId: assign_students_to_task_api_tasks__task_id__assign_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Task Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskAssignRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tasks/{task_id}/scores:
+    get:
+      tags:
+      - Tasks
+      summary: List Task Scores For Hr
+      description: 'Score collection endpoint for HR and Leadership roles.
+
+        Allows HR Members, HR Leaders, Regional HR Heads, and Committee Heads to read
+
+        numerical task scores, grading status, and student metadata.
+
+        Does NOT expose technical submission files or deliverable URLs.
+
+
+        Authorization / Scoping:
+
+        - region_hr_head / hr_admin: can collect scores across all committees.
+
+        - committee_hr_leader / committee_hr_member: restricted to their assigned
+        committee.
+
+        - committee_head / team_lead: restricted to their assigned committee.
+
+        - committee_member / member: strictly forbidden (HTTP 403).'
+      operationId: list_task_scores_for_hr_api_tasks__task_id__scores_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Task Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskScoreItemSchema'
+                title: Response List Task Scores For Hr Api Tasks  Task Id  Scores
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tasks/{task_id}/submissions:
+    get:
+      tags:
+      - Tasks
+      summary: List Submissions For Task
+      operationId: list_submissions_for_task_api_tasks__task_id__submissions_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Task Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubmissionSchema'
+                title: Response List Submissions For Task Api Tasks  Task Id  Submissions
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tasks/submissions/{submission_id}:
+    get:
+      tags:
+      - Tasks
+      summary: Get Submission
+      description: 'Retrieves a single task submission with strict IDOR and confidentiality
+        enforcement:
+
+        - committee_member / member: can only retrieve their own submission, with
+        scores redacted server-side.
+
+        - committee_head / team_lead: can retrieve submissions for their team (with
+        scores).
+
+        - HR roles: strictly forbidden (403).'
+      operationId: get_submission_api_tasks_submissions__submission_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: submission_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Submission Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tasks/submissions/{submission_id}/score:
+    get:
+      tags:
+      - Tasks
+      summary: Get Submission Score For Hr
+      description: 'Retrieves score and grading status for a single submission.
+
+        Provides safe score collection for HR without exposing technical submission
+        deliverables.'
+      operationId: get_submission_score_for_hr_api_tasks_submissions__submission_id__score_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: submission_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Submission Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskScoreItemSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tasks/submissions/{submission_id}/review:
+    put:
+      tags:
+      - Tasks
+      summary: Review Submission
+      description: 'Committee Head reviews and assigns technical scores (/10) for
+        member submissions.
+
+        HR roles have no write or read permission here.'
+      operationId: review_submission_api_tasks_submissions__submission_id__review_put
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: submission_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Submission Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TechnicalScoreUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tasks/{task_id}/submit:
+    post:
+      tags:
+      - Tasks
+      summary: Submit Task
+      description: Allows a committee member student to submit work for a task.
+      operationId: submit_task_api_tasks__task_id__submit_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Task Id
+      - name: file_url
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: File Url
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/TaskSubmitRequest'
+              - type: 'null'
+              title: Body
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/audit/logs:
+    get:
+      tags:
+      - Audit
+      summary: Get Audit Logs
+      operationId: get_audit_logs_api_audit_logs_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/whatsapp/status:
+    get:
+      tags:
+      - WhatsApp
+      summary: Get Official Status
+      description: Returns live connectivity status of official organization OpenWA
+        daemon.
+      operationId: get_official_status_api_whatsapp_status_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfficialWhatsAppStatus'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/whatsapp/qr:
+    get:
+      tags:
+      - WhatsApp
+      summary: Get Official Qr
+      description: 'Returns QR authentication payload for pairing official org number
+        or HR session.
+
+        Restricted to HR personnel.'
+      operationId: get_official_qr_api_whatsapp_qr_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+  /api/whatsapp/send-official:
+    post:
+      tags:
+      - WhatsApp
+      summary: Send Official Message
+      description: 'Dispatches an official organization broadcast via the headless
+        OpenWA container.
+
+        Restricted to Regional Head.
+
+        Guards against duplicate sends if gateway times out.'
+      operationId: send_official_message_api_whatsapp_send_official_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfficialWhatsAppSendRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/whatsapp/generate-link:
+    post:
+      tags:
+      - WhatsApp
+      summary: Generate Student Whatsapp Link
+      description: 'Generates a zero-trust wa.me deep link for HR members to follow
+        up with assigned students
+
+        directly from their personal devices. No personal credentials touch the server.'
+      operationId: generate_student_whatsapp_link_api_whatsapp_generate_link_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      - name: template_type
+        in: query
+        required: false
+        schema:
+          type: string
+          default: OVERDUE_TASK
+          title: Template Type
+      - name: task_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Task Id
+      - name: custom_text
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Custom Text
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhatsAppDirectLinkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/whatsapp/escalations:
+    get:
+      tags:
+      - WhatsApp
+      summary: List Sla Escalations
+      description: 'Returns members with overdue tasks or attendance flags.
+
+        If uncontacted for >= 3 days, flagged as is_escalated for Committee HR Leader
+        and Regional Head.'
+      operationId: list_sla_escalations_api_whatsapp_escalations_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+  /api/whatsapp/threads:
+    get:
+      tags:
+      - WhatsApp
+      summary: List Whatsapp Threads
+      description: 'Returns thread summaries for students assigned to the calling
+        HR member.
+
+        If HR Leader/Admin passes oversight=True, returns all committee/organization
+        threads.'
+      operationId: list_whatsapp_threads_api_whatsapp_threads_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: oversight
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Oversight
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WhatsAppThreadSummary'
+                title: Response List Whatsapp Threads Api Whatsapp Threads Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/whatsapp/threads/{student_id}/messages:
+    get:
+      tags:
+      - WhatsApp
+      summary: Get Thread Messages
+      description: 'Returns message history for a specific student thread.
+
+        Enforces strict server-side access isolation (HTTP 403 if HR member is not
+        assigned).'
+      operationId: get_thread_messages_api_whatsapp_threads__student_id__messages_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WhatsAppMessageResponse'
+                title: Response Get Thread Messages Api Whatsapp Threads  Student
+                  Id  Messages Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - WhatsApp
+      summary: Send Thread Message
+      description: 'Dispatches an outgoing WhatsApp message to the assigned student
+        via OpenWA.
+
+        Verifies server-side assignment boundary before invoking OpenWA API.'
+      operationId: send_thread_message_api_whatsapp_threads__student_id__messages_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WhatsAppSendMessageRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhatsAppMessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/whatsapp/threads/{student_id}/sync:
+    post:
+      tags:
+      - WhatsApp
+      summary: Sync Thread Messages
+      description: 'On-demand catch-up chat sync:
+
+        Pulls recent messages from OpenWA for this student (<phone>@c.us),
+
+        reconciles and upserts into whatsapp_chat_messages with openwa_message_id
+        deduplication,
+
+        and returns full updated conversation history.'
+      operationId: sync_thread_messages_api_whatsapp_threads__student_id__sync_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhatsAppSyncResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/whatsapp/threads/{student_id}/media:
+    post:
+      tags:
+      - WhatsApp
+      summary: Send Thread Media
+      description: Uploads and dispatches media (image, video, document, audio) to
+        the assigned student.
+      operationId: send_thread_media_api_whatsapp_threads__student_id__media_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_send_thread_media_api_whatsapp_threads__student_id__media_post'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhatsAppMessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/whatsapp/threads/{student_id}/messages/{message_id}/reaction:
+    post:
+      tags:
+      - WhatsApp
+      summary: React To Message
+      description: Applies or updates an emoji reaction on a message in the thread.
+      operationId: react_to_message_api_whatsapp_threads__student_id__messages__message_id__reaction_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Message Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WhatsAppReactionRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhatsAppMessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/whatsapp/threads/{student_id}/messages/{message_id}:
+    put:
+      tags:
+      - WhatsApp
+      summary: Edit Thread Message
+      description: Edits an outgoing HR message in the thread.
+      operationId: edit_thread_message_api_whatsapp_threads__student_id__messages__message_id__put
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Message Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WhatsAppEditMessageRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhatsAppMessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/whatsapp/webhook:
+    post:
+      tags:
+      - WhatsApp
+      summary: Openwa Webhook
+      description: 'Webhook receiver registered with OpenWA.
+
+        Handles message.received, onAck, onReaction, onMessageEdit events.
+
+        Resolves sender phone -> assigned student -> assigned HR member,
+
+        persists chat records, and pushes live event to the HR member''s socket.'
+      operationId: openwa_webhook_api_whatsapp_webhook_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /api/automation/settings:
+    get:
+      tags:
+      - Automation
+      summary: Get Automation Settings
+      description: Retrieves automation settings for the authenticated user or system
+        defaults.
+      operationId: get_automation_settings_api_automation_settings_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutomationSettingsSchema'
+      security:
+      - OAuth2PasswordBearer: []
+    put:
+      tags:
+      - Automation
+      summary: Update Automation Settings
+      description: Updates automation settings for the authenticated HR leader.
+      operationId: update_automation_settings_api_automation_settings_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutomationSettingsSchema'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutomationSettingsSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/automation/trigger-run:
+    post:
+      tags:
+      - Automation
+      summary: Trigger Automation Cycle
+      description: Manually triggers an immediate background automation evaluation
+        cycle.
+      operationId: trigger_automation_cycle_api_automation_trigger_run_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+  /api/automation/reminders:
+    get:
+      tags:
+      - Automation
+      summary: Get Automation Logs
+      description: 'Lists automated notifications and reminder logs with strict authorization
+        scoping:
+
+        - committee_member / member: only reminders addressed directly to this student
+        (fail closed).
+
+        - committee_head / committee_hr_leader / committee_hr_member / team_lead:
+        reminders addressed to students in their committee.
+
+        - region_hr_head / hr_admin: unrestricted organization-wide visibility.'
+      operationId: get_automation_logs_api_automation_reminders_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/automation/logs:
+    get:
+      tags:
+      - Automation
+      summary: Get Automation Logs
+      description: 'Lists automated notifications and reminder logs with strict authorization
+        scoping:
+
+        - committee_member / member: only reminders addressed directly to this student
+        (fail closed).
+
+        - committee_head / committee_hr_leader / committee_hr_member / team_lead:
+        reminders addressed to students in their committee.
+
+        - region_hr_head / hr_admin: unrestricted organization-wide visibility.'
+      operationId: get_automation_logs_api_automation_logs_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/automation/reminders/{reminder_id}:
+    get:
+      tags:
+      - Automation
+      summary: Get Reminder By Id
+      description: Retrieves a specific reminder log with strict object-level authorization
+        checks.
+      operationId: get_reminder_by_id_api_automation_reminders__reminder_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: reminder_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Reminder Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/feedback:
+    get:
+      tags:
+      - Feedback
+      summary: List Feedbacks
+      description: 'Retrieves member feedback:
+
+        - HR Leader: reviews all member feedback regarding HR members in the committee.
+
+        - HR Head: read-only oversight of member feedback.
+
+        - Committee Member: sees only their own submitted feedback.
+
+        - HR Member: strictly forbidden (403) for confidentiality.
+
+        - Committee Head: strictly forbidden (403).'
+      operationId: list_feedbacks_api_feedback_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FeedbackResponse'
+                type: array
+                title: Response List Feedbacks Api Feedback Get
+      security:
+      - OAuth2PasswordBearer: []
+    post:
+      tags:
+      - Feedback
+      summary: Submit Feedback
+      description: 'Submits member feedback regarding an HR Member flowing upward
+        to the HR Leader.
+
+        Allowed for Committee Members and all authenticated members.'
+      operationId: submit_feedback_api_feedback_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/feedback/{feedback_id}/status:
+    patch:
+      tags:
+      - Feedback
+      summary: Update Feedback Status
+      description: 'HR Leader reviews and marks member feedback as REVIEWED or ACTIONED.
+
+        HR Head is oversight-only and cannot action operational feedback (403).'
+      operationId: update_feedback_status_api_feedback__feedback_id__status_patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: feedback_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Feedback Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackStatusUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/questions:
+    get:
+      tags:
+      - Questions
+      summary: List Questions
+      description: 'Retrieves questions:
+
+        - Committee Head / Lead: views committee questions to answer them.
+
+        - HR Leader / HR Member: views questions for operational support.
+
+        - Member: views own asked questions and their answers.
+
+        - HR Head: views high-level question stream.'
+      operationId: list_questions_api_questions_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/QuestionResponse'
+                type: array
+                title: Response List Questions Api Questions Get
+      security:
+      - OAuth2PasswordBearer: []
+    post:
+      tags:
+      - Questions
+      summary: Ask Question
+      description: Submits a question from a member for the Social Media Committee
+        Head.
+      operationId: ask_question_api_questions_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/questions/{question_id}/answer:
+    post:
+      tags:
+      - Questions
+      summary: Answer Question
+      description: Committee Head, HR Admin, or Regional HR Head answers a member's
+        question.
+      operationId: answer_question_api_questions__question_id__answer_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: question_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Question Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionAnswerRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/reports/committee/summary:
+    get:
+      tags:
+      - Reports
+      summary: Get Committee Summary
+      description: 'Computes real-time executive summary for the Social Media Committee.
+
+        Used by HR Leader to review committee health and prepare upward reports to
+        HR Head.'
+      operationId: get_committee_summary_api_reports_committee_summary_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+  /api/reports/submit-to-head:
+    post:
+      tags:
+      - Reports
+      summary: Submit Report To Head
+      description: 'Submits a formal committee report upward to the HR Region Head.
+
+        HR Leader responsibility.'
+      operationId: submit_report_to_head_api_reports_submit_to_head_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitteeReportCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitteeReportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/reports:
+    get:
+      tags:
+      - Reports
+      summary: List Reports
+      description: 'Lists submitted reports.
+
+        HR Head views regional committee reports; HR Leader views own submitted reports.'
+      operationId: list_reports_api_reports_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CommitteeReportResponse'
+                type: array
+                title: Response List Reports Api Reports Get
+      security:
+      - OAuth2PasswordBearer: []
+  /api/reports/{report_id}/acknowledge:
+    post:
+      tags:
+      - Reports
+      summary: Acknowledge Report
+      description: 'HR Head acknowledges a submitted committee report. (ISSUE-22)
+
+        HR Leaders cannot acknowledge their own reports.'
+      operationId: acknowledge_report_api_reports__report_id__acknowledge_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Report Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitteeReportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /:
+    get:
+      summary: Root
+      operationId: root__get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+components:
+  schemas:
+    ActionConfirmationRequest:
+      properties:
+        action_id:
+          type: string
+          title: Action Id
+        confirmed:
+          type: boolean
+          title: Confirmed
+        user_id:
+          type: string
+          title: User Id
+          default: hr_lead
+      type: object
+      required:
+      - action_id
+      - confirmed
+      title: ActionConfirmationRequest
+    AgentChatMessage:
+      properties:
+        query:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Query
+          description: Chat query for the AI agent
+        conversation_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Conversation Id
+        user_role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Role
+          default: HR_LEAD
+      type: object
+      required:
+      - query
+      title: AgentChatMessage
+    AgentChatResponse:
+      properties:
+        conversation_id:
+          type: string
+          title: Conversation Id
+        response:
+          type: string
+          title: Response
+        tool_executions:
+          items:
+            $ref: '#/components/schemas/ToolCallExecution'
+          type: array
+          title: Tool Executions
+          default: []
+        requires_confirmation:
+          type: boolean
+          title: Requires Confirmation
+          default: false
+        pending_confirmation:
+          anyOf:
+          - $ref: '#/components/schemas/PendingConfirmation'
+          - type: 'null'
+        audit_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Audit Id
+      type: object
+      required:
+      - conversation_id
+      - response
+      title: AgentChatResponse
+    AssignCohortRequest:
+      properties:
+        student_ids:
+          items:
+            type: string
+          type: array
+          title: Student Ids
+        hr_member_id:
+          type: string
+          title: Hr Member Id
+      type: object
+      required:
+      - student_ids
+      - hr_member_id
+      title: AssignCohortRequest
+    AttendanceRecordSchema:
+      properties:
+        id:
+          type: string
+          title: Id
+        student_id:
+          type: string
+          title: Student Id
+        student_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Student Name
+        arabic_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Arabic Name
+        status:
+          type: string
+          title: Status
+        match_confidence:
+          type: number
+          title: Match Confidence
+        first_join:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: First Join
+        last_leave:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Leave
+        total_duration_minutes:
+          type: number
+          title: Total Duration Minutes
+        excuse_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Excuse Reason
+        excuse_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Excuse Status
+      type: object
+      required:
+      - id
+      - student_id
+      - status
+      - match_confidence
+      - total_duration_minutes
+      title: AttendanceRecordSchema
+    AutomationSettingsSchema:
+      properties:
+        attendance_enabled:
+          type: boolean
+          title: Attendance Enabled
+          default: true
+        attendance_grace_minutes:
+          type: integer
+          title: Attendance Grace Minutes
+          default: 10
+        attendance_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Attendance Message
+        task_pre_enabled:
+          type: boolean
+          title: Task Pre Enabled
+          default: true
+        task_pre_hours:
+          type: integer
+          title: Task Pre Hours
+          default: 24
+        task_pre_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Task Pre Message
+        task_post_enabled:
+          type: boolean
+          title: Task Post Enabled
+          default: true
+        task_post_delay_hours:
+          type: integer
+          title: Task Post Delay Hours
+          default: 2
+        task_post_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Task Post Message
+        whatsapp_enabled:
+          type: boolean
+          title: Whatsapp Enabled
+          default: true
+      type: object
+      title: AutomationSettingsSchema
+    BehaviorScoreUpdate:
+      properties:
+        student_id:
+          type: string
+          title: Student Id
+        month:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Month
+        group_interaction:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+          title: Group Interaction
+        social_media:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+          title: Social Media
+        hierarchy_rules:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+          title: Hierarchy Rules
+        polite_conduct:
+          type: number
+          maximum: 8.0
+          minimum: 0.0
+          title: Polite Conduct
+        interaction:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+          title: Interaction
+          default: 5.0
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+          default: ''
+      type: object
+      required:
+      - student_id
+      - group_interaction
+      - social_media
+      - hierarchy_rules
+      - polite_conduct
+      title: BehaviorScoreUpdate
+    Body_send_thread_media_api_whatsapp_threads__student_id__media_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+        caption:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Caption
+        reply_to_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reply To Message Id
+      type: object
+      required:
+      - file
+      title: Body_send_thread_media_api_whatsapp_threads__student_id__media_post
+    BonusAwardRequest:
+      properties:
+        points:
+          type: number
+          maximum: 10.0
+          minimum: 0.5
+          title: Points
+          description: Bonus points to award (e.g. +2.0)
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+          default: ''
+      type: object
+      required:
+      - points
+      title: BonusAwardRequest
+    CommitteeReportCreateRequest:
+      properties:
+        report_title:
+          type: string
+          maxLength: 150
+          minLength: 3
+          title: Report Title
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+          default: ''
+      type: object
+      required:
+      - report_title
+      title: CommitteeReportCreateRequest
+    CommitteeReportResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        team_id:
+          type: string
+          title: Team Id
+        team_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Team Name
+        submitted_by_name:
+          type: string
+          title: Submitted By Name
+        report_title:
+          type: string
+          title: Report Title
+        metrics_summary:
+          additionalProperties: true
+          type: object
+          title: Metrics Summary
+        notes:
+          type: string
+          title: Notes
+        submitted_at:
+          type: string
+          format: date-time
+          title: Submitted At
+        acknowledged_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Acknowledged At
+      type: object
+      required:
+      - id
+      - team_id
+      - submitted_by_name
+      - report_title
+      - metrics_summary
+      - notes
+      - submitted_at
+      title: CommitteeReportResponse
+    DashboardStats:
+      properties:
+        total_students:
+          type: integer
+          title: Total Students
+        present_today:
+          type: integer
+          title: Present Today
+        late_today:
+          type: integer
+          title: Late Today
+        absent_today:
+          type: integer
+          title: Absent Today
+        attendance_rate_today:
+          type: number
+          title: Attendance Rate Today
+        upcoming_meetings_count:
+          type: integer
+          title: Upcoming Meetings Count
+        pending_submissions_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Pending Submissions Count
+        recent_actions_count:
+          type: integer
+          title: Recent Actions Count
+      type: object
+      required:
+      - total_students
+      - present_today
+      - late_today
+      - absent_today
+      - attendance_rate_today
+      - upcoming_meetings_count
+      - recent_actions_count
+      title: DashboardStats
+    EventCreate:
+      properties:
+        title:
+          type: string
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        event_type:
+          type: string
+          title: Event Type
+          default: MEETING
+        start_time:
+          type: string
+          format: date-time
+          title: Start Time
+        end_time:
+          type: string
+          format: date-time
+          title: End Time
+        location:
+          type: string
+          title: Location
+          default: Google Meet
+        meet_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Meet Url
+          default: ''
+        is_mandatory:
+          type: boolean
+          title: Is Mandatory
+          default: true
+      type: object
+      required:
+      - title
+      - start_time
+      - end_time
+      title: EventCreate
+    EventSchema:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        event_type:
+          type: string
+          title: Event Type
+        start_time:
+          type: string
+          format: date-time
+          title: Start Time
+        end_time:
+          type: string
+          format: date-time
+          title: End Time
+        location:
+          type: string
+          title: Location
+        meet_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Meet Url
+          default: ''
+        is_mandatory:
+          type: boolean
+          title: Is Mandatory
+          default: true
+      type: object
+      required:
+      - id
+      - title
+      - event_type
+      - start_time
+      - end_time
+      - location
+      title: EventSchema
+    FeedbackCreateRequest:
+      properties:
+        hr_member_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Hr Member Id
+        hr_member_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Hr Member Name
+        category:
+          type: string
+          title: Category
+          default: HR_INTERACTION
+        content:
+          type: string
+          maxLength: 2000
+          minLength: 3
+          title: Content
+      type: object
+      required:
+      - content
+      title: FeedbackCreateRequest
+    FeedbackResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        student_id:
+          type: string
+          title: Student Id
+        student_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Student Name
+        hr_member_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Hr Member Id
+        hr_member_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Hr Member Name
+        category:
+          type: string
+          title: Category
+        content:
+          type: string
+          title: Content
+        submitted_at:
+          type: string
+          format: date-time
+          title: Submitted At
+        reviewed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Reviewed At
+        reviewed_by_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewed By Name
+        status:
+          type: string
+          title: Status
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+          default: ''
+      type: object
+      required:
+      - id
+      - student_id
+      - category
+      - content
+      - submitted_at
+      - status
+      title: FeedbackResponse
+    FeedbackStatusUpdate:
+      properties:
+        status:
+          type: string
+          title: Status
+          default: REVIEWED
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+          default: ''
+      type: object
+      title: FeedbackStatusUpdate
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ManualAttendanceUpdate:
+      properties:
+        status:
+          type: string
+          title: Status
+        excuse_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Excuse Reason
+        excuse_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Excuse Status
+      type: object
+      required:
+      - status
+      title: ManualAttendanceUpdate
+    MeetingCreateRequest:
+      properties:
+        title:
+          type: string
+          maxLength: 150
+          minLength: 2
+          title: Title
+        topic:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Topic
+          default: ''
+        start_time:
+          type: string
+          format: date-time
+          title: Start Time
+        duration_minutes:
+          type: integer
+          maximum: 360.0
+          minimum: 15.0
+          title: Duration Minutes
+          default: 60
+        session_number:
+          type: integer
+          minimum: 1.0
+          title: Session Number
+          default: 1
+        meet_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Meet Url
+          default: https://meet.google.com/social-media-sync
+        assigned_student_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Assigned Student Ids
+        team_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Team Id
+      type: object
+      required:
+      - title
+      - start_time
+      title: MeetingCreateRequest
+    MeetingDetailResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        meeting_code:
+          type: string
+          title: Meeting Code
+        title:
+          type: string
+          title: Title
+        topic:
+          type: string
+          title: Topic
+        start_time:
+          type: string
+          format: date-time
+          title: Start Time
+        end_time:
+          type: string
+          format: date-time
+          title: End Time
+        duration_minutes:
+          type: integer
+          title: Duration Minutes
+        meet_url:
+          type: string
+          title: Meet Url
+        status:
+          type: string
+          title: Status
+        session_number:
+          type: integer
+          title: Session Number
+          default: 1
+        team_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Team Id
+        total_expected:
+          type: integer
+          title: Total Expected
+        present_count:
+          type: integer
+          title: Present Count
+        late_count:
+          type: integer
+          title: Late Count
+        absent_count:
+          type: integer
+          title: Absent Count
+        attendance:
+          items:
+            $ref: '#/components/schemas/AttendanceRecordSchema'
+          type: array
+          title: Attendance
+          default: []
+      type: object
+      required:
+      - id
+      - meeting_code
+      - title
+      - topic
+      - start_time
+      - end_time
+      - duration_minutes
+      - meet_url
+      - status
+      - total_expected
+      - present_count
+      - late_count
+      - absent_count
+      title: MeetingDetailResponse
+    OfficialWhatsAppSendRequest:
+      properties:
+        phone_number:
+          type: string
+          title: Phone Number
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - phone_number
+      - message
+      title: OfficialWhatsAppSendRequest
+    OfficialWhatsAppStatus:
+      properties:
+        configured:
+          type: boolean
+          title: Configured
+        status:
+          type: string
+          title: Status
+        phone_number:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Phone Number
+        battery:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Battery
+        qr_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Qr Code
+        session_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Session Name
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+      type: object
+      required:
+      - configured
+      - status
+      title: OfficialWhatsAppStatus
+    PendingConfirmation:
+      properties:
+        action_id:
+          type: string
+          title: Action Id
+        tool_name:
+          type: string
+          title: Tool Name
+        description:
+          type: string
+          title: Description
+        target_count:
+          type: integer
+          title: Target Count
+        preview_data:
+          additionalProperties: true
+          type: object
+          title: Preview Data
+      type: object
+      required:
+      - action_id
+      - tool_name
+      - description
+      - target_count
+      - preview_data
+      title: PendingConfirmation
+    QuestionAnswerRequest:
+      properties:
+        answer:
+          type: string
+          maxLength: 3000
+          minLength: 1
+          title: Answer
+      type: object
+      required:
+      - answer
+      title: QuestionAnswerRequest
+    QuestionCreateRequest:
+      properties:
+        title:
+          type: string
+          maxLength: 150
+          minLength: 2
+          title: Title
+        content:
+          type: string
+          maxLength: 2000
+          minLength: 3
+          title: Content
+      type: object
+      required:
+      - title
+      - content
+      title: QuestionCreateRequest
+    QuestionResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        student_id:
+          type: string
+          title: Student Id
+        student_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Student Name
+        title:
+          type: string
+          title: Title
+        content:
+          type: string
+          title: Content
+        status:
+          type: string
+          title: Status
+        asked_at:
+          type: string
+          format: date-time
+          title: Asked At
+        answered_by_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Answered By Name
+        answer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Answer
+          default: ''
+        answered_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Answered At
+      type: object
+      required:
+      - id
+      - student_id
+      - title
+      - content
+      - status
+      - asked_at
+      title: QuestionResponse
+    RefreshTokenRequest:
+      properties:
+        refresh_token:
+          type: string
+          maxLength: 1000
+          minLength: 10
+          title: Refresh Token
+      type: object
+      required:
+      - refresh_token
+      title: RefreshTokenRequest
+    StudentCreate:
+      properties:
+        student_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Student Code
+        full_name:
+          type: string
+          title: Full Name
+        arabic_name:
+          type: string
+          title: Arabic Name
+        email:
+          type: string
+          format: email
+          title: Email
+        phone:
+          type: string
+          title: Phone
+        university:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: University
+          default: Faculty of Engineering
+        role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+          default: Member
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+          default: ACTIVE
+        team_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Team Id
+        assigned_hr_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assigned Hr Id
+      type: object
+      required:
+      - full_name
+      - arabic_name
+      - email
+      - phone
+      title: StudentCreate
+    StudentInvitationCreateRequest:
+      properties:
+        expires_in_days:
+          anyOf:
+          - type: integer
+            maximum: 30.0
+            minimum: 1.0
+          - type: 'null'
+          title: Expires In Days
+          description: Token expiration window in days
+          default: 7
+      type: object
+      title: StudentInvitationCreateRequest
+    StudentInvitationResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        student_id:
+          type: string
+          title: Student Id
+        token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Token
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+        is_used:
+          type: boolean
+          title: Is Used
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - student_id
+      - expires_at
+      - is_used
+      - created_at
+      title: StudentInvitationResponse
+    StudentLinkRequest:
+      properties:
+        invitation_token:
+          type: string
+          minLength: 10
+          title: Invitation Token
+          description: Single-use invitation token issued by HR/Admin
+      type: object
+      required:
+      - invitation_token
+      title: StudentLinkRequest
+    StudentPhoneUpdate:
+      properties:
+        phone:
+          type: string
+          maxLength: 25
+          minLength: 7
+          title: Phone
+          description: International format e.g. +201012345678
+      type: object
+      required:
+      - phone
+      title: StudentPhoneUpdate
+    StudentResponse:
+      properties:
+        student_code:
+          type: string
+          title: Student Code
+        full_name:
+          type: string
+          title: Full Name
+        arabic_name:
+          type: string
+          title: Arabic Name
+        email:
+          type: string
+          format: email
+          title: Email
+        phone:
+          type: string
+          title: Phone
+        university:
+          type: string
+          title: University
+          default: Faculty of Engineering
+        role:
+          type: string
+          title: Role
+          default: Member
+        status:
+          type: string
+          title: Status
+          default: ACTIVE
+        team_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Team Id
+        assigned_hr_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assigned Hr Id
+        id:
+          type: string
+          title: Id
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - student_code
+      - full_name
+      - arabic_name
+      - email
+      - phone
+      - id
+      - created_at
+      title: StudentResponse
+    StudentScoreSummary:
+      properties:
+        student_id:
+          type: string
+          title: Student Id
+        student_name:
+          type: string
+          title: Student Name
+        arabic_name:
+          type: string
+          title: Arabic Name
+        on_time_attendance_count:
+          type: integer
+          title: On Time Attendance Count
+        late_attendance_count:
+          type: integer
+          title: Late Attendance Count
+        absence_count:
+          type: integer
+          title: Absence Count
+        excused_absence_count:
+          type: integer
+          title: Excused Absence Count
+        on_time_task_count:
+          type: integer
+          title: On Time Task Count
+        late_task_count:
+          type: integer
+          title: Late Task Count
+        pending_task_count:
+          type: integer
+          title: Pending Task Count
+        average_task_quality:
+          type: number
+          title: Average Task Quality
+        group_interaction_score:
+          type: number
+          title: Group Interaction Score
+        interaction_score:
+          type: number
+          title: Interaction Score
+        social_media_score:
+          type: number
+          title: Social Media Score
+        hierarchy_rules_score:
+          type: number
+          title: Hierarchy Rules Score
+        polite_conduct_score:
+          type: number
+          title: Polite Conduct Score
+        total_behavior_score:
+          type: number
+          title: Total Behavior Score
+        bonus_points:
+          type: number
+          title: Bonus Points
+          default: 0.0
+        total_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Total Score
+        total_score_status:
+          type: string
+          title: Total Score Status
+          default: PENDING_FORMULA_DEFINITION
+        overall_rating:
+          type: string
+          title: Overall Rating
+      type: object
+      required:
+      - student_id
+      - student_name
+      - arabic_name
+      - on_time_attendance_count
+      - late_attendance_count
+      - absence_count
+      - excused_absence_count
+      - on_time_task_count
+      - late_task_count
+      - pending_task_count
+      - average_task_quality
+      - group_interaction_score
+      - interaction_score
+      - social_media_score
+      - hierarchy_rules_score
+      - polite_conduct_score
+      - total_behavior_score
+      - overall_rating
+      title: StudentScoreSummary
+    SubmissionSchema:
+      properties:
+        id:
+          type: string
+          title: Id
+        task_id:
+          type: string
+          title: Task Id
+        task_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Task Title
+        student_id:
+          type: string
+          title: Student Id
+        student_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Student Name
+        submitted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted At
+        status:
+          type: string
+          title: Status
+        score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Score
+        technical_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Technical Score
+        file_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: File Url
+        reviewer_notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewer Notes
+        graded_by_user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Graded By User Id
+      type: object
+      required:
+      - id
+      - task_id
+      - student_id
+      - status
+      title: SubmissionSchema
+    TaskAssignRequest:
+      properties:
+        student_ids:
+          items:
+            type: string
+          type: array
+          minItems: 1
+          title: Student Ids
+      type: object
+      required:
+      - student_ids
+      title: TaskAssignRequest
+    TaskCreateRequest:
+      properties:
+        title:
+          type: string
+          maxLength: 150
+          minLength: 2
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        deadline:
+          type: string
+          format: date-time
+          title: Deadline
+        max_score:
+          type: number
+          title: Max Score
+          default: 10.0
+        score_rule:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Score Rule
+          default: Out of 10 points based on quality and punctuality
+        assigned_student_ids:
+          items:
+            type: string
+          type: array
+          title: Assigned Student Ids
+      type: object
+      required:
+      - title
+      - deadline
+      title: TaskCreateRequest
+    TaskSchema:
+      properties:
+        id:
+          type: string
+          title: Id
+        task_number:
+          type: integer
+          title: Task Number
+        title:
+          type: string
+          title: Title
+        description:
+          type: string
+          title: Description
+        deadline:
+          type: string
+          format: date-time
+          title: Deadline
+        max_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Max Score
+        score_rule:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Score Rule
+        submission_count:
+          type: integer
+          title: Submission Count
+          default: 0
+        pending_count:
+          type: integer
+          title: Pending Count
+          default: 0
+        assigned_count:
+          type: integer
+          title: Assigned Count
+          default: 0
+      type: object
+      required:
+      - id
+      - task_number
+      - title
+      - description
+      - deadline
+      title: TaskSchema
+    TaskScoreItemSchema:
+      properties:
+        submission_id:
+          type: string
+          title: Submission Id
+        task_id:
+          type: string
+          title: Task Id
+        task_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Task Title
+        student_id:
+          type: string
+          title: Student Id
+        student_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Student Name
+        arabic_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Arabic Name
+        status:
+          type: string
+          title: Status
+        score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Score
+        technical_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Technical Score
+        reviewer_notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewer Notes
+        submitted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted At
+        reviewed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Reviewed At
+        graded_by_user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Graded By User Id
+      type: object
+      required:
+      - submission_id
+      - task_id
+      - student_id
+      - status
+      title: TaskScoreItemSchema
+      description: 'Score-only projection for HR score collection.
+
+        Deliberately excludes file_url, proprietary deliverables, and submission content.'
+    TaskSubmitRequest:
+      properties:
+        file_url:
+          type: string
+          minLength: 1
+          title: File Url
+          description: Deliverable or file URL for task submission
+      type: object
+      required:
+      - file_url
+      title: TaskSubmitRequest
+    TeamCreateRequest:
+      properties:
+        name:
+          type: string
+          title: Name
+        code:
+          type: string
+          title: Code
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+      type: object
+      required:
+      - name
+      - code
+      title: TeamCreateRequest
+    TeamResponse:
+      properties:
+        name:
+          type: string
+          title: Name
+        code:
+          type: string
+          title: Code
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        id:
+          type: string
+          title: Id
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        member_count:
+          type: integer
+          title: Member Count
+          default: 0
+      type: object
+      required:
+      - name
+      - code
+      - id
+      - created_at
+      title: TeamResponse
+    TechnicalScoreUpdate:
+      properties:
+        score:
+          type: number
+          minimum: 0.0
+          title: Score
+          description: Technical score evaluated against task max_score
+        reviewer_notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewer Notes
+          default: ''
+      type: object
+      required:
+      - score
+      title: TechnicalScoreUpdate
+    TokenResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        refresh_token:
+          type: string
+          title: Refresh Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+        user:
+          $ref: '#/components/schemas/UserResponse'
+      type: object
+      required:
+      - access_token
+      - refresh_token
+      - user
+      title: TokenResponse
+    ToolCallExecution:
+      properties:
+        tool_name:
+          type: string
+          title: Tool Name
+        parameters:
+          additionalProperties: true
+          type: object
+          title: Parameters
+        result:
+          title: Result
+        status:
+          type: string
+          title: Status
+          default: SUCCESS
+        reasoning_summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reasoning Summary
+      type: object
+      required:
+      - tool_name
+      - parameters
+      - result
+      title: ToolCallExecution
+    UserLoginRequest:
+      properties:
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+          description: Email address or username
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+          description: Alternative identifier field (matches username or email)
+        identifier:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identifier
+          description: Generic identifier field
+        password:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Password
+      type: object
+      required:
+      - password
+      title: UserLoginRequest
+    UserRegisterRequest:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+        password:
+          type: string
+          maxLength: 128
+          minLength: 8
+          title: Password
+          description: Password must be between 8 and 128 characters
+        full_name:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Full Name
+        arabic_name:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Arabic Name
+        role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+          description: Ignored on public registration; always creates member accounts
+          default: member
+        team_id:
+          anyOf:
+          - type: string
+            maxLength: 50
+          - type: 'null'
+          title: Team Id
+        invitation_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invitation Token
+          description: Optional single-use invitation token to link an existing Student
+            profile
+      type: object
+      required:
+      - email
+      - password
+      - full_name
+      title: UserRegisterRequest
+    UserResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        email:
+          type: string
+          format: email
+          title: Email
+        full_name:
+          type: string
+          title: Full Name
+        arabic_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Arabic Name
+        role:
+          type: string
+          title: Role
+        team_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Team Id
+        team_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Team Name
+        student_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Student Id
+        is_active:
+          type: boolean
+          title: Is Active
+          default: true
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - email
+      - full_name
+      - role
+      - created_at
+      title: UserResponse
+    UserRoleUpdateRequest:
+      properties:
+        role:
+          type: string
+          pattern: ^(region_hr_head|committee_hr_leader|committee_head|committee_hr_member|committee_member|hr_admin|team_lead|member)$
+          title: Role
+          description: 'Role: 5-tier role or legacy alias'
+      type: object
+      required:
+      - role
+      title: UserRoleUpdateRequest
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    WhatsAppDirectLinkResponse:
+      properties:
+        phone:
+          type: string
+          title: Phone
+        student_id:
+          type: string
+          title: Student Id
+        student_name:
+          type: string
+          title: Student Name
+        encoded_url:
+          type: string
+          title: Encoded Url
+        message_text:
+          type: string
+          title: Message Text
+      type: object
+      required:
+      - phone
+      - student_id
+      - student_name
+      - encoded_url
+      - message_text
+      title: WhatsAppDirectLinkResponse
+    WhatsAppEditMessageRequest:
+      properties:
+        content:
+          type: string
+          minLength: 1
+          title: Content
+      type: object
+      required:
+      - content
+      title: WhatsAppEditMessageRequest
+    WhatsAppMessageResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        openwa_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Openwa Message Id
+        student_id:
+          type: string
+          title: Student Id
+        assigned_hr_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assigned Hr Id
+        sender_type:
+          type: string
+          title: Sender Type
+        sender_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sender Id
+        sender_phone:
+          type: string
+          title: Sender Phone
+        recipient_phone:
+          type: string
+          title: Recipient Phone
+        message_type:
+          type: string
+          title: Message Type
+          default: text
+        content:
+          type: string
+          title: Content
+        media_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Media Url
+        media_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Media Filename
+        media_mimetype:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Media Mimetype
+        status:
+          type: string
+          title: Status
+          default: pending
+        ack_status:
+          type: integer
+          title: Ack Status
+          default: 0
+        reply_to_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reply To Message Id
+        is_edited:
+          type: boolean
+          title: Is Edited
+          default: false
+        reactions:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Reactions
+          default: []
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        delivered_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Delivered At
+        read_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Read At
+      type: object
+      required:
+      - id
+      - student_id
+      - sender_type
+      - sender_phone
+      - recipient_phone
+      - content
+      - created_at
+      title: WhatsAppMessageResponse
+    WhatsAppReactionRequest:
+      properties:
+        reaction:
+          type: string
+          maxLength: 10
+          minLength: 1
+          title: Reaction
+      type: object
+      required:
+      - reaction
+      title: WhatsAppReactionRequest
+    WhatsAppSendMessageRequest:
+      properties:
+        content:
+          type: string
+          minLength: 1
+          title: Content
+        reply_to_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reply To Message Id
+        message_type:
+          type: string
+          title: Message Type
+          default: text
+        media_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Media Url
+        media_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Media Filename
+        media_mimetype:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Media Mimetype
+      type: object
+      required:
+      - content
+      title: WhatsAppSendMessageRequest
+    WhatsAppSyncResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+        student_id:
+          type: string
+          title: Student Id
+        synced_count:
+          type: integer
+          title: Synced Count
+        new_messages_count:
+          type: integer
+          title: New Messages Count
+        updated_messages_count:
+          type: integer
+          title: Updated Messages Count
+        messages:
+          items:
+            $ref: '#/components/schemas/WhatsAppMessageResponse'
+          type: array
+          title: Messages
+          default: []
+      type: object
+      required:
+      - success
+      - student_id
+      - synced_count
+      - new_messages_count
+      - updated_messages_count
+      title: WhatsAppSyncResponse
+    WhatsAppThreadSummary:
+      properties:
+        student_id:
+          type: string
+          title: Student Id
+        student_code:
+          type: string
+          title: Student Code
+        full_name:
+          type: string
+          title: Full Name
+        arabic_name:
+          type: string
+          title: Arabic Name
+        phone:
+          type: string
+          title: Phone
+        team_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Team Id
+        assigned_hr_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assigned Hr Id
+        assigned_hr_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assigned Hr Name
+        last_message:
+          anyOf:
+          - $ref: '#/components/schemas/WhatsAppMessageResponse'
+          - type: 'null'
+        unread_count:
+          type: integer
+          title: Unread Count
+          default: 0
+        status:
+          type: string
+          title: Status
+          default: ACTIVE
+      type: object
+      required:
+      - student_id
+      - student_code
+      - full_name
+      - arabic_name
+      - phone
+      title: WhatsAppThreadSummary
+  securitySchemes:
+    OAuth2PasswordBearer:
+      type: oauth2
+      flows:
+        password:
+          scopes: {}
+          tokenUrl: /api/auth/login

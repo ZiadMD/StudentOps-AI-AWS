@@ -1,0 +1,63 @@
+sequenceDiagram
+    autonumber
+    actor HR as HR Leader
+    participant SPA as AgentChat.tsx
+    participant Stream as POST /api/agent/stream
+    participant ReAct as ReActAgent
+    participant Audit as agent_action_audits
+    participant Conf as POST /api/agent/confirm
+    participant Tool as tool_send_reminder
+    participant Prov as MessagingProvider
+
+    HR->>SPA: "Remind the absent members"
+    SPA->>Stream: POST /api/agent/stream
+    Stream->>ReAct: run_step
+
+    ReAct->>ReAct: INTENT 1B get_meeting_attendance
+    ReAct->>ReAct: state.last_absent_student_ids populated
+    ReAct->>ReAct: get_upcoming_meetings(limit 3)
+    ReAct->>ReAct: prepare_reminder(student_ids, event_id)
+    ReAct->>ReAct: action_id = act_rem_{epoch_ms}
+
+    ReAct->>Audit: INSERT status=PENDING_CONFIRMATION,<br/>requires_confirmation=true, confirmed=false
+    ReAct-->>Stream: requires_confirmation=true + PendingConfirmation
+
+    Stream-->>SPA: SSE type=tool (get_upcoming_meetings, prepare_reminder)
+    Stream-->>SPA: SSE type=token (message preview)
+    Stream-->>SPA: SSE type=done (pending_confirmation.action_id)
+
+    Note over SPA,Conf: Stream is now closed. The UI renders a Confirm and Send button.
+    HR->>Conf: POST /api/agent/confirm { action_id, confirmed: true }
+    Conf->>Audit: SELECT WHERE action_id
+
+    alt Row missing
+        Conf-->>HR: 404 Pending action not found
+    else status != PENDING_CONFIRMATION or already confirmed
+        Conf-->>HR: 400 "is not pending confirmation"
+    end
+
+    Conf->>Conf: Parse parameters JSON, extract student_ids
+    Conf->>Conf: For committee roles, reject if any target student<br/>is outside caller.team_id
+    alt Cross-team target
+        Conf-->>HR: 403 "Cannot confirm actions targeting members outside your assigned team"
+    end
+
+    Conf->>Audit: UPDATE ... SET status = EXECUTING_CONFIRMATION<br/>WHERE status = PENDING_CONFIRMATION
+    alt rowcount == 0 (concurrent request)
+        Conf-->>HR: 409 "already being confirmed or has been modified"
+    end
+
+    Conf->>Tool: tool_send_reminder(is_confirmed=True)
+    Tool->>Tool: Re-apply team scope filter to student_ids
+    Tool->>Prov: send_batch(OutgoingMessage[])
+    Prov-->>Tool: [MessageDeliveryResult]
+    Tool->>Tool: INSERT ReminderLog rows, set status per result
+
+    Conf->>Audit: UPDATE status = EXECUTED, confirmed = true,<br/>user_id = caller, result = json
+    Conf-->>HR: 200 { status: EXECUTED, result: { sent_count } }
+
+    opt User cancels
+        HR->>Conf: POST /api/agent/confirm { action_id, confirmed: false }
+        Conf->>Audit: UPDATE status = REJECTED
+        Conf-->>HR: 200 { status: REJECTED }
+    end

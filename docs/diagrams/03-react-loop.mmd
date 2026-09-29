@@ -1,0 +1,51 @@
+sequenceDiagram
+    autonumber
+    actor HR as HR Leader
+    participant Agent as Agent (chat/stream)
+    participant ReAct as ReActAgent.run_step
+    participant Tools as Tool handlers
+    participant Hitl as /agent/confirm
+    participant DB as Database
+    participant Audit as AgentActionAudit
+
+    Note over ReAct: CLASSIFICATION - is_deterministic_intent(query)<br/>Keyword match on EN + AR tokens
+
+    rect rgb(240, 247, 255)
+        Note over ReAct,Audit: DETERMINISTIC PATH - no LLM called
+        ReAct->>Tools: execute_tool(name, params, db, context)
+        Tools->>Tools: Verify required_roles contains context.role
+        Tools->>Tools: Apply team scope filter on every query
+        Tools->>DB: SELECT / aggregate
+        Tools-->>ReAct: { result }, SUCCESS | FAILED | PENDING_CONFIRMATION
+        ReAct->>Audit: record_action(intent, tool_name, params, result, user_id)
+        ReAct-->>Agent: AgentChatResponse with formatted EN or AR text
+    end
+
+    rect rgb(255, 247, 237)
+        Note over ReAct,Audit: LLM FALLBACK PATH
+        ReAct->>ReAct: state["history"][-20:] conversation memory
+        ReAct->>ReAct: call_openrouter(history, system_prompt)
+        Note over ReAct: System prompt forbids fabricating student data and<br/>directs users to specific commands for real data.
+        ReAct-->>Agent: LLM text
+        ReAct->>Audit: record_action(LLM_CHAT, response[:500])
+        ReAct-->>Agent: AgentChatResponse(tool_executions = [])
+    end
+
+    rect rgb(254, 242, 242)
+        Note over ReAct,DB: EXTERNAL ACTION PATH - requires human confirmation
+        ReAct->>Tools: tool_prepare_reminder(...) - read only, no side effect
+        Tools-->>ReAct: { message_preview, recipients, target_count }
+        ReAct->>Audit: INSERT PENDING_CONFIRMATION, confirmed=false
+        ReAct-->>Agent: requires_confirmation = true, pending_confirmation.action_id
+        Note over Hitl,DB: Stream terminates here. No message is transmitted.
+        HR->>Hitl: POST /agent/confirm { action_id, confirmed }
+        Hitl->>DB: Atomic UPDATE ... WHERE status = PENDING_CONFIRMATION
+        alt rowcount == 0
+            Hitl-->>HR: 409 Conflict
+        end
+        Hitl->>Tools: tool_send_reminder(is_confirmed = true)
+        Tools->>DB: Re-scope student_ids to caller team
+        Tools->>Tools: provider.send_batch(...)
+        Hitl->>DB: UPDATE status = EXECUTED, result = json
+        Hitl-->>HR: 200 { sent_count }
+    end

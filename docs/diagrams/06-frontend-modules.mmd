@@ -1,0 +1,91 @@
+flowchart TB
+    subgraph Entry["Entry and Routing"]
+        E1["main.tsx"]
+        E2["App.tsx<br/>AppContent"]
+        E3["hooks/useLocationPath<br/>navigate + useLocationPath"]
+        E4["History API, no react-router<br/>vercel.json rewrites /app/* to index.html"]
+        E1 --> E2
+        E2 --> E3
+        E3 --> E4
+    end
+
+    subgraph Providers["Context Providers - App.tsx export"]
+        P1["ThemeProvider"]
+        P2["LanguageProvider<br/>dir rtl/ltr on documentElement"]
+        P3["ToastProvider"]
+        P1 --> P2 --> P3
+    end
+
+    subgraph Session["Auth State Machine"]
+        S1{"api.getToken() present?"}
+        S2["checkingSession = true"]
+        S3["GET /api/auth/me"]
+        S4["api.logout() on failure"]
+        S5["currentUser: UserProfile | null"]
+        S6["userRole = currentUser.role ?? 'member'"]
+        S1 --> S2 --> S3 --> S5
+        S3 -.->|catch| S4
+    end
+
+    subgraph Guards["Route and Tab Guards"]
+        G1{"path starts with /app<br/>and no currentUser?"}
+        G2["navigate('/login', true)"]
+        G3{"currentUser and<br/>path is /login or /signup?"}
+        G4["navigate('/app/dashboard', true)"]
+        G5["requestedTab = path.split('/')[2]"]
+        G6["NAV_ITEMS.find(id === resolvedTab<br/>AND roles.includes(userRole))"]
+        G7["Fallback: 'dashboard'"]
+        G8["navigate(`/app/${activeTab}`, true)<br/>if requestedTab !== activeTab"]
+        G1 -->|yes| G2
+        G3 -->|yes| G4
+        G5 --> G6 --> G7 --> G8
+    end
+
+    subgraph Shell["Shell"]
+        SH1["Sidebar<br/>collapsible desktop, full-screen mobile"]
+        SH2["WorkspaceHeader"]
+        SH3["main id=workspace-content<br/>skip-link target, tabIndex -1"]
+    end
+
+    subgraph Views["19 Views - components/"]
+        V1["Dashboard, AgentChat, StudentsPage,<br/>AttendanceView, StudentScoreboard"]
+        V2["CalendarView, TaskManagement, TaskReviewsPage"]
+        V3["CommitteeQnA, MemberFeedbackView,<br/>CommitteeReportsView"]
+        V4["WhatsAppAgentPage view=chat|escalations|official"]
+        V5["NotificationsPage, AuditViewer,<br/>SettingsPage, ProfilePage, LandingPage"]
+    end
+
+    subgraph Data["Data Layer"]
+        D1["api/client.ts<br/>fetchJson wrapper<br/>Bearer header from localStorage"]
+        D2["api/cache.ts<br/>memoryCache with invalidate()"]
+        D3["hooks/useCachedData.ts"]
+        D4["components/AgentChat.tsx<br/>fetch + ReadableStream SSE reader"]
+        D5["hooks/useWhatsAppThreadSync.ts<br/>WebSocket wss + reconnect"]
+        D6["lib/translations.ts<br/>TRANSLATIONS dictionary"]
+        D7["lib/bloub-engine/*<br/>agent mascot rendering"]
+    end
+
+    E2 --> P3
+    S6 --> G1
+    G2 --> SH1
+    G8 --> SH1
+    SH1 --> SH3
+    SH3 --> V1
+    SH3 --> V2
+    SH3 --> V3
+    SH3 --> V4
+    SH3 --> V5
+    V1 --> D3
+    V2 --> D3
+    V3 --> D3
+    V4 --> D5
+    D3 --> D2
+    D2 --> D1
+    V1 --> D4
+    D4 --> D1
+    D4 --> D7
+    V3 --> D6
+    P2 --> D6
+
+    note["Frontend role gating in NAV_ITEMS.roles is a UX affordance only.<br/>It hides tabs; it is not a security boundary. Every restricted<br/>endpoint independently re-checks the role server-side."]
+    G6 -.-> note

@@ -1,0 +1,24 @@
+stateDiagram-v2
+    direction LR
+    [*] --> PENDING : TaskAssignment created<br/>or assigned_student_ids supplied
+    PENDING --> ON_TIME : POST /tasks/{id}/submit<br/>submitted_at <= deadline
+    PENDING --> LATE : POST /tasks/{id}/submit<br/>submitted_at > deadline
+    PENDING --> MISSED : get_task_reminder_candidates<br/>post-deadline, still missing
+
+    ON_TIME --> ON_TIME : PUT /tasks/submissions/{sid}/review<br/>resubmission updates timestamp
+    LATE --> LATE : PUT /tasks/submissions/{sid}/review
+
+    note right of MISSED
+        MISSED is defined in the entity comment
+        and in get_task_reminder_candidates,
+        but no endpoint in routes_tasks.py
+        ever writes it. Every unsubmitted
+        assignment stays PENDING.
+    end note
+
+    note right of PENDING
+        pending_count in TaskSchema counts
+        status = PENDING. The MISSED
+        branch is documented but not
+        reachable through the REST API.
+    end note
