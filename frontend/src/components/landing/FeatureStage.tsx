@@ -24,18 +24,37 @@ export function FeatureStage({
   const [active, setActive] = useState(0);
   const items = content.features.items;
 
+  /**
+   * The pin distance, in pixels.
+   *
+   * A viewport-unit string (`end: '+=140vh'`) is not reliable here. `vh` in a
+   * ScrollTrigger end string resolves against the scroller, not reliably
+   * against `window.innerHeight`, and when it lands short the trigger ends
+   * almost immediately: the reserved spacer collapses to ~140px, all five
+   * features swap in under a second, and the section never actually holds at
+   * `top: 0`. A function is re-evaluated on every refresh, so it stays correct
+   * across resizes and font loads.
+   */
   useLayoutEffect(() => {
     const element = wrap.current;
     if (!element || reducedMotion) return;
 
+    const perFeature = () => window.innerHeight * 0.28;
+
     const context = gsap.context(() => {
       ScrollTrigger.create({
         trigger: element,
-        start: 'top top',
-        end: `+=${items.length * 28}%`,
+        start: () => 'top top',
+        end: () => `+=${items.length * perFeature()}`,
         pin: true,
-        scrub: true,
-        refreshPriority: 1,
+        pinSpacing: true,
+        pinType: 'fixed',
+        scrub: 0.4,
+        // Both pinned sections measure each other, so refresh order decides
+        // which one measures against a stale layout. The week scene sits
+        // first in the document and must resolve before this one.
+        refreshPriority: -1,
+        anticipatePin: 1,
         invalidateOnRefresh: true,
         onUpdate: self => {
           const next = Math.min(items.length - 1, Math.floor(self.progress * items.length));
@@ -52,13 +71,26 @@ export function FeatureStage({
   return (
     <section
       id="features"
-      ref={wrap}
-      className="lo-edge relative z-10 min-h-[100svh] py-24"
+      className="lo-edge relative z-10"
       style={{ background: 'var(--lo-canvas)' }}
     >
-      <div className="grid min-h-[80svh] gap-12 lg:grid-cols-2 lg:items-center">
-        <div>
-          <div className="eyebrow mb-6">{content.features.eyebrow}</div>
+      {/*
+        The pinned element is this inner box, and it must never be taller than
+        the viewport. The Figma source put `py-24` on the pinned section, which
+        made the pinned box overflow the screen at every size; ScrollTrigger
+        pins the whole box, so the overflow sat off-screen and the scrub
+        distance collapsed. `min-h` only sets a floor, so the diagram is capped
+        against the space the padding leaves.
+
+        No `overflow: hidden` here. It is tempting, to stop the diagram
+        spilling at odd widths, but any clipping ancestor becomes the
+        containing block for the pin's `position: fixed` and the section stops
+        pinning altogether.
+      */}
+      <div ref={wrap} className="flex min-h-[100svh] items-center py-6 lg:py-8">
+        <div className="grid w-full gap-8 lg:grid-cols-2 lg:items-center lg:gap-12">
+          <div>
+            <div className="eyebrow mb-4 lg:mb-6">{content.features.eyebrow}</div>
 
           <div key={current.key} className="lo-role-in" style={{ animation: reducedMotion ? undefined : 'lo-role-in 0.5s var(--lo-ease-out)' }}>
             <div className="flex items-center gap-3">
@@ -96,10 +128,13 @@ export function FeatureStage({
         </div>
 
         <div
-          className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-[28px] border"
+          className="relative grid mx-auto aspect-square w-full max-w-full place-items-center overflow-hidden rounded-[28px] border"
           style={{
             borderColor: 'var(--lo-line-strong)',
             background: 'radial-gradient(circle at 50% 40%, #ffffff, #eef2f7)',
+            // Capped to the viewport minus the pinned box's own padding, so the
+            // section can never grow taller than the screen it is pinned in.
+            maxHeight: 'calc(100svh - 4rem)',
           }}
         >
           <FeatureDiagram featureKey={current.key} reducedMotion={reducedMotion} />
@@ -111,6 +146,7 @@ export function FeatureStage({
             {current.kicker}
           </div>
         </div>
+        </div>
       </div>
     </section>
   );
@@ -121,9 +157,9 @@ export function FeatureStage({
  *
  * These are diagrams, not screenshots. The attendance grid is a 3x3 of
  * session tiles, which is what the session roster page actually presents;
- * the scoring dial shows 82 against a ring because the workspace reports a
- * behaviour score out of 23 and a separate task-quality average, and this
- * shows the composite as a proportion rather than inventing a scale.
+ * the scoring dial shows 18 of the 23-point behaviour scale, which is what
+ * `scoring_service` actually returns, and keeps task quality as a separate
+ * labelled figure rather than folding it into a score that does not exist.
  */
 function FeatureDiagram({ featureKey, reducedMotion }: { featureKey: string; reducedMotion: boolean }) {
   const enter = reducedMotion ? undefined : 'lo-role-in 0.5s var(--lo-ease-out)';

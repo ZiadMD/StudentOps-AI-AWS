@@ -113,21 +113,30 @@ export function LandingPage({
    * Recompute pinned sections after layout settles.
    *
    * Pins measure scroll distances, and the document height is wrong on the
-   * first frame: the web fonts have not loaded, and the loader may still be
-   * covering the page. Refreshing after two frames, again on a short delay,
-   * and once more when the fonts resolve covers all three. Switching language
-   * changes text length, so it needs a refresh of its own.
+   * first frame: the web fonts have not loaded and the loader may still be
+   * covering the page. A single refresh here is not enough — both pinned
+   * sections measure each other, so refreshing in the wrong order leaves one
+   * of them holding a stale height. Three passes settle it: after two frames,
+   * on a short delay, and once more when the fonts resolve. Switching
+   * language changes text length, so it needs its own.
    */
   useEffect(() => {
-    const frame = requestAnimationFrame(() => requestAnimationFrame(() => ScrollTrigger.refresh()));
-    const timer = window.setTimeout(() => ScrollTrigger.refresh(), 300);
+    let cancelled = false;
+
+    const refresh = () => {
+      if (!cancelled) ScrollTrigger.refresh();
+    };
+
+    const frame = requestAnimationFrame(() => requestAnimationFrame(refresh));
+    const timer = window.setTimeout(refresh, 300);
 
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     if (fonts?.ready) {
-      fonts.ready.then(() => ScrollTrigger.refresh()).catch(() => undefined);
+      fonts.ready.then(refresh).catch(() => undefined);
     }
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };

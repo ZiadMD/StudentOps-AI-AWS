@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { LandingPage } from '../components/landing/LandingPage';
 import { LANDING_CONTENT } from '../components/landing/content';
@@ -239,6 +241,74 @@ describe('LandingPage', () => {
       // strictly worse than the native one.
       expect(container.querySelector('.lo-cursor-dot')).toBeNull();
       expect(container.querySelector('.lo-root')?.className).not.toContain('lo-has-cursor');
+    });
+
+    it('does not leave either pinned section unmeasured', () => {
+      const { container } = renderLanding();
+
+      /**
+       * ScrollTrigger is not reachable from a test — it lives in the ESM
+       * bundle — so this asserts the invariant that caused it rather than the
+       * library's internals.
+       *
+       * `end: '+=140vh'` is the bug this guards. A viewport-unit string
+       * resolved against the wrong basis, the trigger ended almost
+       * immediately, the reserved spacer collapsed from ~2160px to ~1040px,
+       * and the section scrolled straight through without ever pinning. All
+       * five features swapped in under a second and `top` never reached 0.
+       *
+       * The source of truth is the module text: the distance must be a
+       * function of `window.innerHeight`, which ScrollTrigger re-evaluates on
+       * every refresh.
+       */
+      const source = readFileSync(
+        join(__dirname, '..', 'components', 'landing', 'FeatureStage.tsx'),
+        'utf-8',
+      );
+
+      // Comments are stripped first: they quote the broken form in order to
+      // explain why it is broken, so a naive scan fails against its own
+      // documentation.
+      const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+      expect(code).not.toMatch(/end:\s*`\+=[^`]*vh`/);
+      expect(code).not.toMatch(/end:\s*['"][^'"]*vh['"]/);
+      expect(code).toMatch(/end:\s*\(\)\s*=>/);
+
+      // And the pinned box must be allowed to fill the viewport rather than
+      // sit under a fixed section padding that pushes it past `top: 0`.
+      const pinned = container.querySelector('#features > div');
+      expect(pinned?.className).toContain('min-h-[100svh]');
+      expect(pinned?.className).not.toContain('overflow-hidden');
+    });
+
+    it('keeps the pinned element free of a clipping ancestor', () => {
+      const { container } = renderLanding();
+
+      /**
+       * `overflow-x: clip` on an ancestor of a pin makes that ancestor the
+       * containing block for `position: fixed`, so the pinned element
+       * resolves against it rather than the viewport and never holds. The
+       * root carried it for the hero's benefit; it now lives on the hero
+       * section alone.
+       */
+      const css = readFileSync(
+        join(__dirname, '..', 'components', 'landing', 'landing.css'),
+        'utf-8',
+      );
+      const code = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+      expect(code).not.toMatch(/overflow-x:\s*clip/);
+
+      // The first rule block only, up to its closing brace. A greedy slice to
+      // the next comment swallows the typography helpers, which legitimately
+      // mention overflow in the cursor rules.
+      const rootBlock = code.slice(code.indexOf('.lo-root {'), code.indexOf('}', code.indexOf('.lo-root {')) + 1);
+      expect(rootBlock).not.toMatch(/overflow/);
+
+      expect(container.querySelector('#features')?.querySelector('div')?.className).not.toContain(
+        'overflow-hidden',
+      );
     });
   });
 });

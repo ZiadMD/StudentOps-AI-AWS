@@ -41,12 +41,15 @@
   background: var(--lo-canvas);
   color: var(--lo-ink);
   font-family: var(--lo-font-display);
-  /* The hero stage positions chips with transforms that can exceed the
-     viewport by a pixel on narrow screens. Clip rather than allow a
-     horizontal scrollbar: a landing page that scrolls sideways is a bug. */
-  overflow-x: clip;
   min-height: 100dvh;
 }
+
+/* Horizontal overflow is contained at the hero, not here.
+   `overflow-x: clip` (or `hidden`) on an ancestor of a ScrollTrigger pin makes
+   that ancestor a containing block for `position: fixed`, so the pinned element
+   resolves against it rather than the viewport and never actually holds. Both
+   pinned sections are inside this root, so the rule broke both of them while
+   looking harmless. The hero clips its own stage instead. */
 
 /* Arabic swaps the display face for Cairo, which has no tight optical
    baseline the Latin cut has, and the Latin italics have no Arabic

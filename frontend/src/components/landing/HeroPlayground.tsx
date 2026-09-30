@@ -293,7 +293,7 @@ export function HeroPlayground({
   return (
     <section
       id="top"
-      className="lo-edge relative z-10 min-h-[100svh] overflow-hidden pb-16 pt-28"
+      className="lo-edge relative z-10 min-h-[100svh] overflow-x-clip pb-16 pt-28"
       style={{ background: 'var(--lo-canvas)' }}
     >
       <div className="grid gap-10 lg:grid-cols-[1.05fr_1fr] lg:items-center">
