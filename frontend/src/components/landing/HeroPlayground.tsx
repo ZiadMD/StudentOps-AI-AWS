@@ -296,8 +296,19 @@ export function HeroPlayground({
       className="lo-edge relative z-10 min-h-[100svh] overflow-x-clip pb-16 pt-28"
       style={{ background: 'var(--lo-canvas)' }}
     >
-      <div className="grid gap-10 lg:grid-cols-[1.05fr_1fr] lg:items-center">
-        <div className="relative z-20 max-w-xl">
+      {/*
+        Three children, not two, so the controls can sit under the stage on a
+        phone while staying in the left column on a desktop.
+
+        Mobile order is 1 (text) -> 2 (stage) -> 3 (controls), set with
+        `order`. Desktop is a two-column grid where the text and controls
+        stack in column 1 and the stage spans both rows in column 2, set with
+        explicit `col-start` / `row-start`. Using grid placement rather than
+        duplicating the controls avoids two copies of the button, which would
+        mean two ids and two hold-gesture listeners for the same control.
+      */}
+      <div className="grid gap-8 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-10">
+        <div className="relative z-20 order-1 max-w-xl lg:col-start-1 lg:row-start-1">
           <div className="eyebrow mb-5 flex items-center gap-2">
             <Sparkles size={13} aria-hidden="true" /> {content.hero.eyebrow}
           </div>
@@ -311,96 +322,14 @@ export function HeroPlayground({
           <p className="mt-6 max-w-md text-[1.05rem] leading-relaxed" style={{ color: 'var(--lo-ink-soft)' }}>
             {content.hero.sub}
           </p>
-
-          <div className="mt-9 flex flex-wrap items-center gap-5">
-            <div className="relative">
-              {charging && (
-                <>
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 rounded-full border-2"
-                    style={{ borderColor: 'var(--lo-lime)', animation: 'lo-hold-ping 1.2s var(--lo-ease-out) infinite' }}
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 rounded-full border-2"
-                    style={{ borderColor: 'var(--lo-lime)', animation: 'lo-hold-ping 1.2s var(--lo-ease-out) 0.6s infinite' }}
-                  />
-                </>
-              )}
-
-              <button
-                id="studentops-organize"
-                type="button"
-                onClick={() => {
-                  // A click is the keyboard and screen-reader path. Touch users
-                  // hold instead, which the pointer listeners above handle.
-                  triggerOrganize();
-                }}
-                disabled={isOrdered}
-                aria-label={content.hero.organize}
-                className="lo-mono relative grid h-16 select-none place-items-center rounded-full px-8 text-sm font-medium disabled:opacity-100"
-                style={{
-                  background: 'var(--lo-ink)',
-                  color: 'var(--lo-canvas)',
-                  minWidth: 220,
-                  animation: charging ? 'lo-hold-shake 0.26s linear infinite' : undefined,
-                }}
-                data-cursor="magnetic"
-              >
-                <svg
-                  aria-hidden="true"
-                  className="absolute inset-0 h-full w-full -rotate-90 overflow-visible"
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  style={{
-                    opacity: charge > 0 && !isOrdered ? 1 : 0,
-                    transition: 'opacity 0.45s var(--lo-ease-out)',
-                  }}
-                >
-                  <rect
-                    x="3" y="3" width="94" height="94" rx="50" ry="50"
-                    fill="none" stroke="var(--lo-lime)" strokeWidth="1" opacity={0.3}
-                    pathLength={1} strokeDasharray={1} strokeDashoffset={0}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <rect
-                    x="3" y="3" width="94" height="94" rx="50" ry="50"
-                    fill="none" stroke="var(--lo-lime)" strokeWidth="3.5"
-                    pathLength={1} strokeDasharray={1} strokeDashoffset={1 - charge}
-                    strokeLinecap="round" vectorEffect="non-scaling-stroke"
-                    style={{ transition: 'stroke-dashoffset 0.08s linear' }}
-                  />
-                </svg>
-
-                <span className="relative">
-                  {phase === 'chaos'
-                    ? content.hero.organize
-                    : phase === 'organizing'
-                      ? `${content.hero.organizing}…`
-                      : content.hero.organized}
-                </span>
-              </button>
-            </div>
-
-            {isOrdered && (
-              <button
-                type="button"
-                onClick={reset}
-                className="lo-mono px-2 py-2 text-xs underline underline-offset-4 transition-colors"
-                style={{ color: 'var(--lo-muted)' }}
-              >
-                {content.hero.replay}
-              </button>
-            )}
-          </div>
-
-          <p className="lo-mono mt-5 text-[0.7rem]" style={{ color: 'var(--lo-muted)' }}>
-            {content.hero.stageHint}
-          </p>
         </div>
 
-        <div className="relative">
+        {/*
+          The stage is second in the DOM and comes second on a phone, so the
+          button is below the thing it acts on and the reading order matches
+          the visual order.
+        */}
+        <div className="relative order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2">
           <div
             ref={stage}
             className="relative h-[62vh] min-h-[420px] w-full overflow-hidden rounded-[28px] border"
@@ -496,6 +425,106 @@ export function HeroPlayground({
               {content.hero.bubble}
             </div>
           )}
+        </div>
+
+        {/*
+          The button and its description, as their own grid child so they can
+          sit below the stage on a phone.
+
+          `mt-9` is inside the text block on desktop but here it has to be the
+          block's own top margin on mobile and zero on desktop, where the grid
+          gap already separates it from the paragraph above. The description
+          sits under the button on both.
+        */}
+        <div className="order-3 lg:col-start-1 lg:row-start-2">
+          <div className="mt-0 flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-center lg:-mt-1 lg:gap-5">
+            {/* The wrapper is the flex item, so `w-full` on the button only
+                takes effect once the wrapper is allowed to grow. */}
+            <div className="relative w-full sm:w-auto">
+              {charging && (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-full border-2"
+                    style={{ borderColor: 'var(--lo-lime)', animation: 'lo-hold-ping 1.2s var(--lo-ease-out) infinite' }}
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-full border-2"
+                    style={{ borderColor: 'var(--lo-lime)', animation: 'lo-hold-ping 1.2s var(--lo-ease-out) 0.6s infinite' }}
+                  />
+                </>
+              )}
+
+              <button
+                id="studentops-organize"
+                type="button"
+                onClick={() => {
+                  // A click is the keyboard and screen-reader path. Touch users
+                  // hold instead, which the pointer listeners above handle.
+                  triggerOrganize();
+                }}
+                disabled={isOrdered}
+                aria-label={content.hero.organize}
+                className="lo-mono relative grid h-16 w-full select-none place-items-center rounded-full px-8 text-sm font-medium disabled:opacity-100"
+                style={{
+                  background: 'var(--lo-ink)',
+                  color: 'var(--lo-canvas)',
+                  minWidth: 220,
+                  animation: charging ? 'lo-hold-shake 0.26s linear infinite' : undefined,
+                }}
+                data-cursor="magnetic"
+              >
+                <svg
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full -rotate-90 overflow-visible"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  style={{
+                    opacity: charge > 0 && !isOrdered ? 1 : 0,
+                    transition: 'opacity 0.45s var(--lo-ease-out)',
+                  }}
+                >
+                  <rect
+                    x="3" y="3" width="94" height="94" rx="50" ry="50"
+                    fill="none" stroke="var(--lo-lime)" strokeWidth="1" opacity={0.3}
+                    pathLength={1} strokeDasharray={1} strokeDashoffset={0}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <rect
+                    x="3" y="3" width="94" height="94" rx="50" ry="50"
+                    fill="none" stroke="var(--lo-lime)" strokeWidth="3.5"
+                    pathLength={1} strokeDasharray={1} strokeDashoffset={1 - charge}
+                    strokeLinecap="round" vectorEffect="non-scaling-stroke"
+                    style={{ transition: 'stroke-dashoffset 0.08s linear' }}
+                  />
+                </svg>
+
+                <span className="relative">
+                  {phase === 'chaos'
+                    ? content.hero.organize
+                    : phase === 'organizing'
+                      ? `${content.hero.organizing}…`
+                      : content.hero.organized}
+                </span>
+              </button>
+            </div>
+
+            {isOrdered && (
+              <button
+                type="button"
+                onClick={reset}
+                className="lo-mono -ml-2 px-2 py-2 text-xs underline underline-offset-4 transition-colors sm:ml-0"
+                style={{ color: 'var(--lo-muted)' }}
+              >
+                {content.hero.replay}
+              </button>
+            )}
+          </div>
+
+          <p className="lo-mono mt-4 max-w-sm text-[0.7rem] leading-relaxed" style={{ color: 'var(--lo-muted)' }}>
+            {content.hero.stageHint}
+          </p>
         </div>
       </div>
     </section>
