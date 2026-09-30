@@ -7,7 +7,6 @@ import { LandingNav, Preloader } from './Chrome';
 import { HeroPlayground } from './HeroPlayground';
 import { WeekScene } from './WeekScene';
 import { FeatureStage } from './FeatureStage';
-import { RolesSection } from './RolesSection';
 import { AgentDemo } from './AgentDemo';
 import { Finale, LandingFooter } from './Finale';
 import { LANDING_CONTENT, type LandingContent } from './content';
@@ -51,6 +50,48 @@ export function LandingPage({
   const wipe = useRef<HTMLDivElement>(null);
 
   const workspaceHref = signedIn ? '/app/dashboard' : '/login';
+
+  /**
+   * Release `h-full` from the document root while the landing page is up.
+   *
+   * `index.html` sets `h-full` on `<html>`, `<body>` and `#root` because the
+   * workspace shell is a `min-h-dvh` layout that wants the root to fill the
+   * viewport. On this page the document is many viewports tall, and a root
+   * pinned to `100%` of the viewport leaves the page's own height unbounded
+   * for the browser. ScrollTrigger measures that root to place its pins, and
+   * both pinned sections silently fail to engage — the spacers are still
+   * created, so nothing errors, but the sections scroll straight past and
+   * never hold at `top: 0`.
+   *
+   * Declared before the Lenis and refresh effects on purpose. Effects run in
+   * declaration order, so this one has to have run before anything measures
+   * the document, or the first measurement is taken against the wrong height
+   * and only a later refresh corrects it.
+   *
+   * Restored on unmount so the workspace shell gets its full height back.
+   */
+  useEffect(() => {
+    const { documentElement, body } = document;
+    const root = document.getElementById('root');
+
+    const targets = [documentElement, body, root].filter(
+      (element): element is HTMLElement => element instanceof HTMLElement,
+    );
+    const previousHeight = targets.map(element => element.style.height);
+    const previousClass = targets.map(element => element.className);
+
+    targets.forEach(element => {
+      element.style.height = 'auto';
+      element.classList.remove('h-full');
+    });
+
+    return () => {
+      targets.forEach((element, index) => {
+        element.style.height = previousHeight[index];
+        element.className = previousClass[index];
+      });
+    };
+  }, []);
 
   // The document language and direction are owned by LanguageContext for the
   // rest of the app, and this page must not fight it. Only the title is set
@@ -169,7 +210,6 @@ export function LandingPage({
         <HeroPlayground content={content} reducedMotion={reducedMotion} touch={touch} />
         <WeekScene content={content} reducedMotion={reducedMotion} />
         <FeatureStage content={content} reducedMotion={reducedMotion} />
-        <RolesSection content={content} />
         <AgentDemo content={content} reducedMotion={reducedMotion} />
         <Finale content={content} reducedMotion={reducedMotion} workspaceHref={workspaceHref} />
       </main>

@@ -56,9 +56,6 @@ export function LandingNav({
           <a href="#features" className="py-2 transition-opacity hover:opacity-60">
             {content.nav.features}
           </a>
-          <a href="#roles" className="py-2 transition-opacity hover:opacity-60">
-            {content.nav.roles}
-          </a>
           <a href="#agent" className="py-2 transition-opacity hover:opacity-60">
             {content.nav.agent}
           </a>

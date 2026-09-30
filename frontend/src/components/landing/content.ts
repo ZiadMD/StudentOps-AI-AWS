@@ -32,16 +32,10 @@ export interface FeatureItem {
   body: string;
 }
 
-export interface RoleItem {
-  key: string;
-  name: string;
-  sees: string;
-}
-
 export interface LandingContent {
   dir: 'ltr' | 'rtl';
   meta: { title: string; description: string };
-  nav: { features: string; roles: string; agent: string; cta: string; signIn: string };
+  nav: { features: string; agent: string; cta: string; signIn: string };
   lang: { toggle: string; label: string };
   preloader: { line: string; skip: string };
   hero: {
@@ -68,18 +62,6 @@ export interface LandingContent {
     enter: string;
   };
   features: { eyebrow: string; items: FeatureItem[] };
-  roles: {
-    eyebrow: string;
-    title: string;
-    body: string;
-    list: RoleItem[];
-    escTitle: string;
-    escBody: string;
-    escLabels: string[];
-    escFlag: string;
-    escDays: (d: number) => string;
-    escFire: string;
-  };
   agent: {
     eyebrow: string;
     title: string;
@@ -108,7 +90,7 @@ const EN: LandingContent = {
     description:
       'Attendance, tasks, scoring and follow-up for student organizations, in one system with role-based access.',
   },
-  nav: { features: 'Features', roles: 'Access', agent: 'The agent', cta: 'Get started', signIn: 'Sign in' },
+  nav: { features: 'Features', agent: 'The agent', cta: 'Get started', signIn: 'Sign in' },
   lang: { toggle: 'العربية', label: 'Switch to Arabic' },
   preloader: { line: 'gathering the chaos', skip: 'Skip' },
   hero: {
@@ -184,24 +166,6 @@ const EN: LandingContent = {
       },
     ],
   },
-  roles: {
-    eyebrow: 'Role-based access',
-    title: 'Everyone sees exactly enough.',
-    body: 'The same system re-renders for each role — no clutter, no leaks, no “who can see this?”.',
-    list: [
-      { key: 'member', name: 'Member', sees: 'My tasks, my score, the calendar.' },
-      { key: 'hr', name: 'Committee HR', sees: 'Attendance, submissions and follow-ups for their committee.' },
-      { key: 'head', name: 'Committee Head', sees: 'The whole committee, plus the members flagged for follow-up.' },
-      { key: 'leader', name: 'HR Leader', sees: 'Evaluations across committees.' },
-      { key: 'regional', name: 'Regional / Vice HR', sees: 'Everything, plus escalations past the SLA.' },
-    ],
-    escTitle: 'Escalation, built in.',
-    escBody: 'Flag a member. If nobody follows up within 3 days, leadership is notified automatically — the pulse travels up the chain.',
-    escLabels: ['Member', 'HR', 'Head', 'Leader', 'Regional'],
-    escFlag: 'flagged',
-    escDays: (d: number) => `day ${d} — no follow-up`,
-    escFire: 'escalated to leadership',
-  },
   agent: {
     eyebrow: 'The agent',
     title: 'Ask. It acts.',
@@ -253,21 +217,22 @@ const EN: LandingContent = {
         ],
       },
       {
+        // The role ladder was its own section and has been removed. The column
+        // is kept and repointed rather than deleted, because a three-column
+        // footer on a page this typographic reads better than two, and every
+        // link now resolves to a destination that exists.
         h: 'Access',
         links: [
-          { label: 'Members', href: '#roles' },
-          { label: 'Committee HR', href: '#roles' },
-          { label: 'Heads', href: '#roles' },
-          { label: 'Leaders', href: '#roles' },
-          { label: 'Regional', href: '#roles' },
+          { label: 'Sign in', href: '/login' },
+          { label: 'Create account', href: '/signup' },
+          { label: 'Get started', href: '#finale' },
         ],
       },
       {
         h: 'More',
         links: [
           { label: 'The agent', href: '#agent' },
-          { label: 'Sign in', href: '/login' },
-          { label: 'Create account', href: '/signup' },
+          { label: 'Features', href: '#features' },
         ],
       },
     ],
@@ -281,7 +246,7 @@ const AR: LandingContent = {
     title: 'ستودنت‌أوبس — أدِر نشاطك، لا مجموعات الواتساب.',
     description: 'الحضور والمهام والتقييم والمتابعة لنشطات الطلاب، في نظام واحد بصلاحيات حسب الدور.',
   },
-  nav: { features: 'المزايا', roles: 'الصلاحيات', agent: 'المساعد', cta: 'ابدأ الآن', signIn: 'تسجيل الدخول' },
+  nav: { features: 'المزايا', agent: 'المساعد', cta: 'ابدأ الآن', signIn: 'تسجيل الدخول' },
   lang: { toggle: 'English', label: 'التبديل للإنجليزية' },
   preloader: { line: 'نلمّ الفوضى', skip: 'تخطّي' },
   hero: {
@@ -357,24 +322,6 @@ const AR: LandingContent = {
       },
     ],
   },
-  roles: {
-    eyebrow: 'صلاحيات حسب الدور',
-    title: 'كل شخص يرى ما يلزمه فقط.',
-    body: 'نفس النظام بيتعرض بشكل مختلف لكل دور — بدون زحمة، بدون تسريب، بدون «مين يقدر يشوف ده؟».',
-    list: [
-      { key: 'member', name: 'عضو', sees: 'مهامي، درجتي، التقويم.' },
-      { key: 'hr', name: 'موارد بشرية باللجنة', sees: 'الحضور والتسليمات والمتابعات بلجنتهم.' },
-      { key: 'head', name: 'رئيس لجنة', sees: 'اللجنة كاملة، مع الأعضاء المعلّمين للمتابعة.' },
-      { key: 'leader', name: 'قائد الموارد البشرية', sees: 'التقييمات عبر اللجان.' },
-      { key: 'regional', name: 'رئيس إقليمي / نائب', sees: 'كل شيء، مع التصعيد بعد انتهاء المهلة.' },
-    ],
-    escTitle: 'التصعيد، مدمج من الأساس.',
-    escBody: 'علّم على عضو. لو محدش تابع خلال ٣ أيام، القيادة بتتنبّه تلقائيًا — النبضة بتصعد في السلسلة.',
-    escLabels: ['عضو', 'موارد', 'رئيس', 'قائد', 'إقليمي'],
-    escFlag: 'معلَّم',
-    escDays: (d: number) => `اليوم ${d} — بدون متابعة`,
-    escFire: 'تم التصعيد للقيادة',
-  },
   agent: {
     eyebrow: 'المساعد',
     title: 'اسأل. وهو ينفّذ.',
@@ -424,21 +371,18 @@ const AR: LandingContent = {
         ],
       },
       {
-        h: 'الأدوار',
+        h: 'الحساب',
         links: [
-          { label: 'الأعضاء', href: '#roles' },
-          { label: 'الموارد البشرية', href: '#roles' },
-          { label: 'الرؤساء', href: '#roles' },
-          { label: 'القادة', href: '#roles' },
-          { label: 'الإقليمي', href: '#roles' },
+          { label: 'تسجيل الدخول', href: '/login' },
+          { label: 'إنشاء حساب', href: '/signup' },
+          { label: 'ابدأ الآن', href: '#finale' },
         ],
       },
       {
         h: 'المزيد',
         links: [
           { label: 'المساعد', href: '#agent' },
-          { label: 'تسجيل الدخول', href: '/login' },
-          { label: 'إنشاء حساب', href: '/signup' },
+          { label: 'المزايا', href: '#features' },
         ],
       },
     ],

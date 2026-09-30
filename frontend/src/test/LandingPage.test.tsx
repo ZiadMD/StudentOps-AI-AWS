@@ -79,9 +79,28 @@ describe('LandingPage', () => {
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Run your org.');
     expect(document.getElementById('features')).toBeInTheDocument();
-    expect(document.getElementById('roles')).toBeInTheDocument();
     expect(document.getElementById('agent')).toBeInTheDocument();
     expect(document.getElementById('finale')).toBeInTheDocument();
+
+    // The role ladder is deliberately absent, so nothing may still point at
+    // it: a nav or footer link to `#roles` would scroll nowhere.
+    expect(document.getElementById('roles')).toBeNull();
+  });
+
+  it('has no link pointing at a removed anchor', () => {
+    renderLanding();
+
+    const hrefs = [...document.querySelectorAll('a[href]')].map(link => link.getAttribute('href') ?? '');
+    const ids = new Set(
+      [...document.querySelectorAll('[id]')].map(element => `#${element.id}`),
+    );
+
+    // Every same-page link must resolve. `#roles` was the one that did not,
+    // left behind when the role section was removed.
+    const dangling = hrefs.filter(
+      href => href.startsWith('#') && href.length > 1 && !ids.has(href),
+    );
+    expect(dangling).toEqual([]);
   });
 
   it('points sign-in and sign-up at real auth routes, not at placeholders', () => {
@@ -175,13 +194,6 @@ describe('LandingPage', () => {
       // wrong even though the automation itself does run unattended.
       expect(allCopy()).toMatch(/approve before anything is sent/i);
       expect(allCopy()).toMatch(/waits for your confirmation first/i);
-    });
-
-    it('uses the five roles the backend actually enforces', () => {
-      const copy = allCopy();
-      for (const role of ['Member', 'Committee HR', 'Committee Head', 'HR Leader', 'Regional / Vice HR']) {
-        expect(copy).toContain(role);
-      }
     });
 
     it('carries no emoji and no invented metrics', () => {
@@ -309,6 +321,47 @@ describe('LandingPage', () => {
       expect(container.querySelector('#features')?.querySelector('div')?.className).not.toContain(
         'overflow-hidden',
       );
+    });
+  });
+
+  describe('document root height', () => {
+    it('releases h-full so the pinned sections can measure the document', () => {
+      /**
+       * `index.html` sets `h-full` on `<html>`, `<body>` and `#root` for the
+       * workspace shell. On a page this tall that pins the root to one
+       * viewport, and ScrollTrigger measures the root to place its pins: both
+       * pinned sections stop engaging, with no error and the pin spacers
+       * still created. Removed on mount, restored on unmount.
+       */
+      const { unmount } = renderLanding();
+
+      expect(document.documentElement.style.height).toBe('auto');
+      expect(document.body.style.height).toBe('auto');
+      expect(document.documentElement.classList.contains('h-full')).toBe(false);
+
+      unmount();
+
+      // The workspace shell needs its full height back, so this must be
+      // restored rather than left mutated for the rest of the session.
+      expect(document.documentElement.style.height).not.toBe('auto');
+    });
+
+    it('declares the height fix before anything measures the document', () => {
+      // Effects run in declaration order, so a fix that lands after the
+      // ScrollTrigger refresh measures the wrong height first and only a
+      // later refresh corrects it.
+      const source = readFileSync(
+        join(__dirname, '..', 'components', 'landing', 'LandingPage.tsx'),
+        'utf-8',
+      );
+      const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+      const heightFix = code.indexOf("element.style.height = 'auto'");
+      const lenis = code.indexOf('new Lenis(');
+
+      expect(heightFix).toBeGreaterThan(-1);
+      expect(lenis).toBeGreaterThan(-1);
+      expect(heightFix).toBeLessThan(lenis);
     });
   });
 });
