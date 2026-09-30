@@ -1,0 +1,332 @@
+/* ---------------------------------------------------------------------
+ * Public landing page styles.
+ *
+ * Every rule is scoped under `.lo-root` so nothing here can change how the
+ * workspace pages render. That matters more than usual here: this page
+ * restyles `html`/`body` font family, hides the native cursor, and replaces
+ * the global focus ring, all of which would corrupt the signed-in shell if
+ * any of it leaked.
+ *
+ * Colour is expressed through the `.lo-*` custom properties rather than the
+ * app's slate/blue theme tokens. The landing page is a single fixed art
+ * direction (ink on paper with a lime accent); mapping it onto the workspace
+ * palette would make it look like a second product, and the workspace tokens
+ * are also remapped per-property for dark mode, which this page never uses.
+ * ------------------------------------------------------------------- */
+
+.lo-root {
+  /* "Chaos to order": near-black ink, cool paper, one acid accent. */
+  --lo-canvas: #f8fafc;
+  --lo-ink: #0b1220;
+  --lo-ink-soft: #2a3446;
+  --lo-muted: #64748b;
+  --lo-lime: #c8f53a;
+  --lo-lime-deep: #a6d417;
+  --lo-line: rgb(11 18 32 / 0.1);
+  --lo-line-strong: rgb(11 18 32 / 0.16);
+
+  /* Quarantined to the noisy scene only; never used as a UI accent. */
+  --lo-coral: #ff6b5e;
+  --lo-amber: #ffb020;
+  --lo-cyan: #35d0d6;
+  --lo-violet: #8b7bff;
+
+  --lo-font-display: 'Bricolage Grotesque', 'Cairo', system-ui, sans-serif;
+  --lo-font-serif: 'Instrument Serif', 'Cairo', Georgia, serif;
+  --lo-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --lo-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --lo-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  background: var(--lo-canvas);
+  color: var(--lo-ink);
+  font-family: var(--lo-font-display);
+  /* The hero stage positions chips with transforms that can exceed the
+     viewport by a pixel on narrow screens. Clip rather than allow a
+     horizontal scrollbar: a landing page that scrolls sideways is a bug. */
+  overflow-x: clip;
+  min-height: 100dvh;
+}
+
+/* Arabic swaps the display face for Cairo, which has no tight optical
+   baseline the Latin cut has, and the Latin italics have no Arabic
+   equivalent. Both need their tracking and leading relaxed. */
+.lo-root[dir='rtl'] {
+  --lo-font-display: 'Cairo', 'Bricolage Grotesque', sans-serif;
+  --lo-font-serif: 'Cairo', Georgia, serif;
+}
+
+.lo-root ::selection {
+  background: var(--lo-lime);
+  color: var(--lo-ink);
+}
+
+/* The inherited rule draws a 2px slate outline, which is invisible against
+   the lime finale. Inverted surfaces get the lime ring instead. */
+.lo-root :focus-visible {
+  outline: 3px solid var(--lo-ink);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.lo-root [data-invert] :focus-visible {
+  outline-color: var(--lo-lime);
+}
+
+/* ---------------------------------------------------------------------
+ * Typography helpers
+ * ------------------------------------------------------------------- */
+.lo-display {
+  font-family: var(--lo-font-display);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.lo-root[dir='rtl'] .lo-display {
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.lo-serif-em {
+  font-family: var(--lo-font-serif);
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Arabic has no italic; leaning the serif would fake emphasis. */
+.lo-root[dir='rtl'] .lo-serif-em {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.lo-root .eyebrow {
+  font-family: var(--lo-font-mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.28em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--lo-muted);
+}
+
+.lo-root[dir='rtl'] .eyebrow {
+  letter-spacing: 0.06em;
+}
+
+.lo-root .lo-mono {
+  font-family: var(--lo-font-mono);
+}
+
+/* Horizontal gutter shared by every band. */
+.lo-edge {
+  padding-inline: clamp(1.25rem, 5vw, 6rem);
+}
+
+/* ---------------------------------------------------------------------
+ * Film grain
+ *
+ * A fixed overlay is the one element here that must escape the flow, so it
+ * is a child of the root rather than a sibling of the sections.
+ * ------------------------------------------------------------------- */
+.lo-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.04;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------------------------------------------------------------------
+ * Custom cursor
+ *
+ * Only for a real fine pointer. A touch device or a user on
+ * `prefers-reduced-motion` keeps the native cursor: replacing it with a
+ * JS-tracked element on a device that has no hover is strictly worse.
+ * ------------------------------------------------------------------- */
+@media (hover: hover) and (pointer: fine) {
+  .lo-root.lo-has-cursor,
+  .lo-root.lo-has-cursor * {
+    cursor: none !important;
+  }
+}
+
+.lo-cursor-dot,
+.lo-cursor-ring,
+.lo-cursor-label {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 70;
+  pointer-events: none;
+  border-radius: 999px;
+  will-change: transform;
+  transform: translate(-50%, -50%);
+}
+
+.lo-cursor-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--lo-ink);
+}
+
+.lo-cursor-ring {
+  width: 38px;
+  height: 38px;
+  border: 1.5px solid var(--lo-ink);
+  transition: width 0.25s var(--lo-ease-out), height 0.25s var(--lo-ease-out),
+    background 0.25s, border-color 0.25s;
+}
+
+/* `data-cursor="magnetic"` marks anything the design wants a larger,
+   filled pointer over. The element already declares this, so the cursor
+   only has to read it. */
+.lo-cursor-ring[data-variant='magnetic'] {
+  width: 64px;
+  height: 64px;
+  background: var(--lo-lime);
+  border-color: transparent;
+}
+
+.lo-cursor-ring[data-variant='drag'] {
+  width: 84px;
+  height: 84px;
+  background: var(--lo-ink);
+  border-color: transparent;
+}
+
+.lo-cursor-label {
+  z-index: 71;
+  font-family: var(--lo-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--lo-canvas);
+}
+
+.lo-root [data-invert] .lo-cursor-dot {
+  background: var(--lo-lime);
+}
+
+.lo-root [data-invert] .lo-cursor-ring {
+  border-color: var(--lo-lime);
+}
+
+/* ---------------------------------------------------------------------
+ * Keyframes
+ * ------------------------------------------------------------------- */
+@keyframes lo-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+@keyframes lo-float-z {
+  0% { transform: translateY(0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-26px) translateX(10px); opacity: 0; }
+}
+
+@keyframes lo-ripple-out {
+  0% { transform: scale(0.2); opacity: 0.7; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+@keyframes lo-shake {
+  10%, 90% { transform: translate(-1px, 0); }
+  20%, 80% { transform: translate(2px, -1px); }
+  30%, 50%, 70% { transform: translate(-3px, 1px); }
+  40%, 60% { transform: translate(3px, 1px); }
+}
+
+@keyframes lo-hold-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-1.5px, 1px); }
+  50% { transform: translate(1.5px, -1px); }
+  75% { transform: translate(-1px, -1.5px); }
+}
+
+@keyframes lo-hold-ping {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+@keyframes lo-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes lo-orbit {
+  from { transform: rotate(0deg) translateX(var(--lo-r, 30px)) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(var(--lo-r, 30px)) rotate(-360deg); }
+}
+
+/* Clip-path wipe, used to swap a panel's copy in on scrub. */
+@keyframes lo-role-in {
+  from { clip-path: inset(0 100% 0 0); opacity: 0; }
+  to { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+
+/* RTL: wipe from the right, which is the leading edge in that direction. */
+.lo-root[dir='rtl'] .lo-role-in {
+  animation-name: lo-role-in-rtl;
+}
+
+@keyframes lo-role-in-rtl {
+  from { clip-path: inset(0 0 0 100%); opacity: 0; }
+  to { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+
+@keyframes lo-pop-check {
+  0% { transform: scale(0) translateY(0); opacity: 0; }
+  30% { transform: scale(1.2) translateY(-10px); opacity: 1; }
+  100% { transform: scale(0.9) translateY(-40px); opacity: 0; }
+}
+
+.lo-root .lo-animate-caret::after {
+  content: '';
+  display: inline-block;
+  width: 0.5ch;
+  height: 1em;
+  margin-inline-start: 2px;
+  background: currentColor;
+  vertical-align: -0.12em;
+  animation: lo-caret 1s steps(1) infinite;
+}
+
+/* The language-switch wipe. Sits above everything, never interactive. */
+.lo-lang-wipe {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--lo-ink);
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+}
+
+.lo-root[dir='rtl'] .lo-lang-wipe {
+  transform-origin: right center;
+}
+
+/* ---------------------------------------------------------------------
+ * Reduced motion
+ *
+ * The global rule already clamps durations. This additionally stops the
+ * custom cursor and the grain, which are not transitions at all and so are
+ * not covered by it.
+ * ------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .lo-cursor-dot,
+  .lo-cursor-ring,
+  .lo-cursor-label,
+  .lo-grain {
+    display: none !important;
+  }
+
+  .lo-root.lo-has-cursor,
+  .lo-root.lo-has-cursor * {
+    cursor: auto !important;
+  }
+}

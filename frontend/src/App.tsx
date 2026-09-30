@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { Suspense, lazy, useState, useEffect } from 'react';
 import { WorkspaceHeader } from './components/WorkspaceHeader';
 import { ThemeProvider } from './context/ThemeContext';
-import { LanguageProvider } from './context/LanguageContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, Tab, Role } from './components/Sidebar';
 import { LoginPage }          from './components/auth/LoginPage';
@@ -23,13 +23,35 @@ import { WhatsAppAgentPage }  from './components/WhatsAppAgentPage';
 import { api }                from './api/client';
 import { UserProfile }        from './types';
 import { ToastProvider }      from './context/ToastContext';
-import { LandingPage } from './components/LandingPage';
 import { navigate, useLocationPath } from './hooks/useLocationPath';
 import { NAV_ITEMS } from './components/Sidebar';
 import { ProfilePage } from './components/ProfilePage';
 
+/*
+ * The landing page is a heavy import: it pulls in Lenis, GSAP and the mascot
+ * engine. None of that is needed by a signed-in visitor, so it is loaded only
+ * when the root route is actually rendered. The workspace bundle does not
+ * change.
+ */
+const LandingPage = lazy(() => import('./components/landing/LandingPage'));
+
+/**
+ * Shown while the landing chunk loads. Uses plain Tailwind rather than the
+ * landing stylesheet, which lives in the chunk still loading. Marked as a
+ * status so assistive technology is told the page is loading rather than
+ * being left silent.
+ */
+function LandingFallback() {
+  return (
+    <div className="grid min-h-dvh place-items-center bg-slate-50 text-slate-900" role="status">
+      <span className="font-display text-2xl">StudentOps</span>
+    </div>
+  );
+}
+
 function AppContent() {
   const path = useLocationPath();
+  const { language, toggleLanguage } = useLanguage();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [checkingSession, setCheckingSession] = useState(() => Boolean(api.getToken()));
   const userRole: Role = currentUser?.role || 'member';
@@ -77,8 +99,13 @@ function AppContent() {
   }, [path, checkingSession, currentUser, requestedTab, activeTab]);
 
   useEffect(() => {
-    const title = path === '/' ? 'Student organization workspace' : path === '/login' ? 'Sign in' : path === '/signup' ? 'Create an account' : NAV_ITEMS.find(item => item.id === activeTab)?.label || 'Workspace';
-    document.title = `${title} — StudentOps`;
+    // The landing page owns its own title, which is written in both languages
+    // by the landing chunk once it loads. Overwriting it here would race that
+    // and leave the document showing the generic string.
+    if (path !== '/') {
+      const title = path === '/login' ? 'Sign in' : path === '/signup' ? 'Create an account' : NAV_ITEMS.find(item => item.id === activeTab)?.label || 'Workspace';
+      document.title = `${title} — StudentOps`;
+    }
     setIsMobileSidebarOpen(false);
   }, [path, activeTab]);
 
@@ -101,7 +128,13 @@ function AppContent() {
     setActiveTab('chat');
   };
 
-  if (path === '/') return <LandingPage signedIn={Boolean(currentUser)} />;
+  if (path === '/') {
+    return (
+      <Suspense fallback={<LandingFallback />}>
+        <LandingPage language={language} onToggleLanguage={toggleLanguage} signedIn={Boolean(currentUser)} />
+      </Suspense>
+    );
+  }
   if (checkingSession) return <main className="flex min-h-dvh items-center justify-center" role="status">Opening your workspace…</main>;
   if (path === '/login') return <LoginPage onLogin={handleLogin} onGoToRegister={() => navigate('/signup')} />;
   if (path === '/signup') return <RegisterPage onRegister={handleRegister} onGoToLogin={() => navigate('/login')} />;
